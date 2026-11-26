@@ -1008,18 +1008,14 @@ impl Workspace {
             .map(|result| self.prefix_meta(result.meta))
     }
 
+    /// How to reach the app is settled before the request is written, so a
+    /// refusal leaves nothing queued for a later launch (single_instance.rs).
     fn queue_open(&mut self, local_id: &str, kind: &str) -> Result<Value, String> {
+        #[cfg(target_os = "macos")]
+        let plan = crate::single_instance::open_plan()?;
         let queued = self.write_open_request(local_id, kind)?;
         #[cfg(target_os = "macos")]
-        {
-            let status = std::process::Command::new("open")
-                .args(crate::app_identity::open_app_args())
-                .status()
-                .map_err(|e| format!("launch Rotli: {e}"))?;
-            if !status.success() {
-                return Err("macOS could not open the Rotli app".into());
-            }
-        }
+        crate::single_instance::bring_forward(plan)?;
         Ok(queued)
     }
 

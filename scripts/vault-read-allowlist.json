@@ -54,6 +54,9 @@
       "outside-vault": 1,
       "dir-sync": 1
     },
+    "single_instance.rs": {
+      "outside-vault": 1
+    },
     "usage_lines.rs": {
       "outside-vault": 1
     },

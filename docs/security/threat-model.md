@@ -143,7 +143,11 @@ owns the threat side.
   (`app_identity::refuse_existing_vault`), which refuses a folder that is,
   sits in, or holds an unmarked vault. The standalone build writes and reads
   no mark.
-- **Controls.** At launch every registry file is vetted before any root is
+- **Controls.** A host build is one process per support folder: an
+  exclusive `flock` on `<support folder>/instance/lock`, taken before the Tauri
+  builder, stops a second process (a stray build with the same bundle ID,
+  say) before it runs any launch setup, and `rotli open` nudges the holder or
+  opens its own bundle, never another build by ID. At launch every registry file is vetted before any root is
   read and again after the bookmark repair; a refused file is set aside
   whole, and a launch that can't vet it exits 73. After launch a host takes
   roots, and their adopted and active flags and a connected vault's
@@ -157,7 +161,9 @@ owns the threat side.
   forge the mark inside a Rotli vault next to a planted registry. The mark
   travels with copies and synced replicas of a host's folder. A folder a
   host marked stays its own after a person also opens it in standalone
-  Rotli. Between the vetting and the bind there is a time-of-check gap that
+  Rotli. A writer of the support folder can replace the instance lock file
+  while a holder runs, and a build from before the lock doesn't take it, so
+  the lock stops a second launch of this build, not a hostile writer. Between the vetting and the bind there is a time-of-check gap that
   only a same-user process can race, and a vault made inside an open root
   while the app runs is seen only at the next launch (by the helper and the
   CLI, only when the process restarts). A registry rewritten after launch

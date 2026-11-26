@@ -290,13 +290,6 @@ pub(crate) fn claim(folder: &Path) -> Result<(), String> {
     claim_for(APP_IDENTIFIER, folder) // vault bind (delegated): claim is claim_for for this build
 }
 
-/// How `rotli open` brings the app forward. The standalone build keeps its
-/// historical `open -a rotli`; a host build names itself by bundle ID, so it
-/// never launches the standalone app.
-pub(crate) fn open_app_args() -> [&'static str; 2] {
-    if owns_shared_state() { ["-a", "rotli"] } else { ["-b", APP_IDENTIFIER] }
-}
-
 /// The running app must be the identity this binary was compiled for; a stale
 /// build cache, or a host whose Tauri context names another ID, could
 /// otherwise give one identity the other's behaviour.
