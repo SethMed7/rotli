@@ -75,7 +75,11 @@ export function createOpenRequestGate(take: Take, giveBack: GiveBack) {
       if (!setupShown) return () => {};
       switching++;
       await inTurn(read);
+      let released = false;
       return (moved) => {
+        // a second call would take the count below zero and shut delivery
+        if (released) return;
+        released = true;
         switching--;
         if (!moved) void inTurn(putBack);
         void consume();

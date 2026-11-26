@@ -166,6 +166,17 @@ describe("a request that arrives during setup", () => {
     expect(disk.tabs).toEqual(["first/plan"]);
   });
 
+  test("a release called twice counts once, so delivery never stays shut", async () => {
+    const disk = world();
+    disk.queue("plan");
+    const gate = await inSetup(disk);
+    const release = await gate.holdForSwitch();
+    release(true);
+    release(true);
+    await gate.setSetupShown(false);
+    expect(disk.tabs).toEqual(["first/plan"]);
+  });
+
   test("quitting mid-setup leaves it on disk for the next launch's setup", async () => {
     const disk = world();
     disk.queue("plan");
