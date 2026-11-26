@@ -35,10 +35,11 @@ fn this_build_is_the_identity_it_was_compiled_for() {
     let support = support_dir(Path::new("/Users/someone"));
     assert!(support.ends_with(&expected), "{support:?}");
     assert_eq!(scratch_vault_in(&support).is_none(), standalone);
-    if standalone {
-        assert_eq!(open_app_args(), ["-a", "rotli"]);
-    } else {
-        assert_eq!(open_app_args(), ["-b", expected.as_str()]);
+    // `rotli open` with an instance running: standalone keeps `open -a
+    // rotli`; a host build nudges its own instance (single_instance_tests.rs)
+    let reaching = crate::single_instance::plan_for(standalone, true, Path::new(""));
+    assert_eq!(reaching.unwrap() == crate::single_instance::OpenPlan::Nudge, !standalone);
+    if !standalone {
         assert!(!support.to_string_lossy().contains(STANDALONE_IDENTIFIER));
     }
     assert!(matches_runtime(&expected));
@@ -93,7 +94,8 @@ fn a_host_build_refuses_every_shared_writer() {
     assert_eq!(crate::localmodel::local_model_set_default("any-model".into()), refused);
     assert_eq!(crate::localmodel::local_model_uninstall("any-model".into()), refused);
     assert_eq!(crate::finder_quick_action::finder_quick_action_status(), Ok("unavailable".to_string()));
-    assert_eq!(open_app_args(), ["-b", APP_IDENTIFIER]);
+    let loose = Path::new("/usr/local/bin/rotli");
+    assert_eq!(crate::single_instance::plan_for(false, false, loose), Err(crate::single_instance::NOT_IN_APP.into()));
 }
 
 #[test]
@@ -394,20 +396,32 @@ fn body_of<'a>(source: &'a str, signature: &str) -> &'a str {
     &source[start..start + source[start..].find(&end).unwrap()]
 }
 
-/// At launch, in order: the identity check exits 78 on a mismatch, then
+/// At launch, in order: a host build takes its instance lock in `launch()`,
+/// before the Tauri builder, so a second process runs no plugin, window or
+/// setup step (single_instance.rs); the headless CLI returns before
+/// `launch()` and never holds it. Then the identity check exits 78 on a
+/// mismatch, setup confirms Tauri's support folder is the one locked, and
 /// the scratch vault is made safe (exit 73 when it can't be) before any
 /// root is repaired, registered or watched. The root check trusts only
 /// the scratch vault this build owns.
 #[test]
 fn launch_checks_identity_then_settles_scratch_before_binding_anything() {
     let lib = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs")).unwrap();
+    let launch = &lib[lib.find("fn launch(").expect("launch exists")..];
+    let lock = launch.find("single_instance::hold_at_launch(&context.config().identifier)").expect("launch takes the instance lock");
+    assert!(lock < launch.find("tauri::Builder::default()").unwrap(), "the lock precedes the builder");
+    let main = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/main.rs")).unwrap();
+    assert!(main.find("run_headless_if_requested(").unwrap() < main.find("rotli_lib::run(").unwrap());
     let setup = &lib[lib.find(".setup(|app| {").expect("setup exists")..];
     let identity = setup.find("app_identity::matches_runtime(").unwrap();
     let mismatch_exit = setup.find("std::process::exit(78)").unwrap();
+    let locked_folder = setup.find("single_instance::confirm_support_folder(").expect("setup confirms the locked folder");
     let scratch = setup.find("app_identity::ensure_scratch_vault(").unwrap();
     let scratch_exit = setup.find("std::process::exit(73)").unwrap();
     let repair = setup.find("vault_location::repair_vault_locations(").unwrap();
+    assert!(mismatch_exit < locked_folder && locked_folder < scratch);
     assert!(identity < mismatch_exit && mismatch_exit < scratch && scratch < scratch_exit && scratch_exit < repair);
+    assert!(setup.contains("single_instance::listen(app.handle())"));
     let check = body_of(&lib, "pub(crate) fn reject_privileged_root(");
     assert!(check.contains("app_identity::owned_scratch_vault(app)"), "{check}");
     assert!(!check.contains("app_identity::scratch_vault(app)"), "{check}");

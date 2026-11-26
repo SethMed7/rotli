@@ -20,6 +20,7 @@ mod containment;
 mod corpus;
 mod deep_link;
 mod open_requests;
+mod single_instance;
 mod folder_window;
 mod finder_quick_action;
 mod vault_import;
@@ -199,15 +200,8 @@ enum MacosRelaunchTarget {
 
 #[cfg(all(target_os = "macos", any(not(debug_assertions), test)))]
 fn macos_relaunch_target(current_binary: &std::path::Path) -> MacosRelaunchTarget {
-    let bundle = current_binary
-        .parent()
-        .filter(|parent| parent.file_name() == Some(std::ffi::OsStr::new("MacOS")))
-        .and_then(std::path::Path::parent)
-        .filter(|parent| parent.file_name() == Some(std::ffi::OsStr::new("Contents")))
-        .and_then(std::path::Path::parent)
-        .filter(|parent| parent.extension() == Some(std::ffi::OsStr::new("app")));
-    match bundle {
-        Some(bundle) => MacosRelaunchTarget::Bundle(bundle.to_path_buf()),
+    match single_instance::app_bundle_of(current_binary) {
+        Some(bundle) => MacosRelaunchTarget::Bundle(bundle),
         None => MacosRelaunchTarget::Executable(current_binary.to_path_buf()),
     }
 }
@@ -2062,6 +2056,9 @@ pub fn run_with_host(host: AppHost) {
 }
 
 fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>) {
+    // A host build is one process per support folder: a second one runs no
+    // plugin, window or setup step (single_instance.rs; exits 75 or 73).
+    single_instance::hold_at_launch(&context.config().identifier);
     // before any window exists: the webview reads this default at creation
     spellcheck::enable_continuous_spellcheck_by_default();
     let builder = tauri::Builder::default()
@@ -2392,6 +2389,10 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             #[cfg(all(target_os = "macos", debug_assertions))]
             apply_dev_dock_icon(app.handle());
 
+            // The lock taken in launch() must cover the folder Tauri uses,
+            // checked before Rust's own setup touches it (plugin setup hooks
+            // have already run in build()).
+            single_instance::confirm_support_folder(app.handle());
             // A host build's first run binds its scratch vault (and only it),
             // once it is a real, empty folder this build made. If it can't be
             // made safe, nothing may bind it: stop.
@@ -2596,6 +2597,9 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             // parse_deep_link; a link can never name an arbitrary disk path,
             // and a malformed link is ignored, never an error surface. A host
             // build registers no deep-link plugin, so it listens for none.
+            // A host build has none: a second launch or `rotli open` nudges
+            // this instance through its lock folder instead.
+            single_instance::listen(app.handle());
             if app_identity::owns_shared_state() {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 let handle = app.handle().clone();
