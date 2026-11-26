@@ -248,6 +248,10 @@ for any note: `# Welcome to Synthetic` is written as
 `Inbox/welcome-to-synthetic.md`. `None`, the default, writes Rotli's own
 `Inbox/welcome-to-rotli.md`.
 
+The first line must be `# Title`, with something after the `#`. A body that
+starts any other way (its own frontmatter, a blank line, no heading) stops a
+host's debug build at launch; a release build drops it and writes Rotli's note.
+
 ```rust
 rotli_lib::run_with_host(rotli_lib::AppHost::new(context).words(rotli_lib::HostWords {
     welcome_note: Some(include_str!("welcome.md").into()),

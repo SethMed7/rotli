@@ -107,6 +107,11 @@ fn rotli_words_are_neutral_until_a_host_supplies_its_own() {
     assert_eq!(no_keychain(), words().no_keychain);
     // no first note of its own: the seeding keeps Rotli's, under any identifier
     assert_eq!((defaults.welcome_note.as_deref(), welcome_note()), (None, None));
+    // a host's note names itself on its first line, with no fence of its own
+    assert!(is_note_body("# Welcome to Synthetic\r\n\r\nBody.\n"));
+    for malformed in ["", "---\nid: x\n---\n# Title\n", "Title only\n", "\n# Late heading\n", "## Too deep\n", "# \n"] {
+        assert!(!is_note_body(malformed), "{malformed:?}");
+    }
 }
 
 fn folder(base: &Path, relative: &str) -> PathBuf {

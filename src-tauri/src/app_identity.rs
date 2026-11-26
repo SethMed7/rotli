@@ -39,7 +39,7 @@ pub struct HostWords {
     pub existing_vault: String,
     /// The first note of a new notes folder, as its whole Markdown body with
     /// `# Title` first: the heading names the note and its file. `None` writes
-    /// Rotli's own.
+    /// Rotli's own. `set_host_words` checks the shape (`is_note_body`).
     pub welcome_note: Option<String>,
 }
 
@@ -58,9 +58,21 @@ impl Default for HostWords {
 
 static HOST_WORDS: OnceLock<HostWords> = OnceLock::new();
 
+/// A first note names itself on its first line (`# Title`). Frontmatter of its
+/// own would sit under Rotli's fence, and no heading leaves it unnamed.
+fn is_note_body(body: &str) -> bool {
+    body.lines().next().and_then(|line| line.strip_prefix("# ")).is_some_and(|title| !title.trim().is_empty())
+}
+
 /// Set once, by the host entry, before the app starts. A second call is
-/// ignored: the wording never changes under a running app.
-pub(crate) fn set_host_words(words: HostWords) {
+/// ignored: the wording never changes under a running app. A malformed welcome
+/// note stops a host's debug build; a release build writes Rotli's instead.
+pub(crate) fn set_host_words(mut words: HostWords) {
+    let usable = words.welcome_note.as_deref().is_none_or(is_note_body);
+    debug_assert!(usable, "HostWords::welcome_note starts with a `# Title` line and has no frontmatter");
+    if !usable {
+        words.welcome_note = None;
+    }
     let _ = HOST_WORDS.set(words);
 }
 
