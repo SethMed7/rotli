@@ -26,9 +26,9 @@ pub(crate) use app_identifier;
 pub(crate) const APP_IDENTIFIER: &str = app_identifier!();
 pub(crate) const STANDALONE_IDENTIFIER: &str = "com.rotli.app";
 
-/// The sentences a person reads where a host build declines Rotli's shared
-/// state. Rotli's defaults are neutral; a host supplies its own wording
-/// (`app_host::AppHost::words`).
+/// The words a host build may make its own: the sentences a person reads where
+/// it declines Rotli's shared state, and its welcome note. Rotli's defaults are
+/// neutral; a host supplies its own (`app_host::AppHost::words`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostWords {
     /// Any refused shared-state action (LaunchAgents, shortcuts, Finder).
@@ -37,6 +37,10 @@ pub struct HostWords {
     pub no_keychain: String,
     /// A folder that is already a Rotli vault.
     pub existing_vault: String,
+    /// The first note of a new notes folder, as its whole Markdown body with
+    /// `# Title` first: the heading names the note and its file. `None` writes
+    /// Rotli's own. `set_host_words` checks the shape (`is_note_body`).
+    pub welcome_note: Option<String>,
 }
 
 impl Default for HostWords {
@@ -47,15 +51,28 @@ impl Default for HostWords {
                 .into(),
             existing_vault: "Rotli already uses this folder as a vault, so this app won't open it. Choose another folder."
                 .into(),
+            welcome_note: None,
         }
     }
 }
 
 static HOST_WORDS: OnceLock<HostWords> = OnceLock::new();
 
+/// A first note names itself on its first line (`# Title`). Frontmatter of its
+/// own would sit under Rotli's fence, and no heading leaves it unnamed.
+fn is_note_body(body: &str) -> bool {
+    body.lines().next().and_then(|line| line.strip_prefix("# ")).is_some_and(|title| !title.trim().is_empty())
+}
+
 /// Set once, by the host entry, before the app starts. A second call is
-/// ignored: the wording never changes under a running app.
-pub(crate) fn set_host_words(words: HostWords) {
+/// ignored: the wording never changes under a running app. A malformed welcome
+/// note stops a host's debug build; a release build writes Rotli's instead.
+pub(crate) fn set_host_words(mut words: HostWords) {
+    let usable = words.welcome_note.as_deref().is_none_or(is_note_body);
+    debug_assert!(usable, "HostWords::welcome_note starts with a `# Title` line and has no frontmatter");
+    if !usable {
+        words.welcome_note = None;
+    }
     let _ = HOST_WORDS.set(words);
 }
 
@@ -66,6 +83,11 @@ fn words() -> &'static HostWords {
 /// Shown where a host build refuses shared state.
 pub(crate) fn stays_with_rotli() -> String {
     words().shared_state.clone()
+}
+
+/// A host's own first note, if it supplied one.
+pub(crate) fn welcome_note() -> Option<&'static str> {
+    words().welcome_note.as_deref()
 }
 
 /// Shown where a host build refuses the Keychain.

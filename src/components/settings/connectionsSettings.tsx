@@ -6,10 +6,12 @@
 import type { ReactNode } from "react";
 
 import { WEB_SEARCH_PROVIDERS, webSearchProviderInfo } from "../../ai/searchProvider";
+import { connectionsLead } from "../../host/registry";
 import { COMING_SOON_CAPTION } from "../../lib/featurePolicy";
 import { useUiStore } from "../../state/ui";
 import { CheckGlyph, CopyGlyph } from "../glyphs";
 import { RemoteAgentsSection } from "../remoteAgentsSection";
+import { NotesSectionTag } from "./hostBlocks";
 import { useCopyState } from "./useCopyState";
 
 /** The prompt you paste into Claude Code so a project's docs live in your Rotli
@@ -42,7 +44,10 @@ function WebResearchSection({ braveKeyRow }: { braveKeyRow: ReactNode }) {
 
   return (
     <section className="aisection">
-      <h4 className="set-subhead">Web research</h4>
+      <h4 className="set-subhead">
+        Web research
+        <NotesSectionTag />
+      </h4>
       <p className="setnote">
         Connected models always have web access; for the on-device model, the globe turns it on for a chat.
         This setting picks where searches go.
@@ -87,7 +92,10 @@ function WebResearchSection({ braveKeyRow }: { braveKeyRow: ReactNode }) {
 function ComingSoonConnections() {
   return (
     <section className="aisection">
-      <h4 className="set-subhead">Coming soon</h4>
+      <h4 className="set-subhead">
+        Coming soon
+        <NotesSectionTag />
+      </h4>
       <p className="set-soon">{COMING_SOON_CAPTION}</p>
       <ul className="websearch-options connections-soon">
         {COMING_SOON_CONNECTIONS.map((row) => (
@@ -108,7 +116,10 @@ function ClaudeDocsExtension() {
   const { copyState, copy } = useCopyState();
   return (
     <section className="aisection">
-      <h4 className="set-subhead">Extensions</h4>
+      <h4 className="set-subhead">
+        Extensions
+        <NotesSectionTag />
+      </h4>
       <p className="setnote">
         Extend Rotli&rsquo;s corpus workflows without giving another service ownership of your notes.
       </p>
@@ -146,12 +157,10 @@ function ClaudeDocsExtension() {
 }
 
 export function ConnectionsSettings({ agents, braveKeyRow }: { agents: boolean; braveKeyRow: ReactNode }) {
+  const lead = connectionsLead();
   return (
     <>
-      <p className="lead">
-        Choose the outside services Rotli can contact. Each connection is explicit and never changes
-        destination after a failure.
-      </p>
+      {lead && <p className="lead">{lead}</p>}
       <WebResearchSection braveKeyRow={braveKeyRow} />
       {agents ? (
         <>

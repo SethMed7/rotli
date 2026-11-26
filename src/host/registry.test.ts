@@ -2,16 +2,23 @@ import { expect, test } from "bun:test";
 
 import {
   type AppHost,
+  aboutBody,
   DEFAULT_ABOUT_LABEL,
+  DEFAULT_CONNECTIONS_LEAD,
+  DEFAULT_DOCK_ROW,
   DEFAULT_PRODUCT_NAME,
   DEFAULT_UPDATES_WORDS,
   aboutLabel,
   appHost,
+  connectionsLead,
   createHostRegistry,
+  dockRow,
   hostVersion,
   navFootLabel,
   notesOn,
+  notesSectionTag,
   paneBlocks,
+  plainPaneHeads,
   productName,
   registerHost,
   updatesWords,
@@ -29,6 +36,15 @@ test("standalone Rotli has no host: notes on, Rotli's own words", () => {
   expect(aboutLabel()).toBe("About Rotli");
   expect(hostVersion()).toBeNull();
   expect(paneBlocks("general", "before")).toEqual([]);
+  expect(plainPaneHeads()).toBe(false);
+  expect(connectionsLead()).toBe(DEFAULT_CONNECTIONS_LEAD);
+  expect(notesSectionTag()).toBeNull();
+  expect(DEFAULT_DOCK_ROW).toEqual({
+    label: "Show in the Dock",
+    detail: "Otherwise Rotli lives in the menu bar only.",
+  });
+  expect(dockRow()).toEqual(DEFAULT_DOCK_ROW);
+  expect(aboutBody()).toBeUndefined();
   // the app has read the registry, so a late host is refused
   expect(() => registerHost({ notes: false })).toThrow("before the app starts");
   expect(appHost()).toBeNull();
@@ -70,6 +86,34 @@ test("a host names its product, its version and its About row; Rotli's stay as t
   expect(navFootLabel("Rotli", "1.9.7")).toBe("Rotli 1.9.7");
   expect(navFootLabel("Rotli", null)).toBe("Rotli");
   expect(navFootLabel("Synthetic App", "2.0.1")).toBe("Synthetic App 2.0.1");
+});
+
+test("a host asks for plain heads, words its Connections lead and tags Rotli's sections", () => {
+  expect(plainPaneHeads({ paneHeads: "plain" })).toBe(true);
+  expect(plainPaneHeads({ paneHeads: "rotli" })).toBe(false);
+  const words = { connectionsLead: "A registry lead.", notesSectionTag: "A registry label" };
+  expect(connectionsLead({ words })).toBe("A registry lead.");
+  expect(notesSectionTag({ words })).toBe("A registry label");
+  // an empty lead hides it; an absent or empty tag tags nothing
+  expect(connectionsLead({ words: { connectionsLead: "" } })).toBe("");
+  expect(connectionsLead({})).toBe(DEFAULT_CONNECTIONS_LEAD);
+  expect(notesSectionTag({ words: { notesSectionTag: "" } })).toBeNull();
+});
+
+test("a host rewords or retires the Dock row, and replaces or drops About's wording", () => {
+  expect(dockRow({ words: { dockRow: { label: "A registry row" } } })).toEqual({
+    label: "A registry row",
+    detail: DEFAULT_DOCK_ROW.detail,
+  });
+  expect(dockRow({ words: { dockRow: { detail: "" } } })).toEqual({
+    label: DEFAULT_DOCK_ROW.label,
+    detail: "",
+  });
+  expect(dockRow({ words: { dockRow: null } })).toBeNull();
+  expect(dockRow({})).toEqual(DEFAULT_DOCK_ROW);
+  expect(aboutBody({ words: { aboutBody: "A registry paragraph." } })).toBe("A registry paragraph.");
+  expect(aboutBody({ words: { aboutBody: null } })).toBeNull();
+  expect(aboutBody({})).toBeUndefined();
 });
 
 test("a host adds blocks before or after the body of General, Connections and About, in order", () => {

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { COMING_SOON_CAPTION } from "../../lib/featurePolicy";
@@ -18,6 +19,22 @@ test("a stable build lists Grok Bot and MCP as inert coming-soon rows beside web
   expect((markup.match(/type="radio"/g) ?? []).length).toBe(2);
   expect(markup.includes(COMING_SOON_CAPTION)).toBe(true);
   expect(markup.includes("Remote agents") || markup.includes("Extensions")).toBe(false);
+});
+
+test("with no host, Rotli's lead and untagged section headings; agent sections only with agents", () => {
+  const headings = (agents: boolean) => {
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <ConnectionsSettings agents={agents} braveKeyRow={null} />
+      </QueryClientProvider>,
+    );
+    expect(markup).toStartWith(
+      '<p class="lead">Choose the outside services Rotli can contact. Each connection is explicit and never changes destination after a failure.</p>',
+    );
+    return [...markup.matchAll(/<h4 class="set-subhead"[^>]*>(.*?)<\/h4>/g)].map((match) => match[1]);
+  };
+  expect(headings(false)).toEqual(["Web research", "Coming soon"]);
+  expect(headings(true)).toEqual(["Web research", "Remote agents", "Extensions"]);
 });
 
 test("web research copy keeps its privacy facts", () => {

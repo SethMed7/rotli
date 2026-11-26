@@ -1,10 +1,10 @@
 // The front end's host seam. Standalone Rotli registers nothing and behaves
 // exactly as it always has. A host build registers once, from a module its
 // own entry imports before Rotli's `src/main.tsx`, and adds Settings panes
-// and blocks, orders the nav, says whether notes are part of the app, and
-// supplies its own name and the wording a person reads where this build
-// declines Rotli's shared state. The registry locks on
-// its first read, so what the app rendered with never changes under it.
+// and blocks, orders the nav, says whether notes are part of the app and
+// whether Rotli's pane heads keep their quokka, and supplies its own name and
+// wording where Rotli's would read wrong. The registry locks on its first
+// read, so what the app rendered with never changes under it.
 // docs/architecture/host-seams.md
 
 import type { ComponentType, ReactNode } from "react";
@@ -51,6 +51,18 @@ export interface HostWords {
   version?: string;
   /** The About pane's nav row and heading, where Rotli says "About Rotli". */
   aboutLabel?: string;
+  /** The Connections pane's opening paragraph; an empty string hides it. */
+  connectionsLead?: string;
+  /** A label on each of Rotli's own Connections section headings, to say they
+   * belong to its notes; absent, no label. */
+  notesSectionTag?: string;
+  /** General's "Show in the Dock" switch: its label and its explanation (each
+   * Rotli's when absent; an empty detail shows none), or null for no row. */
+  dockRow?: { label?: string; detail?: string } | null;
+  /** What the About pane says. A string is one paragraph in place of Rotli's
+   * sentences, website link and feedback link; null or empty drops them. The
+   * version row and the third-party credits stay either way. */
+  aboutBody?: string | null;
 }
 
 export interface AppHost {
@@ -65,11 +77,21 @@ export interface AppHost {
   words?: HostWords;
   /** The About row's glyph, where Rotli shows its quokka. */
   aboutGlyph?: HostGlyph;
+  /** The heading of each built-in pane: Rotli's quokka and object ("rotli",
+   * the default), or the scenery alone, as a host's own panes show ("plain"). */
+  paneHeads?: "rotli" | "plain";
 }
 
 export const DEFAULT_UPDATES_WORDS = "Updates arrive with this app";
 export const DEFAULT_PRODUCT_NAME = "Rotli";
 export const DEFAULT_ABOUT_LABEL = "About Rotli";
+export const DEFAULT_CONNECTIONS_LEAD =
+  "Choose the outside services Rotli can contact. Each connection is explicit and never changes destination after a failure.";
+
+export const DEFAULT_DOCK_ROW = {
+  label: "Show in the Dock",
+  detail: "Otherwise Rotli lives in the menu bar only.",
+} as const;
 
 export interface HostRegistry {
   register(host: AppHost): void;
@@ -140,6 +162,32 @@ export function productName(host: AppHost | null = appHost()): string {
 /** The About pane's row and heading. */
 export function aboutLabel(host: AppHost | null = appHost()): string {
   return host?.words?.aboutLabel ?? DEFAULT_ABOUT_LABEL;
+}
+
+/** The Connections pane's opening paragraph; empty means none. */
+export function connectionsLead(host: AppHost | null = appHost()): string {
+  return host?.words?.connectionsLead ?? DEFAULT_CONNECTIONS_LEAD;
+}
+
+/** The label a host puts on Rotli's own section headings, or null for none. */
+export function notesSectionTag(host: AppHost | null = appHost()): string | null {
+  return host?.words?.notesSectionTag || null;
+}
+
+/** Whether built-in pane heads drop the quokka and its object. */
+export function plainPaneHeads(host: AppHost | null = appHost()): boolean {
+  return host?.paneHeads === "plain";
+}
+
+/** The Dock switch's words, or null where a host retired the row. */
+export function dockRow(host: AppHost | null = appHost()): { label: string; detail: string } | null {
+  const row = host?.words?.dockRow;
+  return row === null ? null : { ...DEFAULT_DOCK_ROW, ...row };
+}
+
+/** What stands in for About's wording: undefined keeps Rotli's own. */
+export function aboutBody(host: AppHost | null = appHost()): string | null | undefined {
+  return host?.words?.aboutBody;
 }
 
 /** The version a host supplies, or null to show the bundle's own. */
