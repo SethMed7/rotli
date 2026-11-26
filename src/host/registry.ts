@@ -12,6 +12,14 @@ import type { ComponentType, ReactNode } from "react";
 /** A Settings row's glyph, the same shape as Rotli's own (components/glyphs). */
 export type HostGlyph = (props: { size?: number }) => ReactNode;
 
+/** What Settings hands a host pane's component. */
+export interface HostPaneProps {
+  /** Shows another Settings pane, Rotli's or the host's. A pane this build
+   * doesn't show right now does nothing. An id no pane has throws under the
+   * dev server and does nothing in a built app. */
+  openPane: (id: string) => void;
+}
+
 /** One Settings pane a host adds. */
 export interface HostSettingsPane {
   /** Unique among every pane, Rotli's included. */
@@ -26,7 +34,15 @@ export interface HostSettingsPane {
    * build doesn't show: just before About. */
   after?: string;
   /** The pane's body, below its heading. */
-  Pane: ComponentType;
+  Pane: ComponentType<HostPaneProps>;
+  /** Whether the pane shows right now; absent, always. False takes away its
+   * nav row and every way to open it. Settings calls it while rendering, so it
+   * must be cheap and change nothing. */
+  visible?: () => boolean;
+  /** For a `visible` that changes while Settings is open: call `onChange` when
+   * it may answer differently, and return the unsubscribe. A zustand store's
+   * `subscribe` is one. */
+  subscribeVisible?: (onChange: () => void) => () => void;
 }
 
 /** The built-in panes a host can add blocks to. */
@@ -45,7 +61,7 @@ export interface HostPaneBlock {
 export interface HostWords {
   /** Where the standalone build offers "Check for updates". */
   updates?: string;
-  /** The app's name at the foot of Settings' nav, where Rotli says "Rotli". */
+  /** The app's name where Settings says "Rotli" and means this app. */
   productName?: string;
   /** The version beside that name; the bundle's version when absent. */
   version?: string;
@@ -85,12 +101,14 @@ export interface AppHost {
 export const DEFAULT_UPDATES_WORDS = "Updates arrive with this app";
 export const DEFAULT_PRODUCT_NAME = "Rotli";
 export const DEFAULT_ABOUT_LABEL = "About Rotli";
-export const DEFAULT_CONNECTIONS_LEAD =
-  "Choose the outside services Rotli can contact. Each connection is explicit and never changes destination after a failure.";
+const connectionsLeadFor = (name: string) =>
+  `Choose the outside services ${name} can contact. Each connection is explicit and never changes destination after a failure.`;
+export const DEFAULT_CONNECTIONS_LEAD = connectionsLeadFor(DEFAULT_PRODUCT_NAME);
 
+const dockDetailFor = (name: string) => `Otherwise ${name} lives in the menu bar only.`;
 export const DEFAULT_DOCK_ROW = {
   label: "Show in the Dock",
-  detail: "Otherwise Rotli lives in the menu bar only.",
+  detail: dockDetailFor(DEFAULT_PRODUCT_NAME),
 } as const;
 
 export interface HostRegistry {
@@ -154,7 +172,9 @@ export function paneBlocks(
     .map((block) => block.Block);
 }
 
-/** The app's name where Rotli says "Rotli" in Settings. */
+/** The app's name where Settings says "Rotli" and means this app. Read it
+ * while rendering or in a handler: reading it as a module loads would lock the
+ * registry before a host could register. */
 export function productName(host: AppHost | null = appHost()): string {
   return host?.words?.productName ?? DEFAULT_PRODUCT_NAME;
 }
@@ -166,7 +186,7 @@ export function aboutLabel(host: AppHost | null = appHost()): string {
 
 /** The Connections pane's opening paragraph; empty means none. */
 export function connectionsLead(host: AppHost | null = appHost()): string {
-  return host?.words?.connectionsLead ?? DEFAULT_CONNECTIONS_LEAD;
+  return host?.words?.connectionsLead ?? connectionsLeadFor(productName(host));
 }
 
 /** The label a host puts on Rotli's own section headings, or null for none. */
@@ -182,7 +202,7 @@ export function plainPaneHeads(host: AppHost | null = appHost()): boolean {
 /** The Dock switch's words, or null where a host retired the row. */
 export function dockRow(host: AppHost | null = appHost()): { label: string; detail: string } | null {
   const row = host?.words?.dockRow;
-  return row === null ? null : { ...DEFAULT_DOCK_ROW, ...row };
+  return row === null ? null : { ...DEFAULT_DOCK_ROW, detail: dockDetailFor(productName(host)), ...row };
 }
 
 /** What stands in for About's wording: undefined keeps Rotli's own. */

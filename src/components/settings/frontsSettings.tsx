@@ -3,6 +3,7 @@
 // home, but Notes is the default home; at least one stays on"). The rules live
 // in src/lib/sidebarFronts.ts; state/fronts.ts applies them.
 
+import { productName } from "../../host/registry";
 import { type Front, canTurnOff, enabledFronts, homeFront } from "../../lib/sidebarFronts";
 import { regroupChat } from "../../state/chatWindow";
 import { useChatWindowStore } from "../../state/chatWindowStore";
@@ -33,8 +34,7 @@ export function FrontsSettings() {
     <>
       <h4 className="sethead">Sidebar sections</h4>
       <p className="setnote">
-        Turn off what you don’t use; at least one stays on. With only one on, the switcher at the top of the
-        sidebar goes away. Home is where Rotli opens, and it reads as Home in the switcher.
+        {`Turn off what you don’t use; at least one stays on. With only one on, the switcher at the top of the sidebar goes away. Home is where ${productName()} opens, and it reads as Home in the switcher.`}
       </p>
       <div className="swgroup">
         {AVAILABLE_FRONTS.map((front) => {

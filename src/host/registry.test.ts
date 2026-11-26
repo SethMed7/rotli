@@ -100,6 +100,13 @@ test("a host asks for plain heads, words its Connections lead and tags Rotli's s
   expect(notesSectionTag({ words: { notesSectionTag: "" } })).toBeNull();
 });
 
+test("Rotli's default sentences that name the app follow a host's product name", () => {
+  const words = { productName: "Synthetic" };
+  expect(connectionsLead({ words })).toBe(DEFAULT_CONNECTIONS_LEAD.replace("Rotli", "Synthetic"));
+  expect(dockRow({ words })?.detail).toBe("Otherwise Synthetic lives in the menu bar only.");
+  expect(DEFAULT_CONNECTIONS_LEAD).toStartWith("Choose the outside services Rotli can contact.");
+});
+
 test("a host rewords or retires the Dock row, and replaces or drops About's wording", () => {
   expect(dockRow({ words: { dockRow: { label: "A registry row" } } })).toEqual({
     label: "A registry row",

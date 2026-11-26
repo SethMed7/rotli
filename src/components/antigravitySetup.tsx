@@ -8,6 +8,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { productName } from "../host/registry";
 import {
   ANTIGRAVITY_STATUS_KEY,
   antigravityCancelSignIn,
@@ -58,10 +59,7 @@ export function AntigravitySetup({ onChange }: { onChange: () => void }) {
   return (
     <div className="ailane-help">
       <p className="ailane-desc">
-        Google&rsquo;s FAQ still says third-party tools may not reuse an Antigravity login and that doing so
-        can suspend the account; DeepMind staff have said publicly (September 2026) that the text is out of
-        date and not enforced. Rotli uses Google&rsquo;s own published ACP agent, never the IDE&rsquo;s login.
-        Turning this lane on is your call.
+        {`Google’s FAQ still says third-party tools may not reuse an Antigravity login and that doing so can suspend the account; DeepMind staff have said publicly (September 2026) that the text is out of date and not enforced. ${productName()} uses Google’s own published ACP agent, never the IDE’s login. Turning this lane on is your call.`}
       </p>
       <div className="ailane-verify">
         {!s.installed || s.updateAvailable ? (
@@ -77,8 +75,8 @@ export function AntigravitySetup({ onChange }: { onChange: () => void }) {
         )}
         {!s.installed && !install.isPending && (
           <span className="ailane-desc">
-            This is Google&rsquo;s ACP agent (about 315 MB), separate from the <code>agy</code> command line
-            and the Antigravity IDE and their logins; Rotli uses only this runtime.
+            This is Google&rsquo;s ACP agent (about 315 MB), separate from the <code>agy</code>
+            {` command line and the Antigravity IDE and their logins; ${productName()} uses only this runtime.`}
           </span>
         )}
         {s.installed && !s.signedIn && !signIn.isPending && (
@@ -130,8 +128,7 @@ export function AntigravitySetup({ onChange }: { onChange: () => void }) {
       )}
       {!s.installed && (
         <p className="ailane-desc">
-          Rotli downloads the exact release listed on the Agent Client Protocol registry from dl.google.com,
-          checks its SHA-256 and size, and keeps it in Application Support. Nothing runs until you sign in.
+          {`${productName()} downloads the exact release listed on the Agent Client Protocol registry from dl.google.com, checks its SHA-256 and size, and keeps it in Application Support. Nothing runs until you sign in.`}
         </p>
       )}
     </div>

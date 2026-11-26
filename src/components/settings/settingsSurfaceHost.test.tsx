@@ -3,7 +3,7 @@ import { afterAll, expect, mock, test } from "bun:test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import type { AppHost } from "../../host/registry";
+import type { AppHost, HostPaneProps } from "../../host/registry";
 import { settingsNav } from "./settingsNav";
 
 // Settings under a host build with notes off: the window is Settings, the
@@ -11,7 +11,16 @@ import { settingsNav } from "./settingsNav";
 // character. The host is synthetic; nothing here names a real product.
 const registry = { ...(await import("../../host/registry")) };
 const react = { ...(await import("react")) };
-const HostBody = () => <p className="setnote">Synthetic host pane body.</p>;
+const identity = { ...(await import("../../lib/appIdentity")) };
+const tauri = { ...(await import("../../lib/tauri")) };
+// what the host pane was handed, and what the surface set the pane to
+const links: HostPaneProps["openPane"][] = [];
+const paneSets: unknown[] = [];
+const HostBody = (props: HostPaneProps) => {
+  links.push(props.openPane);
+  return <p className="setnote">Synthetic host pane body.</p>;
+};
+let capable = true;
 const Opening = () => <p className="setnote">Synthetic opening block.</p>;
 const Closing = () => <p className="setnote">Synthetic closing block.</p>;
 const host: AppHost = {
@@ -33,44 +42,60 @@ const host: AppHost = {
       glyph: () => null,
       Pane: HostBody,
     },
+    { id: "gated", label: "Gated", glyph: () => null, Pane: HostBody, visible: () => capable },
   ],
 };
 let selectedPane = "general";
+// null renders standalone Rotli
+let active: AppHost | null = host;
+// the Mac app's own copy (Location) shows only in the Tauri shell
+let native = false;
+// every `false` state starts true: the armed "Remove vault?" button
+let armed = false;
 await mock.module("../../host/registry", () => ({
   ...registry,
-  appHost: () => host,
-  notesOn: (given: AppHost | null = host) => registry.notesOn(given),
-  paneBlocks: (pane: never, place: never, given: AppHost | null = host) =>
+  appHost: () => active,
+  notesOn: (given: AppHost | null = active) => registry.notesOn(given),
+  paneBlocks: (pane: never, place: never, given: AppHost | null = active) =>
     registry.paneBlocks(pane, place, given),
-  productName: (given: AppHost | null = host) => registry.productName(given),
-  aboutLabel: (given: AppHost | null = host) => registry.aboutLabel(given),
-  hostVersion: (given: AppHost | null = host) => registry.hostVersion(given),
-  plainPaneHeads: (given: AppHost | null = host) => registry.plainPaneHeads(given),
-  connectionsLead: (given: AppHost | null = host) => registry.connectionsLead(given),
-  notesSectionTag: (given: AppHost | null = host) => registry.notesSectionTag(given),
-  dockRow: (given: AppHost | null = host) => registry.dockRow(given),
-  aboutBody: (given: AppHost | null = host) => registry.aboutBody(given),
+  productName: (given: AppHost | null = active) => registry.productName(given),
+  aboutLabel: (given: AppHost | null = active) => registry.aboutLabel(given),
+  hostVersion: (given: AppHost | null = active) => registry.hostVersion(given),
+  plainPaneHeads: (given: AppHost | null = active) => registry.plainPaneHeads(given),
+  connectionsLead: (given: AppHost | null = active) => registry.connectionsLead(given),
+  notesSectionTag: (given: AppHost | null = active) => registry.notesSectionTag(given),
+  dockRow: (given: AppHost | null = active) => registry.dockRow(given),
+  aboutBody: (given: AppHost | null = active) => registry.aboutBody(given),
 }));
+// a host build never has Rotli's bundle ID
+await mock.module("../../lib/appIdentity", () => ({ ...identity, OWNS_SHARED_STATE: false }));
+await mock.module("../../lib/tauri", () => ({ ...tauri, isTauri: () => native }));
 // SSR runs no effects, so the surface starts on the pane under test
-const startAt = (initial: unknown) => (initial === "general" ? selectedPane : initial);
 await mock.module("react", () => ({
   ...react,
-  useState: (initial: unknown) => react.useState(startAt(initial)),
+  useState: (initial: unknown) => {
+    const surfacePane = initial === "general";
+    const start = surfacePane ? selectedPane : armed && initial === false ? true : initial;
+    const [value, set] = react.useState(start);
+    if (!surfacePane) return [value, set];
+    return [value, (next: unknown) => (paneSets.push(next), set(next))];
+  },
 }));
 const { SettingsSurface } = await import("../settingsSurface");
 const { ConnectionsSettings } = await import("./connectionsSettings");
 const { BUILT_IN, ROTLI_WEBSITE_URL } = await import("./aboutPane");
+const { registerDefaultActions } = await import("../../keys/actions");
+const { useUiStore } = await import("../../state/ui");
 const { DEFAULT_DOCK_ROW } = registry;
 afterAll(async () => {
   await mock.module("react", () => react);
   await mock.module("../../host/registry", () => registry);
+  await mock.module("../../lib/appIdentity", () => identity);
+  await mock.module("../../lib/tauri", () => tauri);
 });
-const render = () =>
-  renderToStaticMarkup(
-    <QueryClientProvider client={new QueryClient()}>
-      <SettingsSurface />
-    </QueryClientProvider>,
-  );
+const wrap = (node: React.ReactNode, client = new QueryClient()) =>
+  renderToStaticMarkup(<QueryClientProvider client={client}>{node}</QueryClientProvider>);
+const render = (client?: QueryClient) => wrap(<SettingsSurface />, client);
 const navLabels = (html: string) =>
   [...html.matchAll(/<span class="fname">([^<]+)<\/span>/g)].map((m) => m[1]);
 
@@ -175,6 +200,7 @@ test("a host's order, name, version and About label replace Rotli's", () => {
     "appearance",
     "connections",
     "synthetic",
+    "gated",
     "about",
   ]);
   expect(navLabels(html).at(-1)).toBe("About Synthetic");
@@ -241,4 +267,228 @@ test("a host replaces or drops About's wording; version, credits and its blocks 
     expect(html).toContain("Synthetic closing block.");
   }
   expect(renderWith({}, "about")).toContain('<a class="ghostbtn about-link"');
+});
+
+/** A vault, one connected vault (unless `linked` is false) and Antigravity not
+ * yet installed: the states whose copy names the app. */
+const seeded = (linked: boolean, openedInPlace: boolean) => {
+  const vault = (id: string, label: string) => ({
+    id,
+    label,
+    root: `/Users/example/${label}`,
+    role: "brain",
+    memexId: `mx_${id}`,
+    mode: null,
+    perms: "read-only",
+    brainEnabled: true,
+    layout: "memex",
+    inPlace: false,
+  });
+  const client = new QueryClient();
+  client.setQueryData(["memex", "config"], {
+    activeId: "corpus",
+    instances: [vault("corpus", "Garden"), ...(linked ? [vault("other", "Orchard")] : [])],
+    developmentReadOnly: false,
+    openedInPlace,
+  });
+  client.setQueryData(["antigravity", "status"], {
+    platformSupported: true,
+    installed: false,
+    updateAvailable: false,
+    signedIn: false,
+    latestVersion: "1.0.0",
+  });
+  return client;
+};
+
+/** Every built-in pane but About (its words are `aboutBody`'s), in the Mac
+ * shell, plus the states a single render can't show at once. */
+const everyPane = () => {
+  const initial = useUiStore.getInitialState();
+  const provider = initial.webSearchProvider;
+  Object.assign(initial, { webSearchProvider: "brave" });
+  native = true;
+  registerDefaultActions();
+  try {
+    const ids = settingsNav("desktop", null)
+      .map((entry) => entry.id)
+      .filter((id) => id !== "about");
+    const panes = ids.map((id) => ((selectedPane = id), render(seeded(true, false))));
+    selectedPane = "location";
+    panes.push(render(seeded(false, false)));
+    armed = true;
+    panes.push(render(seeded(true, false)));
+    armed = false;
+    selectedPane = "brain";
+    panes.push(render(seeded(true, true)));
+    Object.assign(initial, { webSearchProvider: "duckduckgo" });
+    panes.push(wrap(<ConnectionsSettings agents={false} braveKeyRow={null} />));
+    panes.push(wrap(<ConnectionsSettings agents braveKeyRow={null} />));
+    return panes.join("\n").replaceAll("&#x27;", "'");
+  } finally {
+    Object.assign(initial, { webSearchProvider: provider });
+    native = armed = false;
+  }
+};
+
+/** Every Settings sentence that means "this app", as the app called `name`. */
+const meaningThisApp = (name: string) => [
+  `Every shortcut in ${name} is yours to rebind.`,
+  `Hold ⌘ for a moment and ${name} shows you what you can press`,
+  `${name} is a visitor by default — summon it, write, dismiss it.`,
+  `Otherwise ${name} lives in the menu bar only.`,
+  `placeholder="How should ${name} address you?"`,
+  `/template lists ${name}'s own starters — meeting notes`,
+  `and ${name} draws the box half-filled.`,
+  `toggling relaunches ${name}.`,
+  `Shape ${name} into a workspace that feels like yours.`,
+  `or let ${name} follow your Mac.`,
+  `while ${name} keeps contrast safe.`,
+  `Home is where ${name} opens`,
+  `>Show in ${name}</h4>`,
+  `what a hidden button opens stays in ${name}.`,
+  `Open links and run quick searches inside ${name}.`,
+  `Each page is a normal ${name} tab`,
+  `research without leaving ${name}, not a replacement`,
+  `connect a copy: ${name} copies “Garden” beside your vaults`,
+  `so ${name} never lets the Librarian touch it: it organizes a copy ${name} makes instead.`,
+  `renamed, edited, or deleted by ${name}.`,
+  `is one ${name} treats as private from AI.`,
+  `is flagged when ${name} reads it.`,
+  `${name}’s organizer skips secure notes entirely`,
+  `${name} enables a connected provider only through`,
+  `${name} does not present provider logins`,
+  `${name} reviews these boundaries`,
+  `Sign in with your Claude account. ${name} never sees the credential.`,
+  `Sign in with your ChatGPT account. ${name} never sees the credential.`,
+  `Sign in with your Cursor account. ${name} uses Cursor's read-only Ask mode.`,
+  `Come back to ${name}`,
+  `${name} notices on its own; Check again asks right now.`,
+  `${name} uses Google’s own published ACP agent`,
+  `${name} uses only this runtime.`,
+  `${name} downloads the exact release`,
+  `${name} picks (this Mac's default)`,
+  `${name} adds its organization and retrieval layer`,
+  `${name} never holds your notes hostage.`,
+  `takes a ${name} vault (used in place)`,
+  `Connect another ${name} vault to make it available`,
+  `${name} shows and searches only one active vault`,
+  `only disconnects it from ${name}.`,
+  `>Remove from ${name}</button>`,
+  `aria-label="Confirm removing Orchard from ${name}"`,
+  `Your current vault is all ${name} shows and searches.`,
+  `Choose the outside services ${name} can contact.`,
+  `and ${name} reads the result pages it`,
+  `${name} never ships a shared key`,
+  `${name} tells you when that happens.`,
+  `${name} never displays a saved key.`,
+  `Connect ${name} to Grok Bot`,
+  `Extend ${name}’s corpus workflows`,
+  `${name} must be open and connected for every request.`,
+];
+
+/** What still says Rotli under a host: sentences about Rotli itself, its
+ * formats, its theme and its other builds (docs/architecture/host-seams.md). */
+const ABOUT_ROTLI_ITSELF = [
+  // Rotli, running beside a host, holds the system-wide chords
+  "system-wide shortcuts stay with Rotli",
+  // the About pane's row: its body describes Rotli, and `words.aboutLabel` renames it
+  "About Rotli",
+  // who made the music
+  "from the Rotli studio",
+  // Rotli's own link format, and its past versions
+  "Rotli’s own format",
+  "Older versions of Rotli",
+  // Rotli's Finder Quick Action: a host build never adds it
+  "Open in Rotli",
+  "Rotli changes nothing in Finder",
+  // Rotli's releases, and the dashboard named for them across the app
+  "What’s new in Rotli",
+  "Rotli activity dashboard",
+  // the theme family and the syntax palette
+  '<span class="famlabel">Rotli</span>',
+  ">Rotli</button>",
+  // the agent card whose command runs Rotli's own app and CLI
+  "Use Rotli for your docs",
+  "docs land in Rotli instead",
+  "keep it in my Rotli",
+  "/Applications/Rotli.app",
+  "e.g. Rotli.",
+];
+
+test("under a host named Synthetic, no swept Settings sentence says Rotli", () => {
+  const words = host.words;
+  host.words = { productName: "Synthetic" };
+  host.notes = true;
+  try {
+    const html = everyPane();
+    expect(meaningThisApp("Synthetic").filter((sentence) => !html.includes(sentence))).toEqual([]);
+    expect(meaningThisApp("Rotli").filter((sentence) => html.includes(sentence))).toEqual([]);
+    // a host takes no system-wide chord: its own General note says so by name
+    expect(html).toContain("Synthetic takes no system-wide shortcuts, so open it from its menu-bar icon.");
+    expect(html).toContain('aria-label="Rebind Hide Synthetic');
+    expect(html).toContain('<span class="hklabel">Open or hide Synthetic</span>');
+    const left = ABOUT_ROTLI_ITSELF.reduce((rest, sentence) => rest.replaceAll(sentence, ""), html);
+    expect(left.match(/.{0,60}Rotli.{0,60}/g)).toBeNull();
+  } finally {
+    host.words = words!;
+    host.notes = false;
+  }
+});
+
+test("standalone Rotli's Settings sentences are unchanged", () => {
+  active = null;
+  try {
+    const html = everyPane();
+    expect(meaningThisApp("Rotli").filter((sentence) => !html.includes(sentence))).toEqual([]);
+  } finally {
+    active = host;
+  }
+});
+
+/** Renders Settings started on `pane`, and what it set the pane to meanwhile. */
+const startedOn = (pane: string) => {
+  selectedPane = pane;
+  paneSets.length = 0;
+  return { html: render(), set: [...paneSets] };
+};
+
+test("a host pane its capability hides has no row, and Settings shows General in its place", () => {
+  const shown = startedOn("gated");
+  expect(navLabels(shown.html)).toContain("Gated");
+  expect(shown.html).toContain('<h3 class="set-banner-title">Gated</h3>');
+  expect(shown.set).toEqual([]);
+  capable = false;
+  try {
+    // read again on this render: the same open Settings would do the same
+    const hidden = startedOn("gated");
+    expect(navLabels(hidden.html)).not.toContain("Gated");
+    expect(hidden.html).not.toContain("Gated</h3>");
+    expect(hidden.html).toContain('<h3 class="set-banner-title">General</h3>');
+    // set for good, so the pane coming back doesn't pull the person back to it
+    expect(hidden.set).toEqual(["general"]);
+  } finally {
+    capable = true;
+  }
+});
+
+test("a host pane opens another pane by id, Rotli's or the host's, never a hidden one", () => {
+  startedOn("synthetic");
+  paneSets.length = 0;
+  links.at(-1)?.("connections");
+  links.at(-1)?.("gated");
+  expect(paneSets).toEqual(["connections", "gated"]);
+  paneSets.length = 0;
+  // a notes pane this build doesn't show, a pane hidden since the render, and
+  // no pane at all (a built app ignores a typo): nothing moves
+  capable = false;
+  try {
+    for (const id of ["location", "gated", "nowhere"]) links.at(-1)?.(id);
+    expect(paneSets).toEqual([]);
+    capable = true;
+    links.at(-1)?.("gated");
+    expect(paneSets).toEqual(["gated"]);
+  } finally {
+    capable = true;
+  }
 });

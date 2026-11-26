@@ -308,9 +308,12 @@ rotli_lib::run_with_host(rotli_lib::AppHost::new(context).words(rotli_lib::HostW
 - Only the app reads host words. The headless CLI never calls `run_with_host`,
   so an empty folder it opens first gets Rotli's note.
 
-**For a host repinning:** `HostWords` is a public struct, and a new field breaks
-any literal that names every field. A host that builds `HostWords { … }` without
-`..Default::default()` must add `welcome_note` (`None` keeps today's note).
+**For a host repinning:** `HostWords` is a public struct, so a new field can
+break a host's literal. A host that builds `HostWords { … }` must set every
+field (`welcome_note: None` keeps today's note), or use `..Default::default()`
+only when it leaves at least one field unset. With every field set, the struct
+update has no effect: clippy's `needless_update` rejects it in a crate that
+denies warnings (plain `rustc` accepts it).
 
 ### Building a host crate
 
@@ -350,6 +353,29 @@ on its first read, so a late registration throws. A host can give:
   About), and a body component. An id that is already Rotli's throws. The
   nav comes from `src/components/settings/settingsNav.ts`, and with no host
   it is exactly Rotli's list.
+- **A pane's links (`openPane`).** The body component gets one prop,
+  `openPane(id)` (`HostPaneProps`), which shows another pane, Rotli's or the
+  host's: `<button onClick={() => openPane("connections")}>`. A pane this
+  build doesn't show right now (a notes pane with notes off, a hidden host
+  pane) does nothing. An id no pane has throws under the dev server
+  (`import.meta.env.DEV`) and does nothing in a built app. A component that
+  takes no props is still accepted. Blocks don't get it.
+- **A pane that shows only sometimes (`visible`, `subscribeVisible`).**
+  `visible: () => boolean` says whether the pane shows; absent, always. False
+  takes away its nav row, and nothing opens it: not `navOrder` (which skips
+  it), not `openPane`, not a request from elsewhere in the app. Settings calls
+  it while rendering, so it must be cheap and change nothing. If the answer can
+  change while Settings is open, also give `subscribeVisible(onChange)`, which
+  calls `onChange` when it may differ and returns the unsubscribe; a zustand
+  store's `subscribe` is one. Without it, Settings reads `visible` again only
+  when it next renders. A pane that hides while open gives way to General and
+  stays there if the pane comes back.
+
+  ```ts
+  { id: "synthetic", label: "Synthetic", glyph, Pane: SyntheticPane,
+    visible: () => useSyntheticStore.getState().ready,
+    subscribeVisible: useSyntheticStore.subscribe }
+  ```
 - **`navOrder`**: pane ids, Rotli's or the host's, in the order the nav shows
   them. The named panes trade places among the slots they hold, and every
   other pane keeps its slot, so `["general", "appearance", "connections",
@@ -372,11 +398,17 @@ on its first read, so a late registration throws. A host can give:
   has no "Back to notes", none of Rotli's first-run or vault screens, and no
   notes panes (Keybindings, Browser, Librarian, Security, AI Models, Chat,
   Location). General, Appearance, Connections and About stay.
-- **`words`**: the updates line; `productName` and `version`, which replace
-  "Rotli" and the bundle's version at the foot of the nav; and `aboutLabel`,
+- **`words`**: the updates line; `productName`, which replaces "Rotli"
+  wherever Settings' copy means the running app, including the nav's foot,
+  Connections' lead, the Dock row's explanation, the connected-tool setup
+  steps, "Why a copy?" and the Keybindings titles "Hide …" and "Open or hide
+  …" (what stays is listed under "What a host still sees"); `version`, which
+  replaces the bundle's version at the foot of the nav; and `aboutLabel`,
   which replaces "About Rotli" as the nav row and the pane's heading. The
   About pane's body stays Rotli's; a host adds to it with `paneBlocks`.
-  Rotli's defaults are exactly today's text.
+  Rotli's defaults are exactly today's text. Read `productName()` while
+  rendering or in a handler, never as a module loads: the first read locks the
+  registry.
 - **`words.connectionsLead`**: the paragraph that opens Connections, between a
   host's `before` blocks and Web research. A string replaces Rotli's; an empty
   string hides it.
@@ -393,8 +425,9 @@ on its first read, so a late registration throws. A host can give:
   label. `null` retires the switch and shortens that line to "Pick the Dock
   icon." It changes words and the row only: the switch, when shown, still sets
   Rotli's saved Dock setting, and Rotli still applies that setting at first run
-  and at launch with the row retired. The lead and note around the switches
-  stay Rotli's.
+  and at launch with the row retired. The lead around the switches names
+  `productName`. The note under them, in any host build, says that the app
+  takes no system-wide shortcuts, by the same name.
 - **`words.aboutBody`**: what the About pane says. A string is one paragraph in
   place of Rotli's own: the lead, the website link, and the feedback link and
   its note. `null` or an empty string drops them. Either way the heading, the
@@ -404,6 +437,35 @@ on its first read, so a late registration throws. A host can give:
   credits' sentence use `productName`, and the version row `version`, where a
   host gave them.
 - **`aboutGlyph`**: the About row's glyph, where Rotli shows its quokka.
+
+## What a host still sees
+
+With `productName` set, these still say "Rotli" in Settings, on purpose:
+
+- **Sentences about Rotli itself.** Keybindings' "system-wide shortcuts stay
+  with Rotli" (Rotli, running beside the host, holds them); "Older versions of
+  Rotli" under Security; "Rotli's own format" under General › Link format;
+  "from the Rotli studio" under Ambient audio.
+- **Rotli's names.** The theme family and the Markdown source palette called
+  Rotli; the "What's new in Rotli" action (the highlights are Rotli's
+  releases); the "Rotli activity dashboard", named the same way on the
+  dashboard and its sidebar card.
+- **Rotli's Finder Quick Action.** General still shows "Open in Rotli from
+  Finder", though a host never adds it.
+- **The agent card (development builds only).** "Use Rotli for your docs" and
+  the instruction it copies, which runs Rotli's own app and CLI.
+- **About.** The row and heading read `aboutLabel`, and the body `aboutBody`;
+  `productName` alone changes neither. The feedback note says "your Rotli
+  version" until `aboutBody` replaces it.
+- **Rotli (dev), Rotli Web, Rotli Helper and "Rotli for Mac"** copy, which
+  only development and web builds show. The updater's description, which no
+  host build shows.
+
+**Outside Settings the sweep has not been made.** First-run and vault
+screens, chat, the dashboard and sidebar, Librarian Activity, dialogs, error
+messages from the services and from Rust, the Welcome catalog and the prompts
+models receive still say "Rotli". "Why a copy?" and the connected-tool setup
+steps are shared with Settings, so they follow `productName` everywhere.
 
 ## Not built yet
 
@@ -536,6 +598,18 @@ This list says only what was run.
 - **The same words under a synthetic host**, injected in the test browser only:
   plain heads, a replaced Connections lead, tagged headings, a reworded Dock
   row, and a replaced About paragraph above the credits, in the light theme.
+- **The product name sweep, pane links and hidden panes** (2026-11-26, no
+  Rust change). Server markup of every pane, with the Mac shell's copy, a
+  connected vault and the armed "Remove vault?" button, was identical before
+  and after with no host, text-node boundaries included (56 renders). Browser
+  lane, development and stable channels, three runs each side: the DOM matched
+  in all 66 after shots, ids minted per run aside. The pixels that differed
+  were never more than one step in a colour channel, in places where two runs
+  of the unchanged commit also differ or another after run matched exactly.
+  Under a synthetic host injected in the test browser only, links opened a
+  gated pane and Connections (the latter by keyboard), and the gated pane's
+  row appeared, disappeared and fell back to General while Settings was open.
+  No native build was launched.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run

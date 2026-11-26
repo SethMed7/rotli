@@ -4,11 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { COMING_SOON_CAPTION } from "../../lib/featurePolicy";
-import { CLAUDE_DOCS_COMMAND, COMING_SOON_CONNECTIONS, ConnectionsSettings } from "./connectionsSettings";
+import { CLAUDE_DOCS_COMMAND, ConnectionsSettings, comingSoonConnections } from "./connectionsSettings";
 
 test("a stable build lists Grok Bot and MCP as inert coming-soon rows beside web research", () => {
   const markup = renderToStaticMarkup(<ConnectionsSettings agents={false} braveKeyRow={null} />);
-  expect(COMING_SOON_CONNECTIONS.map((row) => [row.label, row.detail])).toEqual([
+  expect(comingSoonConnections().map((row) => [row.label, row.detail])).toEqual([
     ["Grok Bot plug-in", "Connect Rotli to Grok Bot"],
     ["MCP", "Let outside agents read and write this vault over MCP"],
   ]);

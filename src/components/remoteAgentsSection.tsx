@@ -4,6 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { productName } from "../host/registry";
 import {
   REMOTE_AGENT_STATUS_KEY,
   type RemoteAgentPairing,
@@ -54,7 +55,7 @@ export function RemoteAgentsSection() {
       );
       setNote({ text: "MCP URL and bearer header copied.", err: false });
     } catch {
-      setNote({ text: "Rotli couldn’t access the clipboard.", err: true });
+      setNote({ text: `${productName()} couldn’t access the clipboard.`, err: true });
     }
   };
   const current = status.data;
@@ -82,7 +83,7 @@ export function RemoteAgentsSection() {
         setConfirmRegenerate(false);
         setConfirmUnpair(false);
         setNote({
-          text: "New pairing created. Copy it now—Rotli cannot reveal this client token after you leave this screen.",
+          text: `New pairing created. Copy it now—${productName()} cannot reveal this client token after you leave this screen.`,
           err: false,
         });
         refresh();
@@ -100,8 +101,7 @@ export function RemoteAgentsSection() {
             <NotesSectionTag />
           </h4>
           <p className="setnote">
-            Let a cloud MCP client reach this Mac through your relay. Notes stay in the vault; Rotli must be
-            open and connected for every request.
+            {`Let a cloud MCP client reach this Mac through your relay. Notes stay in the vault; ${productName()} must be open and connected for every request.`}
           </p>
         </div>
         <span className={`ailane-chip ${current?.connected ? "ok" : current?.active ? "busy" : ""}`}>
