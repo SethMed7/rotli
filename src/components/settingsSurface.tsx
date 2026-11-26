@@ -51,6 +51,7 @@ import {
   aboutLabel,
   appHost,
   dockRow,
+  noShortcutsWords,
   notesOn,
   plainPaneHeads,
   productName,
@@ -284,7 +285,7 @@ function HotkeysPane() {
       return (
         <div className="hkrow" key={action.id}>
           <span className="hklabel">{action.title}</span>
-          <span className="hkconflict">system-wide shortcuts stay with Rotli</span>
+          <span className="hkconflict">{noShortcutsWords().row}</span>
           <button
             type="button"
             className="hkchord"
@@ -506,9 +507,7 @@ function GeneralPane() {
               rebindable in Keybindings.
             </p>
           ) : (
-            <p className="setnote">
-              {`Either way the menu-bar icon stays. ${productName()} takes no system-wide shortcuts, so open it from its menu-bar icon.`}
-            </p>
+            <p className="setnote">{noShortcutsWords().note}</p>
           )}
         </>
       )}
@@ -2564,7 +2563,7 @@ function ModelsPane() {
           Official routes only, with no hidden workaround
         </h4>
         <p className="setnote">
-          {`${productName()} enables a connected provider only through that company’s published client or integration route. Authentication stays in the official app on this Mac: ${productName()} does not present provider logins, copy credentials, or replay browser sessions. Provider terms can change and this is not a legal guarantee; ${productName()} reviews these boundaries and disables a route instead of silently working around a restriction.`}
+          {`${productName()} enables a connected provider only through that company’s published client or integration route. Authentication stays in the official app on this Mac: ${productName()} does not present provider logins, copy credentials, or replay browser sessions. Provider terms can change and this is not a legal guarantee; Rotli reviews these boundaries and disables a route instead of silently working around a restriction.`}
         </p>
         <p className="setnote">
           <b>Antigravity</b> runs through Google&rsquo;s official ACP agent (the registry build), never the
@@ -2952,14 +2951,29 @@ export function SettingsSurface() {
   const nav = useMemo(() => navFor(hidden), [hidden]);
   const withNotes = notesOn();
   const [selected, setPane] = useState<string>("general");
+  // counts the switches nobody made on the nav: a pane's link, or a pane that
+  // hid while it was open
+  const [handoffs, setHandoffs] = useState(0);
+  const navRef = useRef<HTMLElement>(null);
   // a pane that hid while it was open gives way to General, for good
   const pane = nav.some((entry) => entry.id === selected) ? selected : "general";
-  if (pane !== selected) setPane(pane);
+  if (pane !== selected) {
+    setPane(pane);
+    setHandoffs((count) => count + 1);
+  }
   // a host pane's link: judged on what shows at the moment of the click, which
   // may have changed since this render
   const openPane = useCallback((id: string) => {
-    if (opensPane(id, navFor(hiddenNow()), appHost(), !!import.meta.env.DEV)) setPane(id);
+    if (!opensPane(id, navFor(hiddenNow()), appHost(), !!import.meta.env.DEV)) return;
+    setPane(id);
+    setHandoffs((count) => count + 1);
   }, []);
+  // such a switch can take the focused control with it, dropping focus on the
+  // page: the new pane's nav row takes it. Focus that survived stays put.
+  useEffect(() => {
+    if (handoffs === 0 || document.activeElement !== document.body) return;
+    navRef.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus();
+  }, [handoffs]);
   // a surface elsewhere asked for a SPECIFIC pane (the Librarian's gear →
   // Settings → Librarian, 2026-07-31) — consume the one-shot request
   const paneRequest = useUiStore((s) => s.settingsPaneRequest);
@@ -2973,7 +2987,7 @@ export function SettingsSurface() {
   return (
     <div className="settings">
       <h2 className="sr-only">Settings</h2>
-      <nav className="set-nav" aria-label="Settings sections">
+      <nav className="set-nav" aria-label="Settings sections" ref={navRef}>
         {/* without notes, Settings is the whole window: nothing to go back to */}
         {withNotes && (
           <button type="button" className="set-back" onClick={() => dispatch("app.settings")}>

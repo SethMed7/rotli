@@ -65,6 +65,7 @@ await mock.module("../../host/registry", () => ({
   connectionsLead: (given: AppHost | null = active) => registry.connectionsLead(given),
   notesSectionTag: (given: AppHost | null = active) => registry.notesSectionTag(given),
   dockRow: (given: AppHost | null = active) => registry.dockRow(given),
+  noShortcutsWords: (given: AppHost | null = active) => registry.noShortcutsWords(given),
   aboutBody: (given: AppHost | null = active) => registry.aboutBody(given),
 }));
 // a host build never has Rotli's bundle ID
@@ -358,7 +359,6 @@ const meaningThisApp = (name: string) => [
   `${name}’s organizer skips secure notes entirely`,
   `${name} enables a connected provider only through`,
   `${name} does not present provider logins`,
-  `${name} reviews these boundaries`,
   `Sign in with your Claude account. ${name} never sees the credential.`,
   `Sign in with your ChatGPT account. ${name} never sees the credential.`,
   `Sign in with your Cursor account. ${name} uses Cursor's read-only Ask mode.`,
@@ -390,8 +390,8 @@ const meaningThisApp = (name: string) => [
 /** What still says Rotli under a host: sentences about Rotli itself, its
  * formats, its theme and its other builds (docs/architecture/host-seams.md). */
 const ABOUT_ROTLI_ITSELF = [
-  // Rotli, running beside a host, holds the system-wide chords
-  "system-wide shortcuts stay with Rotli",
+  // a promise from Rotli's maintainers, not something the running app does
+  "Rotli reviews these boundaries",
   // the About pane's row: its body describes Rotli, and `words.aboutLabel` renames it
   "About Rotli",
   // who made the music
@@ -424,12 +424,34 @@ test("under a host named Synthetic, no swept Settings sentence says Rotli", () =
     const html = everyPane();
     expect(meaningThisApp("Synthetic").filter((sentence) => !html.includes(sentence))).toEqual([]);
     expect(meaningThisApp("Rotli").filter((sentence) => html.includes(sentence))).toEqual([]);
-    // a host takes no system-wide chord: its own General note says so by name
+    // a host takes no system-wide chord: General and Keybindings both say so by name
     expect(html).toContain("Synthetic takes no system-wide shortcuts, so open it from its menu-bar icon.");
+    expect(html).toContain('<span class="hkconflict">Synthetic takes no system-wide shortcuts</span>');
     expect(html).toContain('aria-label="Rebind Hide Synthetic');
     expect(html).toContain('<span class="hklabel">Open or hide Synthetic</span>');
     const left = ABOUT_ROTLI_ITSELF.reduce((rest, sentence) => rest.replaceAll(sentence, ""), html);
     expect(left.match(/.{0,60}Rotli.{0,60}/g)).toBeNull();
+  } finally {
+    host.words = words!;
+    host.notes = false;
+  }
+});
+
+test("a host that gave no name keeps Rotli's own words about system-wide shortcuts", () => {
+  const words = host.words;
+  host.words = {};
+  host.notes = true;
+  registerDefaultActions();
+  try {
+    selectedPane = "general";
+    const general = render();
+    selectedPane = "hotkeys";
+    const keybindings = render();
+    expect(general).toContain(
+      "Either way the menu-bar icon stays. System-wide shortcuts stay with Rotli, so open this app from its menu-bar icon.",
+    );
+    expect(keybindings).toContain('<span class="hkconflict">system-wide shortcuts stay with Rotli</span>');
+    expect(general + keybindings).not.toContain("takes no system-wide shortcuts");
   } finally {
     host.words = words!;
     host.notes = false;

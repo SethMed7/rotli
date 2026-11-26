@@ -364,12 +364,17 @@ on its first read, so a late registration throws. A host can give:
   `visible: () => boolean` says whether the pane shows; absent, always. False
   takes away its nav row, and nothing opens it: not `navOrder` (which skips
   it), not `openPane`, not a request from elsewhere in the app. Settings calls
-  it while rendering, so it must be cheap and change nothing. If the answer can
-  change while Settings is open, also give `subscribeVisible(onChange)`, which
-  calls `onChange` when it may differ and returns the unsubscribe; a zustand
-  store's `subscribe` is one. Without it, Settings reads `visible` again only
-  when it next renders. A pane that hides while open gives way to General and
-  stays there if the pane comes back.
+  it while rendering, so it must be cheap, change nothing and not throw (a
+  throw takes Settings down with it). If the answer can change while Settings
+  is open, also give `subscribeVisible(onChange)`, which calls `onChange` when
+  it may differ and returns the unsubscribe; a zustand store's `subscribe` is
+  one. Without it, Settings reads `visible` again only when it next renders. A
+  pane that hides while open gives way to General and stays there if the pane
+  comes back.
+- **Focus after either switch.** When a link or a hidden pane takes the
+  focused control with it, focus moves to the new pane's nav row instead of
+  dropping to the page. Focus that survives the switch stays where it is, and
+  clicking a nav row is as before.
 
   ```ts
   { id: "synthetic", label: "Synthetic", glyph, Pane: SyntheticPane,
@@ -406,9 +411,13 @@ on its first read, so a late registration throws. A host can give:
   replaces the bundle's version at the foot of the nav; and `aboutLabel`,
   which replaces "About Rotli" as the nav row and the pane's heading. The
   About pane's body stays Rotli's; a host adds to it with `paneBlocks`.
-  Rotli's defaults are exactly today's text. Read `productName()` while
-  rendering or in a handler, never as a module loads: the first read locks the
-  registry.
+  Rotli's defaults are exactly today's text. The first read of `productName()`
+  locks the registry, so nothing may read it before the host registers. After
+  that it is safe, module loads included: the host's registration module runs
+  before `main.tsx` is imported, and `app.tsx` reads the name as it loads
+  (`registerDefaultActions()`), which fixes the two action titles for the
+  app's life. So the module that calls `registerHost`, and anything it
+  imports, must not read it before that call.
 - **`words.connectionsLead`**: the paragraph that opens Connections, between a
   host's `before` blocks and Web research. A string replaces Rotli's; an empty
   string hides it.
@@ -426,8 +435,10 @@ on its first read, so a late registration throws. A host can give:
   icon." It changes words and the row only: the switch, when shown, still sets
   Rotli's saved Dock setting, and Rotli still applies that setting at first run
   and at launch with the row retired. The lead around the switches names
-  `productName`. The note under them, in any host build, says that the app
-  takes no system-wide shortcuts, by the same name.
+  `productName`. In a host build, the note under them and the hint on each
+  system-wide row of Keybindings agree: with a `productName`, both say that
+  app takes no system-wide shortcuts; without one, both keep Rotli's words,
+  that the shortcuts stay with Rotli.
 - **`words.aboutBody`**: what the About pane says. A string is one paragraph in
   place of Rotli's own: the lead, the website link, and the feedback link and
   its note. `null` or an empty string drops them. Either way the heading, the
@@ -442,10 +453,10 @@ on its first read, so a late registration throws. A host can give:
 
 With `productName` set, these still say "Rotli" in Settings, on purpose:
 
-- **Sentences about Rotli itself.** Keybindings' "system-wide shortcuts stay
-  with Rotli" (Rotli, running beside the host, holds them); "Older versions of
-  Rotli" under Security; "Rotli's own format" under General › Link format;
-  "from the Rotli studio" under Ambient audio.
+- **Sentences about Rotli itself.** "Rotli reviews these boundaries…" under
+  AI Models (a promise from Rotli's maintainers); "Older versions of Rotli"
+  under Security; "Rotli's own format" under General › Link format; "from the
+  Rotli studio" under Ambient audio.
 - **Rotli's names.** The theme family and the Markdown source palette called
   Rotli; the "What's new in Rotli" action (the highlights are Rotli's
   releases); the "Rotli activity dashboard", named the same way on the
@@ -464,8 +475,12 @@ With `productName` set, these still say "Rotli" in Settings, on purpose:
 **Outside Settings the sweep has not been made.** First-run and vault
 screens, chat, the dashboard and sidebar, Librarian Activity, dialogs, error
 messages from the services and from Rust, the Welcome catalog and the prompts
-models receive still say "Rotli". "Why a copy?" and the connected-tool setup
-steps are shared with Settings, so they follow `productName` everywhere.
+models receive still say "Rotli".
+
+Some words are shared with Settings, so they follow `productName` outside it
+too: "Why a copy?", the connected-tool setup steps, and the two action titles.
+The command palette lists both "Hide …" and "Open or hide …"; the ⌘-hold list
+shows "Hide …" only, since it leaves system-wide chords out.
 
 ## Not built yet
 
@@ -609,7 +624,10 @@ This list says only what was run.
   Under a synthetic host injected in the test browser only, links opened a
   gated pane and Connections (the latter by keyboard), and the gated pane's
   row appeared, disappeared and fell back to General while Settings was open.
-  No native build was launched.
+  The markup and screenshot comparisons were repeated after the review fixes,
+  with the same results. `e2e/host-panes.spec.ts` now keeps the focus handoff,
+  a dropped pane request, the unsubscribe on close and the dev-server throw
+  under the same kind of host. No native build was launched.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run
@@ -628,5 +646,6 @@ This list says only what was run.
   `breve_dev_roots.rs` and `app_host.rs`.
 - **TypeScript:** `src/lib/appIdentity.test.ts`, `src/host/registry.test.ts`,
   `src/components/settings/settingsNav.test.ts`,
-  `src/components/settings/connectionsSettings.test.tsx` and
-  `src/components/settings/settingsSurfaceHost.test.tsx`.
+  `src/components/settings/connectionsSettings.test.tsx`,
+  `src/components/settings/settingsSurfaceHost.test.tsx` and, in the browser,
+  `e2e/host-panes.spec.ts`.

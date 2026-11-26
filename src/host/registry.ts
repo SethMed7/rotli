@@ -37,7 +37,7 @@ export interface HostSettingsPane {
   Pane: ComponentType<HostPaneProps>;
   /** Whether the pane shows right now; absent, always. False takes away its
    * nav row and every way to open it. Settings calls it while rendering, so it
-   * must be cheap and change nothing. */
+   * must be cheap, change nothing and not throw. */
   visible?: () => boolean;
   /** For a `visible` that changes while Settings is open: call `onChange` when
    * it may answer differently, and return the unsubscribe. A zustand store's
@@ -172,11 +172,30 @@ export function paneBlocks(
     .map((block) => block.Block);
 }
 
-/** The app's name where Settings says "Rotli" and means this app. Read it
- * while rendering or in a handler: reading it as a module loads would lock the
- * registry before a host could register. */
+/** The app's name where Settings says "Rotli" and means this app. The first
+ * read locks the registry, so nothing may read it before the host registers.
+ * After that it is safe, module loads included: a host registers before
+ * main.tsx loads, and app.tsx reads it as it loads (the two action titles). */
 export function productName(host: AppHost | null = appHost()): string {
   return host?.words?.productName ?? DEFAULT_PRODUCT_NAME;
+}
+
+/** What a host build says about system-wide shortcuts, which it never takes:
+ * the note in General and the hint on a Keybindings row. With no name given,
+ * Rotli's words. A named host says it takes none, because "they stay with
+ * <name>" would say the opposite. */
+export function noShortcutsWords(host: AppHost | null = appHost()): { note: string; row: string } {
+  const name = host?.words?.productName;
+  const keeps = "Either way the menu-bar icon stays.";
+  return name === undefined
+    ? {
+        note: `${keeps} System-wide shortcuts stay with Rotli, so open this app from its menu-bar icon.`,
+        row: "system-wide shortcuts stay with Rotli",
+      }
+    : {
+        note: `${keeps} ${name} takes no system-wide shortcuts, so open it from its menu-bar icon.`,
+        row: `${name} takes no system-wide shortcuts`,
+      };
 }
 
 /** The About pane's row and heading. */

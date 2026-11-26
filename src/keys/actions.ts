@@ -151,6 +151,8 @@ export function registerDefaultActions(): void {
     run: () => setupHandle()?.back?.(),
   });
 
+  // the two titles that name the app are read once, here: a host registered
+  // before main.tsx loaded, and it never changes (host/registry.ts productName)
   registerAction({
     id: "app.hide",
     title: PLATFORM === "web" ? "Close current view" : `Hide ${productName()}`,
