@@ -384,14 +384,10 @@ fn root_among(roots: &[PathBuf], want: &Path) -> bool {
 /// write root could plant chats/ inside a curated tree).
 /// pub(crate): provider.rs validates the image-assets root through the same gate.
 pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
-    let cfg = crate::corpus::ensure_corpus_config(app); // vault bind (live): require_live: an open store's root only
-    let mut roots: Vec<PathBuf> = vec![cfg.corpus.abs_path];
-    roots.extend(cfg.brains.into_iter().map(|b| b.abs_path));
-    roots.extend(cfg.folders.into_iter().map(|f| f.abs_path));
+    let roots = crate::host_registry::live_roots(app, crate::corpus::ensure_corpus_config(app)); // vault bind (live): host_registry::live_roots
     let want = PathBuf::from(root);
     if root_among(&roots, &want) {
-        let root = fs::canonicalize(&want).map_err(|e| format!("bad vault root {root}: {e}"))?;
-        crate::host_registry::require_live(app, &root).map(|()| root)
+        fs::canonicalize(&want).map_err(|e| format!("bad vault root {root}: {e}"))
     } else {
         Err(format!("not a registered vault root: {root}"))
     }
@@ -403,15 +399,15 @@ pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<Path
 /// lane around `CorpusStore::perms_read_only` for connected brains.
 fn registered_write_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
     let want = registered_root(app, root)?;
-    let cfg = crate::corpus::ensure_corpus_config(app); // vault bind (no-root): perms only; the root came from registered_root
-    if memex_write_allowed(&cfg, &want) {
+    let cfg = crate::host_registry::live_config(app, crate::corpus::ensure_corpus_config(app)); // vault bind (live): host_registry::live_config takes a host's perms from its open stores
+    if cfg.is_some_and(|cfg| memex_write_allowed(&cfg, &want)) {
         Ok(want)
     } else {
         Err("this vault is read-only for Rotli".into())
     }
 }
 
-fn memex_write_allowed(cfg: &crate::corpus::CorpusConfig, want: &Path) -> bool {
+pub(crate) fn memex_write_allowed(cfg: &crate::corpus::CorpusConfig, want: &Path) -> bool {
     let Ok(want) = fs::canonicalize(want) else {
         return false;
     };

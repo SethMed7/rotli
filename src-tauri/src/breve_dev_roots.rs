@@ -1,7 +1,6 @@
 //! Where debug Breve borrows its delivery settings: the standalone app's vault
 //! locations. Split from breve.rs at its size ceiling.
 
-use std::fs;
 use std::path::PathBuf;
 
 /// The vault locations debug Breve borrows delivery settings from. They are
@@ -16,14 +15,8 @@ pub(super) fn dev_production_roots(
         return Vec::new();
     }
     let mut roots = Vec::new();
-    if let Some(config_dir) = config_dir {
-        // raw read (outside-vault): app config outside any vault
-        if let Some(config) = fs::read_to_string(config_dir.join("corpus.json"))
-            .ok()
-            .and_then(|body| serde_json::from_str::<crate::corpus::CorpusConfig>(&body).ok())
-        {
-            roots.push(config.corpus.abs_path);
-        }
+    if let Some(config) = config_dir.and_then(|dir| crate::corpus::read_config_path(&dir.join("corpus.json"))) { // vault bind (standalone): a host build returned above
+        roots.push(config.corpus.abs_path);
     }
     roots.extend(knowledge);
     if let Some(home) = home {

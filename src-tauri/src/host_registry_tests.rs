@@ -211,12 +211,20 @@ fn after_launch_a_host_takes_only_the_roots_it_has_open() {
         claim_for(crate::app_identity::APP_IDENTIFIER, &folder).unwrap();
         folder
     };
+    crate::memex::scaffold_memex(&home.path().join("work")).unwrap();
     let (own, work) = (mark("own"), mark("work"));
     let vault = rotli_vault(home.path(), "someone's vault");
-    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.into());
-    registry.insert(DEFAULT_ROOT_ID.into(), CorpusStore::open(own.clone()).unwrap()).unwrap();
-    registry.insert("work".into(), CorpusStore::open(work.clone()).unwrap()).unwrap();
-    let state = crate::corpus::CorpusState(std::sync::Mutex::new(registry));
+    let open_state = |with_default: bool| {
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.into());
+        if with_default {
+            registry.insert(DEFAULT_ROOT_ID.into(), CorpusStore::open(own.clone()).unwrap()).unwrap();
+        }
+        let mut connected = CorpusStore::open(work.clone()).unwrap();
+        connected.set_perms_read_only(true);
+        registry.insert("work".into(), connected).unwrap();
+        crate::corpus::CorpusState(std::sync::Mutex::new(registry))
+    };
+    let state = open_state(true);
     let mut holes = Vec::new();
     for (id, open) in [(DEFAULT_ROOT_ID, &own), ("work", &work)] {
         if live_root_for(HOST, Some(&state), id, Some(vault.clone())).as_ref() != Some(open) {
@@ -227,31 +235,50 @@ fn after_launch_a_host_takes_only_the_roots_it_has_open() {
     if live_root_for(HOST, None, DEFAULT_ROOT_ID, Some(vault.clone())).is_some() {
         holes.push("nothing open, yet a root was taken".into());
     }
-    if require_live_for(HOST, Some(&state), &vault).is_ok() {
-        holes.push("the chat and note commands accept a Rotli vault the registry names".into());
-    }
-    let brain = |path: &Path| crate::corpus::ConnectedBrain {
-        id: "b".into(),
+    // the registry rewritten after launch: a Rotli vault as the current vault,
+    // opened in place, a writable vault, and the read-only open one writable
+    let brain = |id: &str, path: &Path| crate::corpus::ConnectedBrain {
+        id: id.into(),
         label: "B".into(),
         abs_path: path.to_path_buf(),
         memex_id: None,
         mode: None,
-        perms: crate::memex::MemexPerms::ReadOnly,
+        perms: crate::memex::MemexPerms::ChatsInbox,
     };
-    let planted = CorpusConfig {
+    let rewritten = |brains| CorpusConfig {
         version: 1,
-        corpus: CorpusRef { abs_path: vault.clone(), adopted: false },
-        brains: vec![brain(&vault), brain(&work)],
+        corpus: CorpusRef { abs_path: vault.clone(), adopted: true },
+        brains,
         folders: Vec::new(),
-        active_brain_id: None,
+        active_brain_id: Some("b".into()),
     };
-    let shown = live_config_for(HOST, Some(&state), planted.clone());
+    let planted = rewritten(vec![brain("b", &vault), brain("work", &work)]);
+    let shown = live_config_for(HOST, Some(&state), planted.clone()).expect("the default store is open");
     if shown.corpus.abs_path != own || shown.brains.iter().any(|brain| brain.abs_path == vault) || shown.brains.len() != 1 {
         holes.push("Settings reads the folders a rewritten registry names".into());
     }
-    assert_eq!(live_config_for(STANDALONE_IDENTIFIER, Some(&state), planted).corpus.abs_path, vault);
-    assert!(require_live_for(HOST, Some(&state), &work).is_ok());
-    assert!(require_live_for(STANDALONE_IDENTIFIER, Some(&state), &vault).is_ok());
+    if shown.corpus.adopted || shown.active_brain_id.is_some() {
+        holes.push("Settings takes the current vault's adopted flag or the active vault from a rewritten registry".into());
+    }
+    if crate::memex::memex_write_allowed(&shown, &work) {
+        holes.push("a rewritten brain.perms opens the memex write lane on a read-only vault".into());
+    }
+    if live_config_for(HOST, Some(&open_state(false)), planted.clone()).is_some() {
+        holes.push("with no open default store, Settings reads the registry's current vault".into());
+    }
+    if live_reopen_for(HOST, &state, DEFAULT_ROOT_ID, &planted).ok() != Some((own.clone(), false)) {
+        holes.push("a rewritten adopted flag reopens the current vault in place".into());
+    }
+    if !live_roots_for(HOST, Some(&state), rewritten(Vec::new())).contains(&work) {
+        holes.push("a registry that drops an open root shuts the chat and note commands out of it".into());
+    }
+    if live_roots_for(HOST, Some(&state), planted.clone()).contains(&vault) {
+        holes.push("the chat and note commands accept a Rotli vault the registry names".into());
+    }
+    let json = |config: CorpusConfig| serde_json::to_value(config).unwrap();
+    assert_eq!(json(live_config_for(STANDALONE_IDENTIFIER, None, planted.clone()).unwrap()), json(planted.clone()));
+    assert_eq!(live_reopen_for(STANDALONE_IDENTIFIER, &state, DEFAULT_ROOT_ID, &planted), Ok((own.clone(), true)));
+    assert!(live_roots_for(STANDALONE_IDENTIFIER, Some(&state), planted).contains(&vault));
     fs::create_dir_all(work.join("later").join(".rotli")).unwrap();
     let folder = CorpusRoot { id: "f".into(), label: "F".into(), abs_path: work.clone(), adopted: false };
     let config = CorpusConfig {

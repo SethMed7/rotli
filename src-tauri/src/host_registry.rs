@@ -9,7 +9,8 @@ use crate::app_identity::{
     claimed_by, owns_shared_state, owns_shared_state_for, refuse_existing_vault_for, scratch_vault_for,
     settle_scratch_for, APP_IDENTIFIER,
 };
-use crate::corpus::{CorpusConfig, CorpusRef, CorpusState};
+use crate::corpus::{CorpusConfig, CorpusRef, CorpusState, OpenRoot};
+use crate::memex::MemexPerms;
 use std::path::{Path, PathBuf};
 
 /// Every registry file a launch reads, in a release or a debug build, with
@@ -149,44 +150,98 @@ pub(crate) fn live_root(app: &tauri::AppHandle, id: &str, named: Option<PathBuf>
     live_root_for(APP_IDENTIFIER, app.try_state::<CorpusState>().as_deref(), id, named)
 }
 
-/// Whether a root a command found in the registry (`memex::registered_root`)
-/// may be used: in a host build, only while it is one of the open stores'
-/// roots, for the same reason as `live_root_for`.
-pub(crate) fn require_live_for(identifier: &str, state: Option<&CorpusState>, root: &Path) -> Result<(), String> {
-    let open = || state.is_some_and(|state| matches!(state.root_id_for_path(root), Ok(Some(_))));
-    if owns_shared_state_for(identifier) || open() {
-        return Ok(());
-    }
-    Err(format!("not an open vault root: {}", root.display()))
+/// The open stores, or none when there is no state to read.
+fn open_roots(state: Option<&CorpusState>) -> Vec<OpenRoot> {
+    state.and_then(|state| state.open_roots().ok()).unwrap_or_default()
 }
 
-/// The registry as Settings shows it after launch, which reads each root's
-/// marker and settings. A host build shows its open default store as the
-/// current vault and a connected vault or folder only while it is open
-/// (`require_live_for`); with no open default store it keeps the registry's.
-pub(crate) fn live_config_for(identifier: &str, state: Option<&CorpusState>, mut config: CorpusConfig) -> CorpusConfig {
+/// The open route `id`, when it is open at the folder `path` names.
+fn open_at<'a>(open: &'a [OpenRoot], id: &str, path: &Path) -> Option<&'a OpenRoot> {
+    let path = std::fs::canonicalize(path).ok()?;
+    open.iter().find(|root| root.id == id && std::fs::canonicalize(&root.root).is_ok_and(|root| root == path))
+}
+
+/// The registry as Settings and the memex write gate read it after launch.
+/// A host build takes the current vault from its open default store, keeps
+/// a connected vault or folder only while its route is open at that folder,
+/// and takes each one's adopted and read-only flags from its store, so a
+/// registry rewritten while the app runs changes none of them. `None`: a
+/// host build with no open default store, which shows no vault at all.
+pub(crate) fn live_config_for(identifier: &str, state: Option<&CorpusState>, mut config: CorpusConfig) -> Option<CorpusConfig> {
     if owns_shared_state_for(identifier) {
-        return config;
+        return Some(config);
     }
-    let open = |root: &Path| std::fs::canonicalize(root).is_ok_and(|root| require_live_for(identifier, state, &root).is_ok());
-    config.brains.retain(|brain| open(&brain.abs_path));
-    config.folders.retain(|folder| open(&folder.abs_path));
-    if let Some(root) = live_root_for(identifier, state, crate::corpus::DEFAULT_ROOT_ID, None) {
-        config.corpus.abs_path = root;
-    }
-    config
+    let open = open_roots(state);
+    let current = open.iter().find(|root| root.id == crate::corpus::DEFAULT_ROOT_ID)?;
+    config.corpus = CorpusRef { abs_path: current.root.clone(), adopted: current.adopted };
+    config.brains.retain_mut(|brain| {
+        let Some(store) = open_at(&open, &brain.id, &brain.abs_path) else { return false };
+        brain.abs_path = store.root.clone();
+        brain.perms = if store.read_only { MemexPerms::ReadOnly } else { MemexPerms::ChatsInbox };
+        true
+    });
+    config.folders.retain_mut(|folder| {
+        let Some(store) = open_at(&open, &folder.id, &folder.abs_path) else { return false };
+        (folder.abs_path, folder.adopted) = (store.root.clone(), store.adopted);
+        true
+    });
+    config.active_brain_id = config.active_brain_id.take().filter(|id| config.brains.iter().any(|brain| &brain.id == id));
+    Some(config)
 }
 
 /// `live_config_for` this build and its open stores.
-pub(crate) fn live_config(app: &tauri::AppHandle, config: CorpusConfig) -> CorpusConfig {
+pub(crate) fn live_config(app: &tauri::AppHandle, config: CorpusConfig) -> Option<CorpusConfig> {
     use tauri::Manager;
     live_config_for(APP_IDENTIFIER, app.try_state::<CorpusState>().as_deref(), config)
 }
 
-/// `require_live_for` this build and its open stores.
-pub(crate) fn require_live(app: &tauri::AppHandle, root: &Path) -> Result<(), String> {
+/// The roots the chat and note commands accept (`memex::registered_root`):
+/// the registry's. A host build takes its open stores' roots instead, so a
+/// registry rewritten after launch can neither add a root nor drop an open one.
+pub(crate) fn live_roots_for(identifier: &str, state: Option<&CorpusState>, config: CorpusConfig) -> Vec<PathBuf> {
+    if !owns_shared_state_for(identifier) {
+        return open_roots(state).into_iter().map(|root| root.root).collect();
+    }
+    std::iter::once(config.corpus.abs_path)
+        .chain(config.brains.into_iter().map(|brain| brain.abs_path))
+        .chain(config.folders.into_iter().map(|folder| folder.abs_path))
+        .collect()
+}
+
+/// `live_roots_for` this build and its open stores.
+pub(crate) fn live_roots(app: &tauri::AppHandle, config: CorpusConfig) -> Vec<PathBuf> {
     use tauri::Manager;
-    require_live_for(APP_IDENTIFIER, app.try_state::<CorpusState>().as_deref(), root)
+    live_roots_for(APP_IDENTIFIER, app.try_state::<CorpusState>().as_deref(), config)
+}
+
+/// Which folder a refresh reopens as route `id`, and whether it opens
+/// adopted (in place). A host build takes the current vault's adopted flag
+/// from its open store, never from the registry.
+pub(crate) fn live_reopen_for(
+    identifier: &str,
+    state: &CorpusState,
+    id: &str,
+    config: &CorpusConfig,
+) -> Result<(PathBuf, bool), String> {
+    if id == crate::corpus::DEFAULT_ROOT_ID {
+        let root = state.default_root_path()?;
+        if owns_shared_state_for(identifier) {
+            return Ok((root, config.corpus.adopted));
+        }
+        return Ok((root, open_roots(Some(state)).iter().any(|open| open.id == id && open.adopted)));
+    }
+    let connected = config.brains.iter().find(|vault| vault.id == id).ok_or_else(|| "no such connected vault".to_string())?;
+    if !state.contains_root(id)? {
+        return Err("the connected vault is not open".into());
+    }
+    let root = live_root_for(identifier, Some(state), id, Some(connected.abs_path.clone()));
+    Ok((root.ok_or("the connected vault is not open")?, false))
+}
+
+/// `live_reopen_for` this build and its open stores.
+pub(crate) fn live_reopen(app: &tauri::AppHandle, id: &str, config: CorpusConfig) -> Result<(PathBuf, bool), String> {
+    use tauri::Manager;
+    live_reopen_for(APP_IDENTIFIER, &app.state::<CorpusState>(), id, &config)
 }
 
 /// The config a first launch writes when it has none. The standalone build

@@ -273,8 +273,7 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
             (fs::canonicalize(&target).map_err(|e| e.to_string())?, true)
         }
     };
-    let result = (|| {
-        crate::reject_privileged_root(app, &destination)?;
+    let result = crate::reject_privileged_root(app, &destination).and_then(|()| {
         check_destination(&source, &destination)?;
         let plan = plan(&source)?;
         let cancel = &app.state::<VaultCopyCancel>().0;
@@ -289,7 +288,7 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
             }
         })?;
         Ok(plan)
-    })();
+    });
     let plan = match result {
         Ok(plan) => plan,
         Err(error) => {

@@ -258,7 +258,7 @@ pub(crate) fn choose_config_as(identifier: &str, config_path: &Path, folder: &Pa
         ));
     }
     crate::app_identity::refuse_existing_vault_for(identifier, &root).and_then(|()| crate::app_identity::claim_for(identifier, &root))?; // vault bind (refused): refuse_existing_vault_for above
-    let id = match read_config(identifier, config_path) { // vault bind (refused): refuse_existing_vault_for above
+    let id = match read_config(identifier, config_path) { // vault bind (no-root): only the id, and only when its root is the folder just refused
         Some(existing) if existing.root == root => existing.id,
         _ => format!("hv_{}", uuid::Uuid::new_v4().simple()),
     };

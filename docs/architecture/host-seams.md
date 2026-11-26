@@ -184,16 +184,30 @@ same refusal as a folder a person picks. `host_registry.rs` owns this.
   and there is no trusted scratch vault.
 - **After launch.** Commands read the registry again while the app runs, and
   anything that writes the support folder can rewrite it then. So a host
-  build takes a root from its open stores, never from that read
-  (`host_registry::live_root`, `require_live`). This covers the current vault
-  that choosing a folder, switching, a new vault and a vault copy move or
-  carry settings from; the connected vault a refresh reopens; the roots the
-  chat and note commands (`memex::registered_root`) read and write; the
-  roots Settings lists and reads markers and settings from
-  (`host_registry::live_config`); the folder a picker starts in; and Reveal
-  in Finder. Inspecting a picked folder
-  meets the refusal first, because the picker grants a folder before it
-  refuses it.
+  build takes a root, and the flags beside it, from its open stores, never
+  from that read (`host_registry::live_root`, `live_roots`, `live_config`,
+  `live_reopen`). Each store keeps the root, the adopted (in place) flag and
+  the read-only flag it was opened or last set with. This covers:
+  - the current vault that choosing a folder, switching, a new vault and a
+    vault copy move or carry settings from;
+  - the vault a refresh reopens, and whether the current vault reopens in
+    place (`live_reopen`);
+  - the roots the chat and note commands (`memex::registered_root`) read and
+    write, which are exactly the open stores' roots (`live_roots`), so a
+    rewrite can neither add a root nor shut them out of an open one;
+  - whether the memex write lane may write a connected vault
+    (`memex::registered_write_root`): its open store's read-only flag, never
+    the registry's `perms`;
+  - the roots Settings lists and reads markers and settings from
+    (`live_config`): the current vault is the open default store, a connected
+    vault or folder shows only while its route is open at that folder, each
+    with its store's adopted and read-only flags, and the active vault only
+    when it is one of those. With no open default store, Settings shows no
+    vault;
+  - the folder a picker starts in, and Reveal in Finder.
+
+  Inspecting a picked folder meets the refusal first, because the picker
+  grants a folder before it refuses it.
 - **No demo mode.** Demo mode binds `memex-demo` beside the corpus, which may
   be Rotli's own demo vault, so a host build ignores a `demo.on` flag and
   refuses to turn demo mode on.
@@ -210,12 +224,34 @@ helper's config, and the wrappers around them) and the registry readers
 rest), since a folder taken from a registry read is a root source. Every
 call in production Rust says why its path is safe with
 `// vault bind (<category>): <reason>`, on the call's line or in the comments
-right above it. `refused` must meet a refusal in the same function (before a
-bind, or after a read); `live` must take the root through `live_root`,
-`require_live` or `live_config`; `delegated` is allowed only inside a function
-on one of the two lists, whose own callers say why. Each file's count per category is
+right above it. Three categories are checked:
+
+- **`refused`** needs a refusal (`reject_privileged_root`,
+  `refuse_existing_vault`, `refuse_pinned_root`) that names the same variable
+  as the marked call, directly or through a `let` made after the refusal. For
+  a bind, the refusal comes first, in a block that encloses the call. For a
+  registry read, it comes after the read, in the read's own block, and takes
+  what the read bound.
+- **`live`** is the same with a `host_registry::live_*` call; a read passed
+  straight into one counts.
+- **`delegated`** is allowed only inside a function on one of the two lists,
+  whose own callers say why.
+
+One shared variable is enough, so a call that takes two paths
+(`carry_settings(current, target)`) needs one of them covered; its marker
+says where the other comes from. The guard also finds calls through an alias
+(`use … as`, a plain or glob `use` of a sink, `use …::{self as m}`, a type
+alias), a sink passed as a value (`.map(CorpusStore::open)`), and a
+`CorpusConfig` parsed straight from JSON. Each file's count per category is
 pinned in `scripts/vault-bind-allowlist.json`, so a new caller fails until
-it is reviewed. The `launch_secures_the_registry_and_writers_mark_their_roots`
+it is reviewed.
+
+**The guard is a tripwire, not a proof.** It reads lines and braces. It
+doesn't follow control flow (an early return, a refusal whose error is
+dropped), a variable reassigned without `let` or copied before the refusal,
+or a method called in UFCS form (`CorpusState::insert_root(&state, …)`), and
+a variable that happens to be shared satisfies it. A reviewer still reads
+each marker. The `launch_secures_the_registry_and_writers_mark_their_roots`
 fence lists the commands that take roots after launch.
 
 ## The host entry (Rust)
@@ -325,14 +361,25 @@ on its first read, so a late registration throws. A host can give:
   uses it too", so the host keeps binding a folder a person also opened in
   Rotli. That is the person's own choice, not an attack. Standalone Rotli
   writes no sign of its own, so nothing tells the host.
-- **While the app runs.** After launch a host takes roots only from its open
-  stores (if it has no open default store, Settings still shows the
-  registry's current vault), but nothing re-walks an open root: a vault made or moved inside one
-  while the app runs is seen at the next launch, as it is by the helper and
-  the CLI at their next start. The registry writers rewrite the registry they
-  read, so an entry planted while the app runs is carried forward and vetted
-  at the next launch. There is also a short window between the vetting and
-  the bind (TOCTOU) that only a same-user process can race.
+- **While the app runs.** After launch a host takes roots and their flags
+  only from its open stores, but nothing re-walks an open root: a vault made
+  or moved inside one while the app runs is seen at the next launch. The
+  registry writers rewrite the registry they read, so an entry planted while
+  the app runs is carried forward and vetted at the next launch. There is
+  also a short window between the vetting and the bind (TOCTOU) that only a
+  same-user process can race.
+- **The helper and the CLI walk once per process.** `walked_once` remembers
+  each root whose walk below it passed and never walks it again, so a
+  long-lived MCP server or helper sees a vault made inside a root only after
+  it restarts. The mark and the folders around the root are still checked
+  on every load.
+- **Which open root is a connected vault, and which an added folder, still
+  comes from the registry.** A store doesn't record it. A rewrite can name an
+  open added folder as a connected vault; if that folder also holds a valid
+  `memex.json`, the memex write lane then writes chats and inbox notes there.
+  It is still the host's own marked folder, so no Rotli vault is reached. A
+  rewrite that drops a connected vault stops its refresh, which fails
+  closed.
 - **The bookmark repair** reads the `memex.json` id of the folder a planted
   bookmark resolves to. It binds nothing, and the vetting after the repair
   refuses any path it repointed.
@@ -363,6 +410,16 @@ on its first read, so a late registration throws. A host can give:
 
 This list says only what was run.
 
+- **The after-launch flags (2026-11-25, after `36b36f5b`).**
+  `after_launch_a_host_takes_only_the_roots_it_has_open` rewrites the
+  registry after launch (a Rotli vault as the current vault with
+  `adopted: true`, a writable `brain.perms` on a read-only open vault, an
+  active vault that isn't open, and a registry that drops an open root) and
+  checks that Settings, the memex write gate, a refresh and the chat and
+  note commands take none of it, that a host with no open default store
+  shows no vault, and that the standalone build keeps the registry's answer.
+  It failed on each of those before the fix. No live host launch has run
+  since this change.
 - **Live host launches at `14f8636f` and again at `f5c0b217`** (2026-11-25).
   A host build (`bun run mac:build`, Developer ID signed, under a host bundle
   ID) was launched by script in sandbox HOMEs. Every run rendered first run
