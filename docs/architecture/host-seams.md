@@ -371,16 +371,16 @@ on its first read, so a late registration throws. A host can give:
   one. Without it, Settings reads `visible` again only when it next renders. A
   pane that hides while open gives way to General and stays there if the pane
   comes back.
-- **Focus after either switch.** When a link or a hidden pane takes the
-  focused control with it, focus moves to the new pane's nav row instead of
-  dropping to the page. Focus that survives the switch stays where it is, and
-  clicking a nav row is as before.
 
   ```ts
   { id: "synthetic", label: "Synthetic", glyph, Pane: SyntheticPane,
     visible: () => useSyntheticStore.getState().ready,
     subscribeVisible: useSyntheticStore.subscribe }
   ```
+- **Focus after either switch.** When a link or a hidden pane takes the
+  focused control with it, focus moves to the new pane's nav row instead of
+  dropping to the page. Focus that survives the switch stays where it is, and
+  clicking a nav row is as before.
 - **`navOrder`**: pane ids, Rotli's or the host's, in the order the nav shows
   them. The named panes trade places among the slots they hold, and every
   other pane keeps its slot, so `["general", "appearance", "connections",
