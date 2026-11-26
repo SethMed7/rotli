@@ -224,7 +224,7 @@ impl Workspace {
             .into_iter()
             .find(|root| root.id == id)
             .ok_or_else(|| format!("unknown Rotli root: {id}"))?;
-        Self::open_target(root)
+        Self::open_target(root) // vault bind (vetted): root_targets vets every root (vet_config, refuse_pinned_root, or the app's open root)
     }
 
     fn open_target(root: RootTarget) -> Result<Self, String> {
@@ -235,9 +235,9 @@ impl Workspace {
             ));
         }
         let mut store = if root.read_only {
-            CorpusStore::open_read_only(root.path.clone())?
+            CorpusStore::open_read_only(root.path.clone())? // vault bind (delegated): its callers take roots from root_targets
         } else {
-            CorpusStore::open(root.path.clone())?
+            CorpusStore::open(root.path.clone())? // vault bind (delegated): its callers take roots from root_targets
         };
         store.set_perms_read_only(root.read_only);
         store.set_agent_lane();
@@ -1013,7 +1013,7 @@ impl Workspace {
         #[cfg(target_os = "macos")]
         {
             let status = std::process::Command::new("open")
-                .args(["-a", "rotli"])
+                .args(crate::app_identity::open_app_args())
                 .status()
                 .map_err(|e| format!("launch Rotli: {e}"))?;
             if !status.success() {
@@ -1157,6 +1157,7 @@ fn root_targets() -> Result<Vec<RootTarget>, String> {
         if path.trim().is_empty() {
             return Err("ROTLI_CORPUS_ROOT is empty".into());
         }
+        crate::app_identity::refuse_pinned_root(Path::new(&path))?; // a host build's CLI refuses as its app does
         return Ok(vec![RootTarget {
             id: DEFAULT_ROOT_ID.to_string(),
             label: "Notes".into(),
@@ -1166,26 +1167,25 @@ fn root_targets() -> Result<Vec<RootTarget>, String> {
         }]);
     }
     let path = production_config_path()?;
-    let config = read_config(&path)
-        .or_else(|| read_config(&path.with_extension("json.bak")))
+    let config = read_config(&path) // vault bind (vetted): vet_config vets every root below
+        .or_else(|| read_config(&path.with_extension("json.bak"))) // vault bind (vetted): vet_config vets every root below
         .ok_or_else(|| {
             format!(
                 "Rotli corpus config is missing or invalid: {}",
                 path.display()
             )
         })?;
-    Ok(targets_from_config(config))
+    Ok(targets_from_config(crate::host_registry::vet_config(config)?))
 }
 
 pub(crate) fn production_config_path() -> Result<PathBuf, String> {
-    if let Ok(path) = std::env::var("ROTLI_CORPUS_CONFIG") {
+    // a host build reads only its own registry, never one a variable points at
+    if let (true, Ok(path)) = (crate::app_identity::owns_shared_state(), std::env::var("ROTLI_CORPUS_CONFIG")) {
         return Ok(PathBuf::from(path));
     }
     let home = std::env::var("HOME").map_err(|_| "HOME is unavailable")?;
-    #[cfg(target_os = "macos")]
-    return Ok(PathBuf::from(home).join("Library/Application Support/com.rotli.app/corpus.json"));
-    #[cfg(not(target_os = "macos"))]
-    Ok(PathBuf::from(home).join(".config/com.rotli.app/corpus.json"))
+    // this build's own registry: a host build's `rotli` never reads Rotli's
+    Ok(crate::app_identity::support_dir(Path::new(&home)).join("corpus.json"))
 }
 
 /// The connected vaults the app can switch to (`corpus_switch_vault`) — none
@@ -1195,8 +1195,8 @@ fn connected_vault_ids() -> Result<Vec<String>, String> {
         return Ok(Vec::new());
     }
     let path = production_config_path()?;
-    let config = read_config(&path)
-        .or_else(|| read_config(&path.with_extension("json.bak")))
+    let config = read_config(&path) // vault bind (no-root): ids only
+        .or_else(|| read_config(&path.with_extension("json.bak"))) // vault bind (no-root): ids only
         .ok_or("Rotli corpus config is missing or invalid")?;
     Ok(config.brains.into_iter().map(|brain| brain.id).collect())
 }
@@ -1204,7 +1204,7 @@ fn connected_vault_ids() -> Result<Vec<String>, String> {
 fn read_config(path: &Path) -> Option<CorpusConfig> {
     fs::read_to_string(path)  // raw read (outside-vault): app config outside any vault
         .ok()
-        .and_then(|raw| serde_json::from_str::<CorpusConfig>(&raw).ok())
+        .and_then(|raw| serde_json::from_str::<CorpusConfig>(&raw).ok()) // vault bind (delegated): a registry reader
 }
 
 fn targets_from_config(config: CorpusConfig) -> Vec<RootTarget> {
@@ -2240,7 +2240,7 @@ fn agent_doctor(root_id: Option<&str>) -> Result<Value, String> {
         .ok_or_else(|| format!("unknown Rotli root: {id}"))?;
     let configured_read_only = target.read_only;
     target.read_only = true;
-    let mut workspace = Workspace::open_target(target)?;
+    let mut workspace = Workspace::open_target(target)?; // vault bind (vetted): root_targets vets every root (vet_config, refuse_pinned_root, or the app's open root)
     let metrics = workspace.metrics()?;
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let tools = mcp_tools();
@@ -2292,7 +2292,7 @@ fn agent_self_test() -> Result<Value, String> {
         r#"{"id":"mx_agent_self_test","contract":"3.4","apps":{}}"#,
     )
     .map_err(|error| error.to_string())?;
-    let mut workspace = Workspace::open_target(RootTarget {
+    let mut workspace = Workspace::open_target(RootTarget { // vault bind (private): a temp folder this call made
         id: DEFAULT_ROOT_ID.into(),
         label: "Isolated agent self-test".into(),
         path: root,

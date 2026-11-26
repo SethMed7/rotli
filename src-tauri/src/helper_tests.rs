@@ -437,7 +437,9 @@ fn completion_accepts_ordinary_prompts_and_does_not_write_a_vault_index() {
     std::fs::write(folder.path().join("ordinary.md"), "A public synthetic note.").unwrap();
     let refused = completion_refusal(&helper, "A public synthetic question.");
     assert!(refused.1.contains("unknown provider"));
-    assert!(!folder.path().join(".rotli").exists());
+    // nothing in `.rotli/` but, in a host build, the mark on the folder it chose
+    let sidecar: Vec<_> = std::fs::read_dir(folder.path().join(".rotli")).into_iter().flatten().flatten().map(|e| e.file_name()).collect();
+    assert!(sidecar.iter().all(|name| name == "bound-by"), "{sidecar:?}");
 }
 
 #[test]

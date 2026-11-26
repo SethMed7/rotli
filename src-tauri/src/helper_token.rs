@@ -13,7 +13,18 @@ pub(crate) fn token_dir() -> Result<PathBuf, String> {
     let home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .ok_or_else(|| "couldn't find your home directory".to_string())?;
-    Ok(PathBuf::from(home).join(".rotli-helper"))
+    Ok(helper_dir_for(Path::new(&home), crate::app_identity::APP_IDENTIFIER))
+}
+
+/// Where a helper keeps its token and vault choice. `~/.rotli-helper` is the
+/// standalone build's; a host build's helper keeps its own inside its own
+/// support folder, so it never serves the vault Rotli's helper chose.
+pub(crate) fn helper_dir_for(home: &Path, identifier: &str) -> PathBuf {
+    if identifier == crate::app_identity::STANDALONE_IDENTIFIER {
+        home.join(".rotli-helper")
+    } else {
+        crate::app_identity::support_dir_for(home, identifier).join("Helper")
+    }
 }
 
 /// Two v4 UUIDs without hyphens: 64 characters from the OS CSPRNG.
@@ -160,3 +171,7 @@ mod tests {
         assert_eq!(load_or_create_token(&dir, false).unwrap(), healed);
     }
 }
+
+#[cfg(test)]
+#[path = "helper_vault_identity_tests.rs"]
+mod identity_tests;

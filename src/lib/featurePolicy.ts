@@ -53,6 +53,9 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
   } as const;
 }
 
+/** Which app this build is (src/lib/appIdentity.ts), beside the two axes above. */
+export { OWNS_SHARED_STATE } from "./appIdentity";
+
 /** The one caption for a capability a surface names but this build withholds. */
 export const COMING_SOON_CAPTION = "Coming soon — not in this release yet";
 /** Only the build chooses the shell; settings and URLs cannot override it. */

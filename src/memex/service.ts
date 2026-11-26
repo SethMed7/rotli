@@ -77,7 +77,10 @@ export const detect = (): Promise<DetectedMemex[]> => memexDetect();
  * False when the picker is cancelled. */
 export const chooseFolder = (path?: string): Promise<boolean> => corpusChooseFolder(path);
 
-/** Ask for a vault folder in the macOS panel: null when the person cancels. */
+/** Ask for a vault folder in the macOS panel: null when the person cancels.
+ * A host build's Rust side refuses a folder Rotli already uses as a vault,
+ * in the host's own words (src-tauri/src/app_identity.rs); the rejection
+ * reaches the person as Rust words it. */
 export const pickVaultFolder = (title: string): Promise<string | null> => memexPickFolder(title);
 
 /** Switch to a vault already registered with Rotli. The backend resolves its

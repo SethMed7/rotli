@@ -103,9 +103,11 @@ pub(crate) fn picker_start(app: &tauri::AppHandle) -> PathBuf {
         .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
         .unwrap_or_else(|| PathBuf::from("/"));
     let configured = crate::corpus::is_configured(app)
-        .then(|| crate::corpus::read_corpus_config(app))
+        .then(|| crate::corpus::read_corpus_config(app)) // vault bind (live): host_registry::live_root below
         .flatten()
         .map(|config| config.corpus.abs_path);
+    // a host build starts beside the vault it has open, never one a registry names
+    let configured = crate::host_registry::live_root(app, crate::corpus::DEFAULT_ROOT_ID, configured);
     picker_start_directory(configured.as_deref(), &home)
 }
 
@@ -283,7 +285,7 @@ pub(crate) fn forget_vault(_app: &tauri::AppHandle, _memex_id: &str) {}
 /// have no portable vault id, so they deliberately remain path-based.
 #[cfg(target_os = "macos")]
 pub(crate) fn repair_vault_locations(app: &tauri::AppHandle) -> Result<bool, String> {
-    let Some(mut config) = crate::corpus::read_corpus_config(app) else {
+    let Some(mut config) = crate::corpus::read_corpus_config(app) else { // vault bind (vetted): launch runs this between two secure_registry passes
         return Ok(false);
     };
     let mut registry = read_registry(app);

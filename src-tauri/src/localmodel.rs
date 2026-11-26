@@ -261,6 +261,7 @@ pub async fn local_model_install(
     approx_mb: Option<u64>,
     vision: Option<bool>,
 ) -> Result<(), String> {
+    crate::app_identity::require_shared_state()?;
     valid_repo(&repo)?;
     valid_name(&name)?;
     let hf = hf_bin();
@@ -479,6 +480,7 @@ fn registry_entry(id: &str) -> Result<(String, PathBuf), String> {
 /// won't re-read the plist).
 #[tauri::command]
 pub fn local_model_set_default(id: String) -> Result<(), String> {
+    crate::app_identity::require_shared_state()?; // ~/.memex/ai and its launchd agent
     valid_name(&id)?;
     let (provider, path) = registry_entry(&id)?;
     if provider != "mlx" {
@@ -574,6 +576,7 @@ fn reload_mlx(plist: &Path) -> Result<(), String> {
 /// memex apps resolve it with no model field, so it must always exist.
 #[tauri::command]
 pub fn local_model_uninstall(id: String) -> Result<(), String> {
+    crate::app_identity::require_shared_state()?;
     valid_name(&id)?;
     let mut reg = read_registry()?;
     let models = reg

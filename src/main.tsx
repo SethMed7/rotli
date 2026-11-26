@@ -3,9 +3,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import App from "./app";
+import { APP_IDENTIFIER, IDENTITY_MISMATCH, identityHolds } from "./lib/appIdentity";
 import { PLATFORM } from "./lib/featurePolicy";
 import { attachIdleMotion } from "./lib/idleMotion";
-import { hasDurableCorpus } from "./lib/tauri";
+import { hasDurableCorpus, isTauri, runtimeIdentifier } from "./lib/tauri";
 import { syncFolderRoles } from "./services/fsNotes";
 import { holdLibrarianOffInPlace } from "./services/librarianSwitch";
 import { hydrateWebVault } from "./services/notes";
@@ -34,6 +35,13 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   // Rotli Web lays its chrome out for a browser tab (no traffic lights, no
   // window drag); the stylesheet keys off this before the first paint.
   document.documentElement.dataset.platform = PLATFORM;
+  // The front end must be the app Rust is (src/lib/appIdentity.ts), before it
+  // reads or applies anything: a host bundle built without the identifier
+  // define would otherwise act as Rotli.
+  if (isTauri() && !(await identityHolds(APP_IDENTIFIER, runtimeIdentifier))) {
+    rootEl.textContent = IDENTITY_MISMATCH;
+    return;
+  }
   await hydrateWebVault(); // Rotli Web: connect the bound vault, or leave setup to show; a no-op elsewhere
   await syncFolderRoles(); // an imported vault's own folders, before anything lists it
   await hydratePersistedState(); // no-op in a plain browser; never throws

@@ -90,6 +90,9 @@ as an encrypted vault.
   neither receives secure notes or independent filesystem authority.
 - **Network services** and DNS responses are untrusted. Each destination class
   is pinned, resolved, bounded, or explicitly approved at its adapter.
+- **A host build** is another app that runs Rotli's shell under its own
+  bundle ID (`docs/architecture/host-seams.md`). It is trusted with its own
+  folders and untrusted with Rotli's: see "The host-identity boundary".
 - **Dependencies and release infrastructure** may be compromised. Lockfiles,
   adapter seams, audits, signatures, notarization, and provenance reduce but do
   not eliminate this risk.
@@ -119,6 +122,66 @@ Updater  ── pinned HTTPS feed + signed artifact + notarized bundle
 Dependencies point inward; no presentation or imported document may choose a
 transport, credential, or filesystem authority directly.
 
+## The host-identity boundary
+
+A host build shares Rotli's code but not Rotli's state. Its contract is in
+[`../architecture/host-seams.md`](../architecture/host-seams.md); this section
+owns the threat side.
+
+- **Assets.** Rotli's vaults (every folder that is, sits in, or holds one) and
+  the state two installed apps would share: the `rotli` Keychain service,
+  LaunchAgents, the update feed, `rotli://`, `~/.memex/ai`, `~/breve`.
+- **Attacker.** Anything that can write the host's support folder
+  (`~/Library/Application Support/<bundle ID>`): a sync tool, a restore, a
+  migration, or a process scoped to that folder. It can plant a registry, a
+  backup, a legacy pointer, a helper config, a bookmark, or a folder at the
+  scratch path, before launch or while the app runs.
+- **The new writable surface.** A host build writes one empty file into each
+  folder it binds: `.rotli/bound-by/<bundle ID>` (`app_identity::claim`).
+  Nothing in the support folder vouches for a folder; only this mark, inside
+  the folder, does, and only together with the vault refusal
+  (`app_identity::refuse_existing_vault`), which refuses a folder that is,
+  sits in, or holds an unmarked vault. The standalone build writes and reads
+  no mark.
+- **Controls.** At launch every registry file is vetted before any root is
+  read and again after the bookmark repair; a refused file is set aside
+  whole, and a launch that can't vet it exits 73. After launch a host takes
+  roots, and their adopted and active flags and a connected vault's
+  read-only flag, only from its open stores; the current vault's write right
+  comes from its own `memex.json`, never the registry. The helper and the CLI vet each root on every load and walk below
+  it once per process. `check:vault-binds` makes every call that turns a path
+  into a root, and every registry read, say why it is safe, ties a refused or
+  live reason to the same variable, and pins the count per file. It is a
+  tripwire, not a proof.
+- **What it can't stop.** A same-user process with general write access can
+  forge the mark inside a Rotli vault next to a planted registry. The mark
+  travels with copies and synced replicas of a host's folder. A folder a
+  host marked stays its own after a person also opens it in standalone
+  Rotli. Between the vetting and the bind there is a time-of-check gap that
+  only a same-user process can race, and a vault made inside an open root
+  while the app runs is seen only at the next launch (by the helper and the
+  CLI, only when the process restarts). A registry rewritten after launch
+  can still name an open added folder as a connected vault, which opens the
+  memex write lane there if the folder holds a valid `memex.json`; it is the
+  host's own folder.
+- **Residual risk, accepted 2026-11-25.**
+  - **Asset and abuse case:** a Rotli vault, opened by a host build because a
+    hostile same-user process forged the mark inside it next to a planted
+    registry.
+  - **Reachability:** none in the shipped macOS product, which is standalone
+    Rotli and writes and reads no mark. It is reachable only in a host build.
+  - **Severity:** moderate. A process that can already write the vault can
+    already read and change it.
+  - **Compensating controls:** the mark, the vault refusal at every bind,
+    `check:vault-binds`, and macOS account isolation. The case also sits under
+    "Confidentiality between processes running as the same macOS user"
+    (below).
+  - **Owner:** the maintainer.
+  - **Review date:** 2027-02-25.
+  - **Reconsider earlier** when a host build ships to people outside the
+    maintainer's own machines, or a host adds a sync or restore path into its
+    support folder.
+
 ## Abuse cases and controls
 
 | Abuse case | Primary controls | Residual risk / owner |
@@ -145,6 +208,7 @@ transport, credential, or filesystem authority directly.
 | A page in the private browser invokes Rotli IPC or retains a session | Separate child webview; capability targets name only app-owned webviews; no remote capability URLs; non-persistent WebKit data store; HTTP(S)-only top-level navigation; browser tabs hydrate as absent | The viewed site still receives ordinary browser request metadata and user-entered data; downloads are intentionally disabled in this first slice |
 | A connected client, or a tampered model cache, reports a hostile model id, effort, or label | Model discovery (`provider_models.rs`) accepts only what the client itself reported: ids must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,95}(\[1m\])?$` (never a flag, no spaces), efforts are intersected with Rotli's fixed vocabulary before any `-c` value is built, labels lose control/format characters and are length-capped; the webview can name an id but never add one; discovery spawns reuse each lane's isolation (Claude safe mode, tools off, no persistence), send no prompt, and are killed at a 20 s deadline with 1 MB output caps | A same-user process that can edit `~/.codex/models_cache.json` can add a well-formed model name the user may then pick; it already controls that CLI's own configuration |
 | A connected CLI loads the user's own MCP servers or tools, which can read a secure note outside Rotli's gates and send it to the provider | Claude: `--safe-mode --strict-mcp-config`, built-in tools off, cleared and allowlisted environment. Codex: `--ignore-user-config` plus overrides for skills, apps, plugins, remote plugins, sub-agents, `view_image`, image generation, goals, sleep and native web search; code-loading variables removed; a fail-closed floor of 0.147.0 read from the `codex-cli` version (`scripts/probe-codex-isolation.sh` proves the tool list and that code-mode `exec` reads nothing). Cursor: paused in Rust and TS (`lane_pause.rs`, `src/lib/lanePause.ts`) until a signed-in probe shows `~/.cursor/mcp.json` tools can't reach the model. Antigravity: private profile, host Google variables stripped. Every ACP lane: `mcpServers: []`, no fs/terminal capability, permission requests refused (`cli_isolation.rs`, chat audit 2026-11-24) | Codex still offers code-mode `exec` (a JavaScript isolate with no file system or network), `update_plan`, `request_user_input`, the clock, MCP resource tools with no server, and `apply_patch`: the read-only sandbox refuses every write, but its "lines not found" error confirms or denies a guessed line in any readable file (a one-bit check, no content); `$CODEX_HOME/AGENTS.md` still reaches it as instructions; Codex account-side apps and remote plugins were turned off by key but not observed under a ChatGPT sign-in; Codex system (`/etc/codex/config.toml`) and managed config layers still load, so an administrator-installed MCP server would still start |
+| A planted registry, pointer, helper config or scratch folder in a host build's support folder names a Rotli vault | The mark inside the folder plus the vault refusal, at launch, after launch (open stores only), in the helper and in the CLI; `check:vault-binds` | A same-user writer can forge the mark inside a vault; see "The host-identity boundary" |
 | A hostile same-user process invokes the workspace CLI | Registered roots, secure/locked refusal, revisions, remote content gate | Same-user processes can edit ordinary files directly; stronger OS isolation is not claimed |
 | Two writers overwrite one another | Atomic writes, file locks where ownership matters, optimistic revisions for workspace edits | Editor/filesystem races outside revision-aware paths require focused tests |
 | An updater or release channel is replaced | Pinned feed (rotli.co redirecting to GitHub, GitHub as fallback, 2026-10-01), minisign verification, Developer ID signing, notarization, stapling; a hostile rotli.co can withhold an update and can't substitute an unsigned build, but could offer an older validly signed build (the plugin doesn't bind the manifest version to the signature), as a compromised GitHub feed could | Signing-key custody and release provenance remain operational responsibilities |

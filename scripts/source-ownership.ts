@@ -11,6 +11,7 @@ export const SOURCE_DIRECTORY_OWNERS = {
   documents: "editable document domain, workflows, codecs, engines, and composition",
   editor: "Markdown editor capability and its rendering/editing adapters",
   graph: "the Graph view: link projection domain, layout-engine adapter, and composition",
+  host: "the host seam: what a host build registers (Settings panes, notes on or off, wording) before the app starts",
   jsonCanvas: "JSON Canvas (.canvas) files: format model, edit workflow, note paths, and composition",
   keys: "keybinding vocabulary, dispatch, chords, and keyboard interaction policy",
   lib: "cross-capability utilities and narrow host adapters; pure by default",

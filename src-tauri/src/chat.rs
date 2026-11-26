@@ -565,7 +565,8 @@ fn read_api_key() -> Option<String> {
 /// Best-effort: kick the on-demand llama.cpp supervisor so the first openai call
 /// doesn't hit a dead socket. No `-k` (don't restart a warm server); errors ignored.
 fn ensure_llamacpp_up(endpoint: &str) {
-    if !endpoint.contains("11436") {
+    // a host build never drives the standalone app's launchd services
+    if !endpoint.contains("11436") || !crate::app_identity::owns_shared_state() {
         return; // only the memex llama.cpp tier is launchd-managed
     }
     let uid = match std::process::Command::new("id").arg("-u").output() {
