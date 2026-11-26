@@ -77,9 +77,8 @@ pub(crate) struct VaultConfig {
 
 pub(crate) struct ServedVault {
     config_path: PathBuf,
-    /// The config as last read, only to warm the ledger once per new vault.
-    /// Every request re-reads the (tiny) file instead of trusting its mtime:
-    /// `rotli-helper --vault` in a terminal rewrites it, and two quick
+    /// The config last walked and warmed. Every request re-reads the (tiny)
+    /// file, not its mtime: `rotli-helper --vault` rewrites it, and two quick
     /// rewrites can share an mtime.
     cached: Mutex<Option<VaultConfig>>,
     picker: Picker,
@@ -100,20 +99,21 @@ impl ServedVault {
 
     /// The vault being served now, read fresh from the config file.
     pub(crate) fn current(&self) -> Option<VaultConfig> {
-        let config = read_config(&self.config_path);
-        self.remember(config.as_ref());
-        config
+        let config = read_config(crate::app_identity::APP_IDENTIFIER, &self.config_path); // vault bind (vetted): read_config serves a marked root only, and remember walks below it
+        self.remember(config.as_ref()).then_some(config).flatten()
     }
 
-    /// Warm the ledger when the served vault is new to this process.
-    fn remember(&self, config: Option<&VaultConfig>) {
+    /// A served vault new to this process (at start, or a new choice) is walked
+    /// below as the app's launch walks, then warmed; `false`: serve nothing.
+    fn remember(&self, config: Option<&VaultConfig>) -> bool {
         let mut cached = self.cached.lock().unwrap_or_else(|p| p.into_inner());
+        let refused = cached.as_ref() != config
+            && config.is_some_and(|config| crate::app_identity::refuse_existing_vault(&config.root).is_err());
         if cached.as_ref() != config {
-            if let Some(config) = config {
-                warm_ledger(&config.root);
-            }
-            *cached = config.cloned();
+            *cached = config.filter(|_| !refused).cloned();
+            cached.as_ref().inspect(|config| warm_ledger(&config.root));
         }
+        !refused
     }
 
     /// Fresh disk truth before every remote completion, including external
@@ -130,7 +130,7 @@ impl ServedVault {
         scan: impl FnOnce(&Path, Option<&str>) -> Result<bool, Refusal>,
     ) -> Result<(), Refusal> {
         let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
-        let Some(config) = read_config(&self.config_path) else {
+        let Some(config) = self.current() else {
             // FSA pages can use a helper with no served vault. A missing config
             // has no vault to confuse; a broken one may hide secure notes.
             if self.config_path.exists() || vault_id.is_some() || vault_road.is_some_and(|road| road != "folder") {
@@ -165,7 +165,7 @@ impl ServedVault {
     /// Serve `folder` from now on. The same root keeps its id; a new one
     /// gets a new id, so a page bound to the old vault notices.
     pub(crate) fn choose(&self, folder: &Path) -> Result<VaultConfig, String> {
-        let config = choose_config(&self.config_path, folder)?;
+        let config = choose_config(&self.config_path, folder)?; // vault bind (vetted): choose_config refuses the folder before it marks or saves it
         self.remember(Some(&config));
         Ok(config)
     }
@@ -224,22 +224,26 @@ impl ServedVault {
     }
 }
 
-fn read_config(path: &Path) -> Option<VaultConfig> {
+/// The served vault while `identifier` owns it: never one a config merely names.
+pub(crate) fn read_config(identifier: &str, path: &Path) -> Option<VaultConfig> {
     // raw read (outside-vault): app config outside any vault
     let raw: Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
     let root = PathBuf::from(raw.get("root")?.as_str()?);
     let id = raw.get("id")?.as_str()?.to_string();
     // a folder that was moved or deleted is not served; the page says so
     let root = fs::canonicalize(root).ok().filter(|r| r.is_dir())?;
-    if contains_helper_dir(&root, path) {
-        return None; // a hand-edited or tampered config never serves the helper's own files
+    if contains_helper_dir(&root, path) || !crate::app_identity::still_owned_for(identifier, &root) {
+        return None; // a hand-edited or tampered config never serves the helper's own files or a vault it doesn't own
     }
     (!id.is_empty()).then_some(VaultConfig { root, id })
 }
 
-/// Validate `folder`, keep the id when it is the root already served, and
-/// persist the config owner-only. Shared by `--vault` and `vault_choose`.
+/// Validate `folder` (a host identity refuses a Rotli vault without its mark, then marks the folder),
+/// keep the id when it is the root already served, and persist the config owner-only. Shared by `--vault` and `vault_choose`.
 pub(crate) fn choose_config(config_path: &Path, folder: &Path) -> Result<VaultConfig, String> {
+    choose_config_as(crate::app_identity::APP_IDENTIFIER, config_path, folder) // vault bind (delegated): choose_config_as for this build
+}
+pub(crate) fn choose_config_as(identifier: &str, config_path: &Path, folder: &Path) -> Result<VaultConfig, String> {
     let root = fs::canonicalize(folder).map_err(|e| format!("couldn't open {}: {e}", folder.display()))?;
     if !root.is_dir() {
         return Err(format!("{} is not a folder", root.display()));
@@ -253,7 +257,8 @@ pub(crate) fn choose_config(config_path: &Path, folder: &Path) -> Result<VaultCo
             root.display()
         ));
     }
-    let id = match read_config(config_path) {
+    crate::app_identity::refuse_existing_vault_for(identifier, &root).and_then(|()| crate::app_identity::claim_for(identifier, &root))?; // vault bind (refused): refuse_existing_vault_for above
+    let id = match read_config(identifier, config_path) { // vault bind (refused): refuse_existing_vault_for above
         Some(existing) if existing.root == root => existing.id,
         _ => format!("hv_{}", uuid::Uuid::new_v4().simple()),
     };

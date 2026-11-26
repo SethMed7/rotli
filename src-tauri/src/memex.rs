@@ -384,13 +384,14 @@ fn root_among(roots: &[PathBuf], want: &Path) -> bool {
 /// write root could plant chats/ inside a curated tree).
 /// pub(crate): provider.rs validates the image-assets root through the same gate.
 pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
-    let cfg = crate::corpus::ensure_corpus_config(app);
+    let cfg = crate::corpus::ensure_corpus_config(app); // vault bind (live): require_live: an open store's root only
     let mut roots: Vec<PathBuf> = vec![cfg.corpus.abs_path];
     roots.extend(cfg.brains.into_iter().map(|b| b.abs_path));
     roots.extend(cfg.folders.into_iter().map(|f| f.abs_path));
     let want = PathBuf::from(root);
     if root_among(&roots, &want) {
-        fs::canonicalize(&want).map_err(|e| format!("bad vault root {root}: {e}"))
+        let root = fs::canonicalize(&want).map_err(|e| format!("bad vault root {root}: {e}"))?;
+        crate::host_registry::require_live(app, &root).map(|()| root)
     } else {
         Err(format!("not a registered vault root: {root}"))
     }
@@ -402,7 +403,7 @@ pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<Path
 /// lane around `CorpusStore::perms_read_only` for connected brains.
 fn registered_write_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
     let want = registered_root(app, root)?;
-    let cfg = crate::corpus::ensure_corpus_config(app);
+    let cfg = crate::corpus::ensure_corpus_config(app); // vault bind (no-root): perms only; the root came from registered_root
     if memex_write_allowed(&cfg, &want) {
         Ok(want)
     } else {
@@ -432,6 +433,11 @@ pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String>
     // A debug shell is an isolated review workspace. Never enumerate or offer
     // the user's production brains from `tauri dev`.
     if crate::development_read_only(&app) {
+        return Ok(Vec::new());
+    }
+    // A host build never offers an existing vault (its first run is the
+    // scratch vault, and every vault Rotli uses stays Rotli's).
+    if !crate::app_identity::owns_shared_state() {
         return Ok(Vec::new());
     }
     let mut roots: Vec<PathBuf> = Vec::new();

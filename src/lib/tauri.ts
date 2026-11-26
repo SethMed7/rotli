@@ -23,7 +23,7 @@ import type { PromptText } from "./promptText";
 export type { FrontmatterView } from "./corpusFrontmatter";
 import { type PathId, splitRootId } from "./corpusWireId";
 export { rootIdOf, splitRootId } from "./corpusWireId";
-import { PLATFORM } from "./featurePolicy";
+import { OWNS_SHARED_STATE, PLATFORM } from "./featurePolicy";
 import { PAUSED_MESSAGE, lanePaused } from "./lanePause";
 import { sameTaskRequest } from "./sameTaskRequest";
 import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
@@ -148,7 +148,7 @@ export async function summon(): Promise<void> {
  * Rejects when the OS refuses the chord — the caller must NOT have committed
  * the rebind yet. */
 export async function setGlobalShortcut(actionId: string, accelerator: string | null): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri() || !OWNS_SHARED_STATE) return; // a host build takes no OS-wide chord
   await invoke("set_summon_shortcut", { actionId, accelerator });
 }
 
@@ -236,10 +236,17 @@ export async function appVersion(): Promise<string | null> {
   return getVersion();
 }
 
+/** The bundle ID the running app reports (Tauri's runtime config). Only
+ * called inside Tauri. */
+export async function runtimeIdentifier(): Promise<string> {
+  const { getIdentifier } = await import("@tauri-apps/api/app");
+  return getIdentifier();
+}
+
 /** Ask the feed once whether a newer signed build exists. Resolves
  * { available:false } outside Tauri, or when the feed says we're current. */
 export async function checkForUpdate(): Promise<UpdateStatus> {
-  if (!isTauri()) return { available: false };
+  if (!isTauri() || !OWNS_SHARED_STATE) return { available: false }; // a host build never reads the feed
   const { check } = await import("@tauri-apps/plugin-updater");
   const update = await check();
   if (!update) return { available: false };
@@ -255,7 +262,7 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
  * reporting 0–100% progress, then relaunch into the new build. No-op outside
  * Tauri or when nothing is available. */
 export async function downloadAndInstallUpdate(onProgress?: (pct: number) => void): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri() || !OWNS_SHARED_STATE) return;
   const { check } = await import("@tauri-apps/plugin-updater");
   const update = await check();
   if (!update) return;
@@ -1890,55 +1897,11 @@ export const clipboardFilePaths = (): Promise<string[]> =>
 //     rotli surface — #96, audit 2026-07). Mirror-not-import: the byte-shape
 //     of what we write lives in src/memex/contract.ts; these only move bytes. ———
 
-/** A folder probed for a memex signature (the memex.json `mx_` marker). */
-export interface DetectedMemex {
-  root: string;
-  label: string;
-  /** "memex" (real, mx_ memex.json) · "plain" (a dir, no valid memex.json) ·
-   * "fresh" (empty/absent — safe to init). */
-  kind: "memex" | "plain" | "fresh";
-  memexId: string | null;
-  contract: string | null;
-  hasUsersJson: boolean;
-  /** Raw users.json contents (TS parses access mode with the mirror codec). */
-  usersJson: string | null;
-}
+import type { DetectedMemex, MemexChatSummary, MemexContractRaw, MemexValidateReport } from "./memexWire";
+export type { DetectedMemex, MemexChatSummary, MemexContractRaw, MemexValidateReport } from "./memexWire";
 
 /** The wire perms a brain carries — the contract's user tiers, never the Filer lane. */
 export type MemexPerms = UserPerms;
-
-export interface MemexContractRaw {
-  memexJson: string;
-  usersJson: string;
-  identitiesJson: string;
-}
-
-export interface MemexChatSummary {
-  slug: string;
-  title: string;
-  source: string;
-  attachedTo: string;
-  path: string;
-  /** fs mtime in ms (0 when unreadable) — ⌥A summon-chat picks the newest. */
-  modifiedMs: number;
-  /** When the newest reply landed (ms; 0 = no reply yet, or one longer than
-   * the listing's tail window) — the sidebar's order (chatActivityMs). */
-  repliedMs: number;
-  /** `pinned: true` frontmatter — the sidebar sorts pinned chats first. */
-  pinned: boolean;
-  /** `model:` / `provider:` frontmatter — who answers this chat, in the file
-   * itself (2026-09-17); "" when the chat predates them. */
-  model: string;
-  provider: string;
-}
-
-export interface MemexValidateReport {
-  ok: boolean;
-  skipped: boolean;
-  stdout: string;
-  errors: number;
-  warnings: number;
-}
 
 function memexInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {

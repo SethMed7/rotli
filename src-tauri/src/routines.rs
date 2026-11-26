@@ -517,8 +517,8 @@ fn stop_child(child: &mut Child) {
 
 impl BreveSupervisor {
     pub fn start(&self, app: &AppHandle, root: PathBuf) -> Result<(), String> {
-        // Stable and debug previews never install or start a managed scheduler.
-        if !crate::feature_policy::breve_enabled() || cfg!(debug_assertions) {
+        // Stable, debug and host builds never install or start a managed scheduler.
+        if !crate::feature_policy::breve_enabled() || cfg!(debug_assertions) || !crate::app_identity::owns_shared_state() {
             return Ok(());
         }
         if !root.join(MANAGED_MARKER).is_file() {

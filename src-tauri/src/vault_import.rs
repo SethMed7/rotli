@@ -309,13 +309,14 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
     }
     let record = record(&source, &destination, &plan)?;
     crate::flush_webviews_before_shutdown(app)?;
-    let previous = corpus::is_configured(app).then(|| corpus::resolve_corpus(app));
+    let configured = corpus::is_configured(app).then(|| corpus::resolve_corpus(app)); // vault bind (live): host_registry::live_root below
+    let previous = crate::host_registry::live_root(app, corpus::DEFAULT_ROOT_ID, configured);
     // a copy of a folder connected in place replaces it (read before the copy
     // is marked: the copy gets a fresh, not-in-place marker)
     let replaces = crate::vault_roles::in_place(&source);
     let marked = make_vault(&destination, previous.as_deref())?;
     let memex = crate::memex::detect_folder(&destination).kind == "memex";
-    crate::activate_vault_path_live(app, destination.clone(), !memex)?;
+    crate::activate_vault_path_live(app, destination.clone(), !memex)?; // vault bind (refused): the destination was refused above
     if replaces {
         // only the copy stays connected, and the original gets back the
         // marker Rotli wrote into it (the owner, 2026-10-15)
@@ -340,7 +341,7 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
 pub(crate) fn make_vault(destination: &Path, previous: Option<&Path>) -> Result<Marked, String> {
     let marked = crate::vault_roles::mark_imported(destination)?;
     if let Some(previous) = previous {
-        corpus::carry_settings(previous, destination)?;
+        corpus::carry_settings(previous, destination)?; // vault bind (vetted): previous is the open vault (host_registry::live_root); the destination was refused
     }
     if marked == Marked::Imported {
         crate::vault_roles::seed_librarian(destination)?;

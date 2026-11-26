@@ -609,6 +609,9 @@ mod tests {
 
     #[test]
     fn removing_a_pairing_disconnects_and_deletes_the_keychain_bundle() {
+        if !crate::app_identity::owns_shared_state() {
+            return; // a host build has no Keychain to pair through (keychain.rs tests)
+        }
         let pairing = new_pairing("https://relay.example");
         crate::keychain::store_secret(
             REMOTE_AGENT_TOKEN_ACCOUNT,

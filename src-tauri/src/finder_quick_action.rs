@@ -95,6 +95,11 @@ fn user_services() -> Result<PathBuf, String> {
 /// `absent` · `installed` · `theirs` (a same-named workflow Rotli didn't make).
 #[tauri::command]
 pub(crate) fn finder_quick_action_status() -> Result<String, String> {
+    // "Open in Rotli" is the standalone app's; a host build neither reads
+    // nor writes ~/Library/Services
+    if !crate::app_identity::owns_shared_state() {
+        return Ok("unavailable".into());
+    }
     Ok(status_word(status(&user_services()?)).into())
 }
 
@@ -102,6 +107,7 @@ pub(crate) fn finder_quick_action_status() -> Result<String, String> {
 /// Settings. Returns the new status word.
 #[tauri::command]
 pub(crate) async fn finder_quick_action_set(app: tauri::AppHandle, installed: bool) -> Result<String, String> {
+    crate::app_identity::require_shared_state()?;
     let bundle_id = app.config().identifier.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let services = user_services()?;

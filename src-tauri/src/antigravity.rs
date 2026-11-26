@@ -40,9 +40,12 @@ pub(crate) const HARNESS_BYTES: u64 = 101_551_680;
 /// Where the managed runtime lives — a fixed path so the provider allowlist
 /// (`CLIS`, parity-pinned) can name it without an app handle. On macOS Tauri's
 /// app-data dir is exactly `~/Library/Application Support/<identifier>`.
-pub(crate) const BIN_CANDIDATE: &str =
-    "~/Library/Application Support/com.rotli.app/antigravity-acp/current/agy_acp_server.par";
-const SUPPORT_DIR: &str = "Library/Application Support/com.rotli.app";
+pub(crate) const BIN_CANDIDATE: &str = concat!(
+    "~/Library/Application Support/",
+    crate::app_identity::app_identifier!(),
+    "/antigravity-acp/current/agy_acp_server.par"
+);
+const SUPPORT_DIR: &str = concat!("Library/Application Support/", crate::app_identity::app_identifier!());
 const RELEASE_RECORD: &str = "release.json";
 const SIGN_IN_REQUEST_ID: &str = "antigravity:sign-in";
 const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(300);

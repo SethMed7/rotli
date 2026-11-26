@@ -334,7 +334,7 @@ fn cli_bin_candidates_match_fixture() {
     );
     for spec in crate::provider::CLIS {
         assert_eq!(
-            string_list(&map[spec.id]),
+            string_list(&map[spec.id]).iter().map(|bin| bin.replace(crate::app_identity::STANDALONE_IDENTIFIER, crate::app_identity::APP_IDENTIFIER)).collect::<Vec<_>>(),
             spec.bins,
             "candidate list drifted for {}",
             spec.id

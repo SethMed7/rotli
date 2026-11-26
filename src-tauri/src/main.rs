@@ -6,5 +6,5 @@ fn main() {
     if let Some(status) = rotli_lib::run_headless_if_requested(&args) {
         std::process::exit(status);
     }
-    rotli_lib::run()
+    rotli_lib::run(tauri::generate_context!())
 }

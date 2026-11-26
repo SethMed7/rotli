@@ -6,6 +6,8 @@
 mod agent_bridge;
 mod agent_bridge_socket;
 mod ai_edit_policy;
+mod app_host;
+mod app_identity;
 mod app_settings;
 mod board;
 mod breve;
@@ -29,6 +31,7 @@ pub mod helper;
 mod helper_args;
 mod helper_picker;
 mod helper_vault;
+mod host_registry;
 mod helper_token;
 mod keychain;
 mod loopback_http;
@@ -756,7 +759,7 @@ fn hide_quick_window(app: AppHandle) {
 /// Settings → Storage → "Reveal in Finder": open the corpus folder.
 #[tauri::command]
 fn corpus_reveal(app: AppHandle) {
-    let root = corpus::resolve_corpus(&app);
+    let Some(root) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, Some(corpus::resolve_corpus(&app))) else { return }; // vault bind (live): host_registry::live_root
     #[cfg(target_os = "macos")]
     let _ = child_run::spawn_reaped(std::process::Command::new("open").arg(&root));
     #[cfg(not(target_os = "macos"))]
@@ -795,6 +798,11 @@ pub(crate) fn reject_privileged_root(
     use tauri::Manager;
     let candidate = std::fs::canonicalize(candidate)
         .map_err(|error| format!("canonicalize selected folder: {error}"))?;
+    // a host build's own scratch vault sits in its support folder on purpose;
+    // only while it is still the real folder this build made
+    if app_identity::owned_scratch_vault(app).as_ref() == Some(&candidate) {
+        return app_identity::refuse_existing_vault(&candidate);
+    }
     let mut protected = Vec::new();
     let mut forbidden_home_or_ancestor = false;
     if let Ok(home) = std::env::var("HOME") {
@@ -827,10 +835,12 @@ pub(crate) fn reject_privileged_root(
         protected.push(path);
     }
     if forbidden_home_or_ancestor || overlaps_any_private_path(&candidate, &protected) {
-        Err("That folder overlaps private application, credential, or agent-runtime state and cannot be used as a notes root.".into())
-    } else {
-        Ok(())
+        return Err("That folder overlaps private application, credential, or agent-runtime state and cannot be used as a notes root.".into());
     }
+    // A host build never opens a folder Rotli already uses as a vault: every
+    // way a folder becomes notes passes here before anything writes to it.
+    // The standalone build refuses nothing and reads nothing more.
+    app_identity::refuse_existing_vault(&candidate)
 }
 
 fn overlaps_any_private_path(
@@ -986,7 +996,7 @@ fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bo
     }
     reject_privileged_root(&app, &abs)?;
     flush_webviews_before_shutdown(&app)?;
-    if !corpus::add_folder(&app, abs)? {
+    if !corpus::add_folder(&app, abs)? { // vault bind (refused): reject_privileged_root above
         return Ok(true); // already the corpus / a brain / a folder — no-op, no restart
     }
     relaunch_app(&app)?;
@@ -1188,6 +1198,10 @@ async fn corpus_inspect_folder(app: AppHandle, path: String) -> Result<VaultInsp
         let path = app
             .state::<memex::FolderAuthorizations>()
             .require(std::path::Path::new(&path))?;
+        // the picker grants a folder before refusing it; a host reads no refused folder
+        if !app_identity::owns_shared_state() {
+            reject_privileged_root(&app, &path)?;
+        }
         inspect_vault_path(&path)
     })
     .await
@@ -1235,7 +1249,7 @@ fn corpus_status(app: AppHandle) -> bool {
 /// The whole Location config. Migrates the four legacy files in on first read.
 #[tauri::command]
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
-    let cfg = corpus::ensure_corpus_config(&app);
+    let cfg = host_registry::live_config(&app, corpus::ensure_corpus_config(&app)); // vault bind (live): host_registry::live_config
     let development_read_only = development_read_only(&app);
     // An imported vault is not a memex to the webview: its notes go through the
     // corpus store, never the memex note lanes (wiki/_inbox). Its Librarian
@@ -1324,7 +1338,8 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
             picked.into_path().map_err(|e| e.to_string())?
         }
     };
-    let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
+    let configured = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app)); // vault bind (live): host_registry::live_root below
+    let current = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, configured);
     reject_privileged_root(&app, &abs)?;
     if current.as_ref() == Some(&abs) {
         return Ok(false);
@@ -1334,23 +1349,23 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
     let adopted = match memex::detect_folder(&abs).kind.as_str() {
         "memex" => {
             if let Some(current) = &current {
-                corpus::carry_settings(current, &abs)?;
+                corpus::carry_settings(current, &abs)?; // vault bind (refused): the target was refused; current is host_registry::live_root
             }
             false
         }
         "fresh" => {
             if let Some(current) = &current {
                 if !corpus::is_memex_root(current) {
-                    corpus::relocate(current, &abs)?;
+                    corpus::relocate(current, &abs)?; // vault bind (refused): the target was refused; current is host_registry::live_root
                 }
                 // relocate carries .rotli/ along; this is a no-op in that case
-                corpus::carry_settings(current, &abs)?;
+                corpus::carry_settings(current, &abs)?; // vault bind (refused): the target was refused; current is host_registry::live_root
             }
             false
         }
         _ => {
             if let Some(current) = &current {
-                corpus::carry_settings(current, &abs)?;
+                corpus::carry_settings(current, &abs)?; // vault bind (refused): the target was refused; current is host_registry::live_root
             }
             // Decision I: the same layout as a copy (marker + role map, Rotli's
             // folders suffixed), marked "in place" so the Librarian never runs
@@ -1365,7 +1380,7 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
             true
         }
     };
-    activate_vault_path_live(&app, abs, adopted)
+    activate_vault_path_live(&app, abs, adopted) // vault bind (refused): reject_privileged_root above
 }
 
 /// Attach one newly opened root to every long-lived runtime service. Existing
@@ -1384,7 +1399,7 @@ fn recover_missing_active_vault(app: &AppHandle, missing_root: &std::path::Path)
         return false;
     }
 
-    let fallback = corpus::read_corpus_config(app).and_then(|cfg| {
+    let fallback = corpus::read_corpus_config(app).and_then(|cfg| { // vault bind (vetted): taken only when an open store has that path and id
         cfg.brains.into_iter().find(|candidate| {
             candidate.abs_path.is_dir()
                 && state
@@ -1395,7 +1410,7 @@ fn recover_missing_active_vault(app: &AppHandle, missing_root: &std::path::Path)
         })
     });
     if let Some(fallback) = fallback {
-        if let Err(error) = activate_vault_path_live(app, fallback.abs_path, false) {
+        if let Err(error) = activate_vault_path_live(app, fallback.abs_path, false) { // vault bind (vetted): the fallback is already an open store at that path
             eprintln!("rotli: could not recover from a removed active vault ({error})");
         }
     } else {
@@ -1436,7 +1451,7 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
     let lane = vault_lane();
     let state = app.state::<corpus::CorpusState>();
     let active = id == corpus::DEFAULT_ROOT_ID;
-    let config = corpus::ensure_corpus_config(&app);
+    let config = corpus::ensure_corpus_config(&app); // vault bind (live): host_registry::live_root below
     let (root, adopted) = if active {
         (state.default_root_path()?, config.corpus.adopted)
     } else {
@@ -1448,7 +1463,8 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
         if !state.contains_root(&id)? {
             return Err("the connected vault is not open".into());
         }
-        (connected.abs_path.clone(), false)
+        let root = host_registry::live_root(&app, &id, Some(connected.abs_path.clone()));
+        (root.ok_or("the connected vault is not open")?, false)
     };
     if !root.is_dir() {
         if active {
@@ -1460,11 +1476,11 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
     }
     flush_webviews_before_shutdown(&app)?;
     let mut store = if development_read_only(&app) {
-        corpus::CorpusStore::open_read_only(root.clone())?
+        corpus::CorpusStore::open_read_only(root.clone())? // vault bind (vetted): host_registry::live_root: the open store's own root
     } else if adopted {
-        corpus::CorpusStore::open_adopted(root.clone())?
+        corpus::CorpusStore::open_adopted(root.clone())? // vault bind (vetted): host_registry::live_root: the open store's own root
     } else {
-        corpus::CorpusStore::open(root.clone())?
+        corpus::CorpusStore::open(root.clone())? // vault bind (vetted): host_registry::live_root: the open store's own root
     };
     store.warm_secure_ledger()?;
     store.seed_main_if_brought_in()?;
@@ -1494,11 +1510,11 @@ fn install_live_root_watcher(
     root: std::path::PathBuf,
     suppress: corpus::SuppressSet,
 ) {
-    let _ = app.asset_protocol_scope().allow_directory(&root, true);
+    let _ = app.asset_protocol_scope().allow_directory(&root, true); // vault bind (delegated): its callers refuse or vet the root first
     let handle = app.clone();
     let organizer = app.state::<organizer::OrganizerState>().0.clone();
     let active_root = root.clone();
-    if let Err(error) = corpus::spawn_watcher(root, suppress, move |paths| {
+    if let Err(error) = corpus::spawn_watcher(root, suppress, move |paths| { // vault bind (delegated): its callers refuse or vet the root first
         if !root_still_registered(&handle, &active_root) {
             return false;
         }
@@ -1538,9 +1554,9 @@ fn activate_vault_path_live(
     let mut new_root = None;
     if existing_id.is_none() {
         let mut store = if adopted {
-            corpus::CorpusStore::open_adopted(root.clone())?
+            corpus::CorpusStore::open_adopted(root.clone())? // vault bind (delegated): its callers refuse or vet the root first
         } else {
-            corpus::CorpusStore::open(root.clone())?
+            corpus::CorpusStore::open(root.clone())? // vault bind (delegated): its callers refuse or vet the root first
         };
         store.warm_secure_ledger()?;
         store.seed_main_if_brought_in()?;
@@ -1556,15 +1572,15 @@ fn activate_vault_path_live(
     let mut watcher = None;
     organizer.with_vault_transition(|| {
         if let Some(incoming_id) = existing_id.as_deref() {
-            state.activate_registered_root(incoming_id, || {
-                corpus::set_corpus_path_live(app, root.clone(), adopted)
+            state.activate_registered_root(incoming_id, || { // vault bind (delegated): its callers refuse or vet the root first
+                corpus::set_corpus_path_live(app, root.clone(), adopted) // vault bind (delegated): its callers refuse or vet the root first
             })?;
         } else {
             let (store, suppress) = new_root
                 .take()
                 .ok_or_else(|| "the selected vault could not be opened".to_string())?;
-            state.activate_new_root(store, || {
-                corpus::set_corpus_path_live(app, root.clone(), adopted)
+            state.activate_new_root(store, || { // vault bind (delegated): its callers refuse or vet the root first
+                corpus::set_corpus_path_live(app, root.clone(), adopted) // vault bind (delegated): its callers refuse or vet the root first
             })?;
             watcher = Some(suppress);
         }
@@ -1584,7 +1600,7 @@ fn activate_vault_path_live(
         Ok(())
     })?;
     if let Some(suppress) = watcher {
-        install_live_root_watcher(app, root, suppress);
+        install_live_root_watcher(app, root, suppress); // vault bind (delegated): its callers refuse or vet the root first
     }
     let _ = app.emit("rotli:vault-changed", ());
     Ok(true)
@@ -1604,7 +1620,7 @@ async fn corpus_switch_vault(app: AppHandle, id: String) -> Result<bool, String>
 
 fn corpus_switch_vault_blocking(app: AppHandle, id: String) -> Result<bool, String> {
     let _lane = vault_lane();
-    let cfg = corpus::ensure_corpus_config(&app);
+    let cfg = corpus::ensure_corpus_config(&app); // vault bind (refused): reject_privileged_root refuses the target below
     let target = corpus::connected_vault_switch_target(&cfg, &id)?;
     reject_privileged_root(&app, &target.abs_path)?;
     let live = memex::brain_connect_view(&target.abs_path)?;
@@ -1618,9 +1634,10 @@ fn corpus_switch_vault_blocking(app: AppHandle, id: String) -> Result<bool, Stri
         );
     }
     flush_webviews_before_shutdown(&app)?;
-    let current = corpus::resolve_corpus(&app);
-    corpus::carry_settings(&current, &target.abs_path)?;
-    activate_vault_path_live(&app, target.abs_path, false)
+    if let Some(current) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, Some(corpus::resolve_corpus(&app))) { // vault bind (live): host_registry::live_root
+        corpus::carry_settings(&current, &target.abs_path)?; // vault bind (refused): the target was refused; current is host_registry::live_root
+    }
+    activate_vault_path_live(&app, target.abs_path, false) // vault bind (refused): reject_privileged_root above
 }
 
 /// Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
@@ -1656,11 +1673,12 @@ fn corpus_init_memex_blocking(
     memex::scaffold_memex(&root)?;
     // a scaffolded memex has no .rotli — carry the onboarding flow's choices
     // (Librarian-vs-raw included) so the new vault honors what was just picked
-    if corpus::is_configured(&app) {
-        corpus::carry_settings(&corpus::resolve_corpus(&app), &root)?;
+    let configured = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app)); // vault bind (live): host_registry::live_root
+    if let Some(current) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, configured) {
+        corpus::carry_settings(&current, &root)?; // vault bind (refused): the target was refused; current is host_registry::live_root
     }
     write_new_vault_settings(&root, Some(brain_enabled))?;
-    activate_vault_path_live(&app, root, false)?;
+    activate_vault_path_live(&app, root, false)?; // vault bind (refused): reject_privileged_root above
     app.state::<corpus::CorpusState>()
         .route(corpus::DEFAULT_ROOT_ID, |store| {
             store.wire_id_of(memex::WELCOME_PRESET_FILE)
@@ -1716,11 +1734,11 @@ fn mount_connected_brain(
     } else {
         let suppress = store.suppress_set();
         store.set_perms_read_only(perms.read_only());
-        state.insert_root(root_id.clone(), store)?;
-        let _ = app.asset_protocol_scope().allow_directory(&root, true);
+        state.insert_root(root_id.clone(), store)?; // vault bind (delegated): its callers refuse or vet the root first
+        let _ = app.asset_protocol_scope().allow_directory(&root, true); // vault bind (delegated): its callers refuse or vet the root first
         let handle = app.clone();
         let watched = root.clone();
-        if let Err(error) = corpus::spawn_watcher(root, suppress, move |_| {
+        if let Err(error) = corpus::spawn_watcher(root, suppress, move |_| { // vault bind (delegated): its callers refuse or vet the root first
             if !root_still_registered(&handle, &watched) {
                 return false;
             }
@@ -1779,11 +1797,11 @@ fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result
     reject_privileged_root(&app, &abs)?;
     vault_marker::heal_best_effort(&abs);
     let meta = memex::prepare_brain_connect(&abs)?;
-    let mut store = corpus::CorpusStore::open(abs.clone())?;
+    let mut store = corpus::CorpusStore::open(abs.clone())?; // vault bind (refused): reject_privileged_root above
     store.set_perms_read_only(meta.perms.read_only());
     store.warm_secure_ledger()?;
     let perms = meta.perms;
-    let root_id = corpus::upsert_brain(
+    let root_id = corpus::upsert_brain( // vault bind (refused): reject_privileged_root above
         &app,
         corpus::ConnectedBrain {
             id: String::new(),
@@ -1795,7 +1813,7 @@ fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result
         },
         true,
     )?;
-    mount_connected_brain(&app, root_id, abs, perms, store)?;
+    mount_connected_brain(&app, root_id, abs, perms, store)?; // vault bind (refused): reject_privileged_root above
     Ok(true)
 }
 
@@ -1833,7 +1851,7 @@ pub(crate) fn forget_vault_at(app: &AppHandle, root: &std::path::Path) -> Result
     let same = |path: &std::path::Path| {
         std::fs::canonicalize(path).ok() == std::fs::canonicalize(root).ok() || path == root
     };
-    let cfg = corpus::ensure_corpus_config(app);
+    let cfg = corpus::ensure_corpus_config(app); // vault bind (no-root): matches a path to forget a vault by id
     match cfg.brains.iter().find(|brain| same(&brain.abs_path)) {
         Some(brain) => forget_brain_now(app, &brain.id.clone()),
         None => Ok(()),
@@ -2002,6 +2020,8 @@ fn set_summon_shortcut(
     action_id: String,
     accelerator: Option<String>,
 ) -> Result<(), String> {
+    // Rotli holds the OS-wide chords; a host build takes none of them.
+    app_identity::require_shared_state()?;
     if let Some(acc) = accelerator.as_deref() {
         acc.parse::<Shortcut>()
             .map_err(|e| format!("invalid accelerator {acc:?}: {e}"))?;
@@ -2036,14 +2056,38 @@ fn set_summon_shortcut(
     Ok(())
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub use app_host::AppHost;
+pub use app_identity::HostWords;
+
+/// Standalone Rotli: the shell with no host, under the Tauri context the
+/// `rotli` binary expands (src/main.rs). The library never expands a context
+/// itself, so a host crate links it without Rotli's front end.
+pub fn run(context: tauri::Context<tauri::Wry>) {
+    launch(context, Vec::new())
+}
+
+/// The shell under a host build (`app_host.rs`): its context, its plugins,
+/// its wording.
+pub fn run_with_host(host: AppHost) {
+    app_identity::set_host_words(host.words);
+    launch(host.context, host.plugins)
+}
+
+fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>) {
     // before any window exists: the webview reads this default at creation
     spellcheck::enable_continuous_spellcheck_by_default();
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_deep_link::init())
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_clipboard_manager::init());
+    // The update feed and rotli:// belong to the standalone build alone: a
+    // host build never registers either plugin, so it cannot ask rotli.co for
+    // an update or receive a link.
+    let builder = if app_identity::owns_shared_state() {
+        builder.plugin(tauri_plugin_updater::Builder::new().build()).plugin(tauri_plugin_deep_link::init())
+    } else {
+        builder
+    };
+    let global_default = |chord: &str| app_identity::owns_shared_state().then(|| chord.to_string());
+    let builder = builder
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -2071,13 +2115,16 @@ pub fn run() {
                     }
                 })
                 .build(),
-        )
+        );
+    // a host's own plugins come after Rotli's, in the order it gave them
+    let builder = host_plugins.into_iter().fold(builder, |builder, plugin| builder.plugin(plugin));
+    builder
         .manage(GlobalChords {
-            capture: Mutex::new(Some(DEFAULT_CAPTURE.to_string())),
-            main_toggle: Mutex::new(Some(DEFAULT_MAIN_TOGGLE.to_string())),
-            quick: Mutex::new(Some(DEFAULT_QUICK.to_string())),
-            chat: Mutex::new(Some(DEFAULT_CHAT_SUMMON.to_string())),
-            search: Mutex::new(Some(DEFAULT_SEARCH_SUMMON.to_string())),
+            capture: Mutex::new(global_default(DEFAULT_CAPTURE)),
+            main_toggle: Mutex::new(global_default(DEFAULT_MAIN_TOGGLE)),
+            quick: Mutex::new(global_default(DEFAULT_QUICK)),
+            chat: Mutex::new(global_default(DEFAULT_CHAT_SUMMON)),
+            search: Mutex::new(global_default(DEFAULT_SEARCH_SUMMON)),
         })
         .manage(LastBlurHide(Mutex::new(None)))
         .manage(NativeDialogOpen::default())
@@ -2332,6 +2379,17 @@ pub fn run() {
             memex::memex_pick_folder
         ])
         .setup(|app| {
+            // A stale build cache, or a host context naming another bundle ID,
+            // must not give one identity the other's behaviour: stop before
+            // the scratch vault is made or any folder is bound.
+            if !app_identity::matches_runtime(&app.config().identifier) {
+                eprintln!(
+                    "rotli: this binary was built as {} but runs as {}; rebuild it",
+                    app_identity::APP_IDENTIFIER,
+                    app.config().identifier
+                );
+                std::process::exit(78);
+            }
             #[cfg(target_os = "macos")]
             if native_drag::debug_drops() {
                 if let Some(main) = app.get_webview_window("main") {
@@ -2346,12 +2404,31 @@ pub fn run() {
             #[cfg(all(target_os = "macos", debug_assertions))]
             apply_dev_dock_icon(app.handle());
 
+            // A host build's first run binds its scratch vault (and only it),
+            // once it is a real, empty folder this build made. If it can't be
+            // made safe, nothing may bind it: stop.
+            if let Err(error) = app_identity::ensure_scratch_vault(app.handle()) {
+                eprintln!("rotli: the scratch vault is not safe to open ({error})");
+                std::process::exit(73);
+            }
+            // A host build binds only folders it marked: whatever its registry
+            // names that it doesn't own is set aside before anything reads a
+            // root, the repair below included, and again after the repair. If
+            // that fails, nothing binds.
+            let secure_registry = || {
+                if let Err(error) = host_registry::secure_registry(app.handle()) {
+                    eprintln!("rotli: the registry is not safe to open ({error})");
+                    std::process::exit(73);
+                }
+            };
+            secure_registry();
             // Resolve Finder moves and renames before any root is registered or
             // watched. A bookmark is accepted only when the live memex.json id
             // still matches the vault identity that was originally selected.
             if let Err(error) = vault_location::repair_vault_locations(app.handle()) {
                 eprintln!("rotli: could not repair moved vault locations ({error})");
             }
+            secure_registry();
 
             // Phase 2 / Track 2 — the corpus, now MULTI-ROOT. Build the root
             // registry (the DEFAULT root is always registered, pointing at
@@ -2372,7 +2449,7 @@ pub fn run() {
             // Rust write gates, not only the TS canWrite — carry them by root id.
             let brain_perms: std::collections::HashMap<String, memex::MemexPerms> =
                 if corpus::is_configured(app.handle()) {
-                    corpus::ensure_corpus_config(app.handle())
+                    corpus::ensure_corpus_config(app.handle()) // vault bind (no-root): perms only, after secure_registry
                         .brains
                         .into_iter()
                         .map(|b| (b.id, b.perms))
@@ -2385,11 +2462,11 @@ pub fn run() {
             secret::begin_ledger_warmup();
             for root in roots {
                 let opened = if development_read_only(app.handle()) {
-                    corpus::CorpusStore::open_read_only(root.abs_path.clone())
+                    corpus::CorpusStore::open_read_only(root.abs_path.clone()) // vault bind (vetted): startup_roots reads the registry secure_registry just vetted
                 } else if root.adopted {
-                    corpus::CorpusStore::open_adopted(root.abs_path.clone())
+                    corpus::CorpusStore::open_adopted(root.abs_path.clone()) // vault bind (vetted): startup_roots reads the registry secure_registry just vetted
                 } else {
-                    corpus::CorpusStore::open(root.abs_path.clone())
+                    corpus::CorpusStore::open(root.abs_path.clone()) // vault bind (vetted): startup_roots reads the registry secure_registry just vetted
                 };
                 match opened {
                     Ok(mut store) => {
@@ -2406,12 +2483,12 @@ pub fn run() {
                         // deliberately EMPTY (security decision 2026-07-18 — the old
                         // $HOME/** exposed ~/.ssh etc. to the webview), so every
                         // servable path is a registered corpus root, nothing else.
-                        let _ = app.asset_protocol_scope().allow_directory(store.root(), true);
+                        let _ = app.asset_protocol_scope().allow_directory(store.root(), true); // vault bind (vetted): startup_roots reads the registry secure_registry just vetted
                         let handle = app.handle().clone();
                         let org = organizer_handle.clone();
                         let org_root = store.root().to_path_buf();
                         let is_brain = brain_perms.contains_key(&root.id);
-                        if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move |paths| {
+                        if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move |paths| { // vault bind (vetted): startup_roots reads the registry secure_registry just vetted
                             if !root_still_registered(&handle, &org_root) {
                                 return false;
                             }
@@ -2529,8 +2606,9 @@ pub fn run() {
             // one-shot mailbox lane `rotli open` uses — the webview consumes it
             // through rotli:open-request. Ids only, validated in
             // parse_deep_link; a link can never name an arbitrary disk path,
-            // and a malformed link is ignored, never an error surface.
-            {
+            // and a malformed link is ignored, never an error surface. A host
+            // build registers no deep-link plugin, so it listens for none.
+            if app_identity::owns_shared_state() {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 let handle = app.handle().clone();
                 app.deep_link().on_open_url(move |event| {
@@ -2551,8 +2629,9 @@ pub fn run() {
             // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
             // Best-effort: another app owning a chord (launchers love ⌥Space)
             // must DEGRADE — the app still launches, the chord stays rebindable
-            // in Settings → Hotkeys — never abort startup.
-            {
+            // in Settings → Hotkeys — never abort startup. A host build
+            // registers none: a running Rotli holds these chords.
+            if app_identity::owns_shared_state() {
                 let chords = app.state::<GlobalChords>();
                 for (chord, slot) in [
                     (DEFAULT_MAIN_TOGGLE, &chords.main_toggle),
@@ -2772,7 +2851,7 @@ pub fn run() {
                 _ => {}
             }
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {

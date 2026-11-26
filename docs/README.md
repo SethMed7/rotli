@@ -63,6 +63,7 @@ fix both in the same change.
 | Quokka expressions — the chat buddy's moments, and new expressions to draw | [`design/quokka-emotions.md`](design/quokka-emotions.md) |
 | Rotli Web experience review — what a fresh vault walk found and fixed | [`design/web-experience-review-2026-09-27.md`](design/web-experience-review-2026-09-27.md) |
 | Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
+| One shell with or without a host: the build-time identity, shared state that fails closed, the vault refusal, the host entry and Settings registry | [`architecture/host-seams.md`](architecture/host-seams.md) |
 | Repository privacy, main/dev protection, reviewers, and PR flow | [`operations/repository-access.md`](operations/repository-access.md) |
 | Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |
 | Privacy-safe support, diagnostics, backup, and incident triage | [`operations/support-and-diagnostics.md`](operations/support-and-diagnostics.md) |

@@ -45,6 +45,18 @@ path, a destination clamp on the model transport, and prompt-injection framing
 so tool results are data and never instructions. `check:security` is the
 tripwire that keeps a future change from silently widening any of these.
 
+A **host build** (another app running Rotli's shell under its own bundle ID)
+adds one writable surface: an empty `.rotli/bound-by/<bundle ID>` file in each
+folder it binds, which is how it tells its own folders from Rotli's vaults. It
+binds a folder only while that mark is there and no unmarked vault is around
+or below it. The attacker it answers is anything that writes the host's
+support folder; a same-user process that writes inside a vault can forge the
+mark. Boundary, controls and residual risk:
+[`../security/threat-model.md`](../security/threat-model.md), "The
+host-identity boundary"; contract:
+[`../architecture/host-seams.md`](../architecture/host-seams.md).
+`check:vault-binds` keeps every root bind in production Rust explained.
+
 The full-text **search index** (`.rotli/search/`, Tantivy) is a DERIVED,
 gitignored, rebuildable at-rest asset that now holds secure-note content (tokens
 + positions). It is not an egress path: `corpus_search` is the user lane, and the

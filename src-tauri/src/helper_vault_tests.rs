@@ -250,9 +250,13 @@ fn symlinks_are_neither_listed_nor_followed() {
     std::os::unix::fs::symlink(outside.path(), vault.path().join("escape")).unwrap();
     std::os::unix::fs::symlink(outside.path().join("secret.md"), vault.path().join("link.md")).unwrap();
     fs::write(vault.path().join("real.md"), "inside").unwrap();
-    let walked = call(&served, "vault_walk", json!({ "path": "" })).unwrap();
-    assert_eq!(walked.as_array().unwrap().len(), 1, "{walked}");
-    assert_eq!(call(&served, "vault_list", json!({ "path": "" })).unwrap(), json!([{ "name": "real.md", "kind": "file" }]));
+    // a host build's mark (`.rotli/bound-by`) is the only other entry
+    let notes = |listed: Value, key: &str| -> Vec<Value> {
+        listed.as_array().unwrap().iter().filter(|entry| !entry[key].as_str().unwrap().starts_with(".rotli")).cloned().collect()
+    };
+    let walked = notes(call(&served, "vault_walk", json!({ "path": "" })).unwrap(), "path");
+    assert_eq!(walked.len(), 1, "{walked:?}");
+    assert_eq!(notes(call(&served, "vault_list", json!({ "path": "" })).unwrap(), "name"), vec![json!({ "name": "real.md", "kind": "file" })]);
     for (command, args) in [
         ("vault_read", json!({ "path": "escape/secret.md" })),
         ("vault_read", json!({ "path": "link.md" })),
@@ -280,7 +284,7 @@ fn a_moved_vault_is_no_longer_served() {
 fn info_reports_an_empty_folder_the_way_the_page_does() {
     let (vault, _config, served) = serving();
     fs::write(vault.path().join(".DS_Store"), "").unwrap();
-    fs::create_dir(vault.path().join(".rotli")).unwrap();
+    fs::create_dir_all(vault.path().join(".rotli")).unwrap(); // a host build has marked it already
     assert_eq!(call(&served, "vault_info", json!({})).unwrap()["empty"], true);
     fs::write(vault.path().join("MAP.md"), "# MAP\n").unwrap();
     assert_eq!(call(&served, "vault_info", json!({})).unwrap()["empty"], false);

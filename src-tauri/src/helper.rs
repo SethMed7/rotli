@@ -137,7 +137,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
     if let Some(folder) = &options.vault {
         // write the choice and exit: the login-item helper owns the port and
         // follows the config file on its next request
-        let config = crate::helper_vault::choose_config(&dir.join(CONFIG_FILE), std::path::Path::new(folder))?;
+        let config = crate::helper_vault::choose_config(&dir.join(CONFIG_FILE), std::path::Path::new(folder))?; // vault bind (vetted): choose_config refuses the folder before it marks or saves it
         println!("Rotli Helper will serve the vault in {}.", config.root.display());
         return Ok(());
     }

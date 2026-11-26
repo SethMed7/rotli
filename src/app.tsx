@@ -40,6 +40,7 @@ import { AppOpening } from "./components/onboarding/appOpening";
 import { PinPanel } from "./components/pinnedSites/pinPanel";
 import { WebVaultOverlays } from "./components/onboarding/webVaultOverlays";
 import { WebChatSetupDialog } from "./components/webChatSetupDialog";
+import { notesOn } from "./host/registry";
 import { registerDefaultActions } from "./keys/actions";
 import { replayHistoryKey } from "./keys/editHistoryActions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
@@ -154,8 +155,11 @@ function MainShell() {
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
   // first run, or once after an update that requires it (1.8.0: state/onboarding.ts)
   const onboardingActive = setupShows(isTauri(), import.meta.env.DEV, window.location.search, onboarded);
-  // first run's screens, or the vault screen when there is no vault (setupFlow.tsx)
-  const setupScreen = useSetupFront(onboardingActive, isTauri());
+  // first run's screens, or the vault screen when there is no vault
+  // (setupFlow.tsx). A host without notes asks for neither: its window is
+  // Settings (host/registry.ts).
+  const withNotes = notesOn();
+  const setupScreen = useSetupFront(onboardingActive && withNotes, isTauri() && withNotes);
   const inSetup = setupScreen !== null;
   const showWebVaultGate = useWebVaultGateShown();
   const setupFront = inSetup || showWebVaultGate;
@@ -420,7 +424,7 @@ function MainShell() {
             Recent all render inside NotesSurface's content area (contentView), so
             the three left-menu sections stay visible (the maintainer, 2026-06-26). Memory is
             no longer a front — the brain is browsed via the Vault tree (2026-06-28). */}
-        {settingsOpen ? (
+        {settingsOpen || !withNotes ? (
           <Suspense fallback={null}>
             <SettingsSurface />
           </Suspense>

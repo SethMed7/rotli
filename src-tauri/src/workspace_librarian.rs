@@ -128,7 +128,7 @@ fn call(name: &str, args: &Value) -> Result<Value, String> {
     if folder_identity(&bound.target.path) != bound.identity {
         return Err("the vault folder was replaced since this Librarian server started; restart it for the vault you mean".into());
     }
-    let mut ws = Workspace::open_target(bound.target)?;
+    let mut ws = Workspace::open_target(bound.target)?; // vault bind (vetted): bound at serve from root_targets, which vets every root
     require_on(&ws.root.path)?;
     let list = |key: &str| args.get(key).and_then(Value::as_array).cloned().unwrap_or_default();
     match name {

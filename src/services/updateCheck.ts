@@ -9,6 +9,7 @@
 // re-armed timer, and a hidden window waits for its next wake — which also
 // covers a Mac that slept through the timer.
 
+import { OWNS_SHARED_STATE } from "../lib/appIdentity";
 import {
   type UpdateStatus,
   appVersion,
@@ -88,7 +89,7 @@ export function createRoutineUpdateCheck(deps: {
  * only. A development build never pings the feed on its own, and the browser
  * has no bundle to update. Returns the teardown. */
 export function startRoutineUpdateCheck(): () => void {
-  if (!isTauri() || import.meta.env.DEV) return () => {};
+  if (!isTauri() || import.meta.env.DEV || !updatesFromFeed()) return () => {};
   const routine = createRoutineUpdateCheck({
     now: () => Date.now(),
     enabled: () => useUiStore.getState().autoUpdateCheck,
@@ -120,6 +121,12 @@ export function startRoutineUpdateCheck(): () => void {
 }
 
 // ——— The person's own check and install (Settings menu foot) ———
+
+/** False in a host build: it never reads the release feed, and Settings says
+ * what the host gives it instead (host/registry.ts updatesWords). */
+export function updatesFromFeed(): boolean {
+  return OWNS_SHARED_STATE;
+}
 
 /** The installed bundle version, or null outside the Mac app. */
 export function installedVersion(): Promise<string | null> {
