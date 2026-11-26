@@ -443,13 +443,29 @@ files opened from Finder share the mailbox and wait the same way.
   disk, and the next launch holds it again.
 - A vault switch from setup (choosing a folder, or the Librarian step's copy)
   is the exception, because the mailbox lives under the vault's own folder.
-  The webview takes the request into memory just before the switch and opens it
-  in the vault setup chose. A newer request queued there wins. An item that
-  vault doesn't have opens as any stale request does.
-- Limits: once such a switch has started, the held request is in memory only,
-  so a quit before setup ends drops it. When setup is run again, a request for
-  a connected vault that setup then makes the active one opens nothing and says
-  it couldn't switch to that vault.
+  The webview takes the request into memory just before the switch, and does
+  the same with one that arrives while the switch runs. The newest opens in the
+  vault setup chose, once setup and the switch have both ended. A newer request
+  queued in that vault wins. An item it doesn't have opens as any stale request
+  does.
+- If the vault didn't move (the switch failed, the copy was stopped, or that
+  folder was already open), the held request goes back to the mailbox through
+  `workspace_return_open_request`, so a quit keeps it. That write never
+  replaces a newer request; if it fails, the request stays in memory.
+
+Limits:
+
+- While a switch runs, and after one that moved the vault, the held request is
+  in memory only, so a quit before setup ends drops it.
+- Reading during a switch depends on the app being nudged. A request whose
+  nudge is missed, or handled only after the vault has moved, stays in the old
+  vault's mailbox.
+- A request already opening when a setup screen appears still opens behind it
+  (a window of milliseconds).
+- A file opened from Finder is mounted only while the app runs, so one that a
+  quit left in the mailbox opens as a stale request does.
+- When setup is run again, a request for a connected vault that setup then
+  makes the active one opens nothing and says it couldn't switch to that vault.
 
 The app also registers the `rotli://` URL scheme (2026-07-31). A clicked
 `rotli://open?id=…&kind=note|board|file` link rides the SAME mailbox lane: the

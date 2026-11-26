@@ -1835,6 +1835,13 @@ export function workspaceTakeOpenRequest(): Promise<WorkspaceOpenRequest | null>
   return invoke<WorkspaceOpenRequest | null>("workspace_take_open_request");
 }
 
+/** Queue a taken request again, after a setup vault switch that didn't happen;
+ * a newer one already in the mailbox stays (open_requests.rs). */
+export function workspaceReturnOpenRequest(request: WorkspaceOpenRequest): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("workspace_return_open_request", { request });
+}
+
 /** One live organizer-progress beat (2026-07-31): the daemon narrates a cycle
  * — start (queue size), each note it looks at (title only, never content),
  * and the end tally. The Activity surface renders these as the working feed. */

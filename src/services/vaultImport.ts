@@ -55,9 +55,11 @@ export async function copyAndOpen(path: string, label: string): Promise<boolean>
   });
   // the Librarian step offers this mid-setup (state/openRequestGate.ts)
   const releaseOpenRequests = await openRequestGate.holdForSwitch();
+  let vaultMoved = false;
   try {
     const report = await corpusCopyVault(path);
     await refreshActiveVault();
+    vaultMoved = true;
     set({ kind: "done", label, report });
     return true;
   } catch (cause) {
@@ -65,7 +67,7 @@ export async function copyAndOpen(path: string, label: string): Promise<boolean>
     return false;
   } finally {
     stop();
-    releaseOpenRequests();
+    releaseOpenRequests(vaultMoved);
   }
 }
 

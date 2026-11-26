@@ -3,9 +3,33 @@
 //! Each ends in the one-shot open mailbox the main webview consumes through
 //! `rotli:open-request`.
 
+use std::path::{Path, PathBuf};
+
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{corpus, deep_link, fsutil, SummonIntent};
+use crate::{corpus, deep_link, fsutil, workspace::WorkspaceOpenRequest, SummonIntent};
+
+const TEMP_PREFIX: &str = ".rotli-open-";
+
+/// The one-shot open mailbox under a default root.
+pub(crate) fn mailbox(root: &Path) -> PathBuf {
+    root.join(corpus::DOT_DIR).join("workspace-open.json")
+}
+
+/// The mailbox ready to be written: its path, the folder made, and the body.
+fn prepare(root: &Path, request: &WorkspaceOpenRequest) -> Result<(PathBuf, String), String> {
+    let path = mailbox(root);
+    let parent = path.parent().ok_or("open request has no parent")?;
+    std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let body = serde_json::to_string(request).map_err(|error| error.to_string())?;
+    Ok((path, body))
+}
+
+/// Queue `request`. The mailbox holds one, and the newest wins.
+pub(crate) fn write_mailbox(root: &Path, request: &WorkspaceOpenRequest) -> Result<(), String> {
+    let (path, body) = prepare(root, request)?;
+    fsutil::atomic_write(&path, &body, TEMP_PREFIX)
+}
 
 /// One accepted deep link → write the one-shot mailbox at the default root,
 /// surface the window, and let the webview consume it (the exact flow of
@@ -62,13 +86,8 @@ fn queue_open_request(app: &AppHandle, id: &str, kind: &str) {
     let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() else {
         return;
     };
-    let path = root.join(".rotli").join("workspace-open.json");
-    let Some(parent) = path.parent() else { return };
-    if std::fs::create_dir_all(parent).is_err() {
-        return;
-    }
-    let body = serde_json::json!({ "id": id, "kind": kind }).to_string();
-    if fsutil::atomic_write(&path, &body, ".rotli-open-").is_err() {
+    let request = WorkspaceOpenRequest { id: id.into(), kind: kind.into() };
+    if write_mailbox(&root, &request).is_err() {
         return;
     }
     SummonIntent::ShowMain.perform(app);
@@ -88,4 +107,62 @@ fn reveal_deep_link(app: &AppHandle, rel: &str, vault: Option<&str>) {
         }
     }
     let _ = corpus::corpus_reveal_file(state, rel.to_string());
+}
+
+/// The webview took a request before a setup vault switch that didn't happen
+/// (src/state/openRequestGate.ts): queue it again, so a quit keeps it. No
+/// summon and no event, because setup is still holding the mailbox.
+#[tauri::command]
+pub(crate) fn workspace_return_open_request(
+    state: tauri::State<'_, corpus::CorpusState>,
+    request: WorkspaceOpenRequest,
+) -> Result<(), String> {
+    return_to_mailbox(&state.default_root_path()?, &request)
+}
+
+/// Checked as a rotli:// link is. A request already waiting is newer and stays.
+fn return_to_mailbox(root: &Path, request: &WorkspaceOpenRequest) -> Result<(), String> {
+    if !deep_link::valid_open(&request.id, &request.kind) {
+        return Err("not an open request".into());
+    }
+    let (path, body) = prepare(root, request)?;
+    fsutil::atomic_write_new(&path, &body, TEMP_PREFIX)?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(id: &str, kind: &str) -> WorkspaceOpenRequest {
+        WorkspaceOpenRequest { id: id.into(), kind: kind.into() }
+    }
+
+    fn mailed(root: &Path) -> Option<String> {
+        std::fs::read_to_string(mailbox(root)).ok()
+    }
+
+    #[test]
+    fn a_returned_request_is_queued_again_even_before_the_sidecar_folder_exists() {
+        let root = tempfile::tempdir().unwrap();
+        return_to_mailbox(root.path(), &request("wiki/plan.md", "note")).unwrap();
+        assert_eq!(mailed(root.path()).as_deref(), Some(r#"{"id":"wiki/plan.md","kind":"note"}"#));
+    }
+
+    #[test]
+    fn a_returned_request_never_replaces_a_newer_one() {
+        let root = tempfile::tempdir().unwrap();
+        return_to_mailbox(root.path(), &request("newer", "note")).unwrap();
+        return_to_mailbox(root.path(), &request("older", "board")).unwrap();
+        assert!(mailed(root.path()).unwrap_or_default().contains("newer"));
+    }
+
+    #[test]
+    fn only_a_well_formed_request_is_written() {
+        let root = tempfile::tempdir().unwrap();
+        for (id, kind) in [("", "note"), ("../outside.md", "note"), ("/etc/hosts", "file"), ("a.md", "chat")] {
+            assert!(return_to_mailbox(root.path(), &request(id, kind)).is_err(), "{id} {kind}");
+        }
+        assert_eq!(mailed(root.path()), None);
+    }
 }

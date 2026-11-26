@@ -2348,6 +2348,7 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             corpus::corpus_views_read,
             corpus::corpus_views_write,
             workspace::workspace_take_open_request,
+            open_requests::workspace_return_open_request,
             memex::memex_detect,
             memex::memex_read_contract,
             memex::memex_read_chat,

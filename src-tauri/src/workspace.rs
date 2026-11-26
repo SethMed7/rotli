@@ -19,7 +19,7 @@ use serde_json::{json, Value};
 use crate::corpus::{
     ConnectedBrain, CorpusBoardDoc, CorpusConfig, CorpusList, CorpusRoot, CorpusStore, FolderMeta,
     Frontmatter, NamedView, NoteDoc, NoteKind, NoteMeta, ReferenceManifest as MainManifest,
-    ReferenceNode as MainNode, SearchHit, ViewsManifest, DEFAULT_ROOT_ID, DOT_DIR,
+    ReferenceNode as MainNode, SearchHit, ViewsManifest, DEFAULT_ROOT_ID,
 };
 use crate::memex_query::{parse_query, record_matches, ParsedQuery};
 use crate::loopback_http::{
@@ -44,7 +44,6 @@ const MCP_PROTOCOL: &str = "2025-03-26";
 pub(crate) const MCP_MAX_REQUEST_BYTES: usize = 256_000;
 pub(crate) const MCP_MAX_OUTPUT_BYTES: usize = 512_000;
 const MAIN_ROOT: &str = "main:";
-const OPEN_REQUEST_FILE: &str = "workspace-open.json";
 
 thread_local! {
     /// The GUI connector pins every remote call to the app's current default
@@ -1048,11 +1047,7 @@ impl Workspace {
                 .path,
         };
         let request = WorkspaceOpenRequest { id: wire_id.clone(), kind: kind.to_string() };
-        let path = mailbox.join(DOT_DIR).join(OPEN_REQUEST_FILE);
-        fs::create_dir_all(path.parent().ok_or("open request has no parent")?)
-            .map_err(|e| e.to_string())?;
-        let body = serde_json::to_string(&request).map_err(|e| e.to_string())?;
-        crate::fsutil::atomic_write(&path, &body, ".rotli-open-")?;
+        crate::open_requests::write_mailbox(&mailbox, &request)?;
         Ok(json!({
             "queued": true,
             "id": wire_id,
@@ -1769,10 +1764,7 @@ fn now_millis() -> i64 {
 pub(crate) fn workspace_take_open_request(
     state: tauri::State<'_, crate::corpus::CorpusState>,
 ) -> Result<Option<WorkspaceOpenRequest>, String> {
-    let path = state
-        .default_root_path()?
-        .join(DOT_DIR)
-        .join(OPEN_REQUEST_FILE);
+    let path = crate::open_requests::mailbox(&state.default_root_path()?);
     let Some(raw) = crate::fsutil::read_own_sidecar(&path).map_err(|error| format!("read open request: {error}"))? else {
         return Ok(None);
     };

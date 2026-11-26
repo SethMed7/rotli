@@ -85,20 +85,24 @@ export function useVaultChoice({
     if (busy) return;
     setError(null);
     setBusy(true);
-    let releaseOpenRequests = () => {};
+    let releaseOpenRequests: (moved: boolean) => void = () => {};
+    let vaultMoved = false;
     try {
       const path = await pickVaultFolder("Choose a folder for your notes");
       if (!path) return;
       // a read-only look first decides what the folder becomes
       const inspection = await corpusInspectFolder(path);
       const plan = vaultPlan(inspection.kind);
+      /** True when the vault moved; false when that folder is already open. */
       const openInPlace = async () => {
-        if (await chooseFolder(path)) {
+        const moved = await chooseFolder(path);
+        if (moved) {
           await refreshActiveVault();
         } else {
           const why = openedOrWhy(false, await corpusStatus());
           if (why) throw new Error(why);
         }
+        return moved;
       };
       await onBeforeSwitch?.();
       await flushSettingsNow();
@@ -106,17 +110,18 @@ export function useVaultChoice({
       if (plan === "create") {
         await initMemexAsCorpus(path, librarian());
         await activateCreatedVault();
+        vaultMoved = true;
       } else {
         // a vault, or someone's notes: used in place. Setup never asks about
         // a copy; the Librarian is its own step, and only it would need one
-        await openInPlace();
+        vaultMoved = await openInPlace();
       }
       await onDone?.();
     } catch (cause) {
       await restoreVaultStep();
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      releaseOpenRequests();
+      releaseOpenRequests(vaultMoved);
       setBusy(false);
     }
   };
