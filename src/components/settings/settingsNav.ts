@@ -83,8 +83,39 @@ export interface NavEntry {
   host?: HostSettingsPane;
 }
 
-/** The nav this build shows, top to bottom. */
-export function settingsNav(platform: Platform, host: AppHost | null): NavEntry[] {
+/** The host panes whose `visible` says no right now. */
+export function hiddenPanes(host: AppHost | null): string[] {
+  return (host?.settingsPanes ?? []).filter((pane) => pane.visible?.() === false).map((pane) => pane.id);
+}
+
+/** Calls `onChange` whenever a host pane's visibility may have changed. */
+export function watchPanes(host: AppHost | null, onChange: () => void): () => void {
+  const stops = (host?.settingsPanes ?? []).map((pane) => pane.subscribeVisible?.(onChange));
+  return () => {
+    for (const stop of stops) stop?.();
+  };
+}
+
+/** Whether a link to `id` can open it: true for a pane `nav` shows. An id no
+ * pane has is a mistake in the caller, so `strict` throws on it. */
+export function opensPane(
+  id: string,
+  nav: readonly NavEntry[],
+  host: AppHost | null,
+  strict: boolean,
+): boolean {
+  if (nav.some((entry) => entry.id === id)) return true;
+  const known = [...BUILTIN_NAV, ...(host?.settingsPanes ?? [])].some((pane) => pane.id === id);
+  if (strict && !known) throw new Error(`A link names an unknown Settings pane ${JSON.stringify(id)}`);
+  return false;
+}
+
+/** The nav this build shows, top to bottom, without the host panes in `hidden`. */
+export function settingsNav(
+  platform: Platform,
+  host: AppHost | null,
+  hidden: readonly string[] = [],
+): NavEntry[] {
   const notes = host?.notes !== false;
   const shown: NavEntry[] = BUILTIN_NAV.filter(
     (pane) => !(platform === "web" && WEB_HIDDEN_PANES.has(pane.id)) && (notes || !NOTES_PANES.has(pane.id)),
@@ -97,6 +128,8 @@ export function settingsNav(platform: Platform, host: AppHost | null): NavEntry[
   for (const pane of host?.settingsPanes ?? []) {
     if (taken.has(pane.id)) throw new Error(`Settings pane id ${JSON.stringify(pane.id)} is already Rotli's`);
     taken.add(pane.id);
+    // hidden: no row, but still a known id, so a nav order naming it is skipped
+    if (hidden.includes(pane.id)) continue;
     const entry: NavEntry = { id: pane.id, label: pane.label, glyph: pane.glyph, host: pane };
     const anchor = pane.after === undefined ? -1 : shown.findIndex((row) => row.id === pane.after);
     // after its anchor and any host panes already placed there, in the order given

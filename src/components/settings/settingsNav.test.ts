@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test";
 
-import type { AppHost } from "../../host/registry";
-import { BUILTIN_NAV, NOTES_PANES, settingsNav } from "./settingsNav";
+import type { ComponentType } from "react";
+
+import type { AppHost, HostSettingsPane } from "../../host/registry";
+import { BUILTIN_NAV, NOTES_PANES, hiddenPanes, opensPane, settingsNav, watchPanes } from "./settingsNav";
 
 const Pane = () => null;
 const glyph = () => null;
@@ -123,4 +125,59 @@ test("a host's About label and glyph mark the About row; Rotli's stay About Rotl
   expect(labelled?.glyph).toBe(rotliGlyph);
   const mark = () => null;
   expect(about({ aboutGlyph: mark })?.glyph).toBe(mark);
+});
+
+test("a pane whose `visible` says no is left out, and a nav order naming it is skipped", () => {
+  let paired = false;
+  const gated = { ...pane("cards", "general"), visible: () => paired };
+  const host: AppHost = {
+    notes: false,
+    settingsPanes: [gated, pane("extra")],
+    navOrder: ["cards", "connections", "general"],
+  };
+  const shown = () => settingsNav("desktop", host, hiddenPanes(host)).map((entry) => entry.id);
+  expect(hiddenPanes(host)).toEqual(["cards"]);
+  expect(shown()).toEqual(["connections", "appearance", "general", "extra", "about"]);
+  paired = true;
+  expect(hiddenPanes(host)).toEqual([]);
+  expect(shown()).toEqual(["cards", "connections", "appearance", "general", "extra", "about"]);
+  // a pane with no `visible` always shows; no host hides nothing
+  expect(hiddenPanes({ settingsPanes: [pane("extra")] })).toEqual([]);
+  expect(hiddenPanes(null)).toEqual([]);
+});
+
+test("Settings hears every host pane that can say its visibility changed, until it closes", () => {
+  const listeners = new Set<() => void>();
+  const subscribeVisible = (onChange: () => void) => {
+    listeners.add(onChange);
+    return () => void listeners.delete(onChange);
+  };
+  let heard = 0;
+  const stop = watchPanes({ settingsPanes: [{ ...pane("cards"), subscribeVisible }, pane("extra")] }, () => {
+    heard += 1;
+  });
+  expect(listeners.size).toBe(1);
+  for (const listener of listeners) listener();
+  expect(heard).toBe(1);
+  stop();
+  expect(listeners.size).toBe(0);
+  watchPanes(null, () => {})();
+});
+
+test("a link opens only a pane the nav shows; an unknown id throws when strict", () => {
+  const host: AppHost = { notes: false, settingsPanes: [pane("cards")] };
+  const nav = settingsNav("desktop", host);
+  const opens = (id: string, strict = true) => opensPane(id, nav, host, strict);
+  expect([opens("connections"), opens("cards")]).toEqual([true, true]);
+  // known, but this build doesn't show it: quietly nothing
+  expect(opens("location")).toBe(false);
+  expect(opensPane("cards", settingsNav("desktop", host, ["cards"]), host, true)).toBe(false);
+  expect(() => opens("nowhere")).toThrow('unknown Settings pane "nowhere"');
+  expect(opens("nowhere", false)).toBe(false);
+});
+
+test("a host's pane component may take no props, as before", () => {
+  const Plain: ComponentType = () => null;
+  const entry: HostSettingsPane = { id: "plain", label: "Plain", glyph, Pane: Plain };
+  expect(ids({ settingsPanes: [entry] })).toContain("plain");
 });

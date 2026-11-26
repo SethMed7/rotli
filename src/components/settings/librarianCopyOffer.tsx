@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 
+import { productName } from "../../host/registry";
 import { copyAndOpen } from "../../services/vaultImport";
 import { useUiStore } from "../../state/ui";
 import { WhyCopy } from "../whyCopy";
@@ -24,8 +25,9 @@ export function LibrarianCopyOffer({ root, label }: { root: string; label: strin
     <>
       <p className="setnote">{IN_PLACE_LIBRARIAN_LINE}</p>
       <p className="setnote">
-        To use the Librarian, connect a copy: Rotli copies “{label}” beside your vaults, and the Librarian
-        organizes the copy, suggesting each change first. Your original stays exactly as it is.
+        {`To use the Librarian, connect a copy: ${productName()} copies “`}
+        {label}
+        {`” beside your vaults, and the Librarian organizes the copy, suggesting each change first. Your original stays exactly as it is.`}
       </p>
       <WhyCopy />
       <div className="memex-actions">

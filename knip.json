@@ -4,6 +4,7 @@
     "index.html!",
     "src/**/*.test.ts",
     "e2e/**/*.spec.ts",
+    "e2e/**/*.fixture.ts",
     "scripts/*.mjs",
     "scripts/*.test.ts",
     "scripts/eval-*.ts",

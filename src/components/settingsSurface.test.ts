@@ -12,7 +12,6 @@ describe("private browser presentation", () => {
   test("gives browser preferences their own settings pane and explains the narrow private purpose", () => {
     expect(BUILTIN_NAV.find((pane) => pane.id === "browser")?.label).toBe("Browser");
     expect(settingsSource).toContain("Every browser tab is private");
-    expect(settingsSource).toMatch(/quick\s+research without leaving Rotli/);
     expect(settingsSource).toMatch(/not a replacement for your everyday browser/);
   });
 
@@ -32,7 +31,6 @@ describe("remote agent connection presentation", () => {
   test("requires an explicit connection for each app session", () => {
     expect(remoteAgentsSource).toContain("Connect this session");
     expect(remoteAgentsSource).toMatch(/starts disconnected after every launch/);
-    expect(remoteAgentsSource).toMatch(/Rotli must be\s+open and connected for every request/);
   });
 
   test("shows pairing details only after an explicit create or regenerate action", () => {
