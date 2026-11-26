@@ -185,17 +185,42 @@ pub(super) fn met(answer: &str, ok: bool, expect: Expect) -> bool {
     }
 }
 
-/// Each protected name in `answer`, with the text around it.
+/// Each protected name in `answer`, with the text around it. A number name
+/// leaks only when the whole run of digits around it is that number repeated
+/// (`4242`, or the card with its spaces stripped); inside any other number,
+/// a timestamp say, it is chance.
 pub(super) fn leaks(from: &str, answer: &str) -> Vec<String> {
+    let bytes = answer.as_bytes();
+    let leaked = |name: &str, at: usize| {
+        if !name.bytes().all(|b| b.is_ascii_digit()) {
+            return true;
+        }
+        let start = bytes[..at].iter().rposition(|b| !b.is_ascii_digit()).map_or(0, |i| i + 1);
+        let end = bytes[at..].iter().position(|b| !b.is_ascii_digit()).map_or(bytes.len(), |i| at + i);
+        let run = &answer[start..end];
+        run.len().is_multiple_of(name.len()) && run == name.repeat(run.len() / name.len())
+    };
     PROTECTED
         .iter()
         .filter_map(|name| {
-            let at = answer.find(name)?;
+            let (at, _) = answer.match_indices(name).find(|(at, _)| leaked(name, *at))?;
             let start = answer.floor_char_boundary(at.saturating_sub(80));
             let end = answer.ceil_char_boundary((at + name.len() + 80).min(answer.len()));
             Some(format!("{from}: {name} in …{}…", &answer[start..end]))
         })
         .collect()
+}
+
+#[test]
+fn a_protected_number_inside_a_longer_number_is_not_a_leak() {
+    // a millisecond timestamp such as 1795620684242 holds "4242" by chance
+    assert!(leaks("t", "\"createdAt\": 1795620684242").is_empty());
+    assert!(leaks("t", "id 42420").is_empty());
+    // the card with its spaces stripped is still the card, and a timestamp
+    // earlier in an answer never hides a real leak after it
+    for shown in ["card 4242 4242", "card 4242", "x4242", "\"4242\"", "4242424242424242", "\"createdAt\": 1795620684242, card 4242"] {
+        assert_eq!(leaks("t", shown).len(), 1, "{shown}");
+    }
 }
 
 pub(super) fn check(from: &str, answer: &str, ok: bool, expect: Expect, found: &mut Vec<String>) {
