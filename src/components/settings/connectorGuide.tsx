@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 
 import { type GuideStep as GuideStepData, connectorGuide, guideOs, stepDone } from "../../ai/connectorGuides";
 import { PROVIDER_LABELS, type ProviderId } from "../../ai/models";
+import { productName } from "../../host/registry";
 import type { CliDetect } from "../../services/connectorSetup";
 import { CheckGlyph, CopyGlyph } from "../glyphs";
 import { useCopyState } from "./useCopyState";
@@ -76,7 +77,8 @@ export function ConnectorGuide({
   onRecheck?: (() => void) | undefined;
   checking?: boolean;
 }) {
-  const steps: GuideStepData[] = connectorGuide(lane, guideOs(navigator.platform || navigator.userAgent));
+  const os = guideOs(navigator.platform || navigator.userAgent);
+  const steps: GuideStepData[] = connectorGuide(lane, os, productName());
   if (steps.length === 0) return null;
   return (
     <div className="guide" aria-label={`Set up ${PROVIDER_LABELS[lane]}`}>

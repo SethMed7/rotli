@@ -7,6 +7,7 @@ import {
 // listeners elsewhere. The dispatcher routes by surface; Settings lists
 // only capabilities enabled in this build.
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
+import { productName } from "../host/registry";
 import { sendChatWindow } from "../lib/chatWindowBridge";
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import {
@@ -150,9 +151,11 @@ export function registerDefaultActions(): void {
     run: () => setupHandle()?.back?.(),
   });
 
+  // the two titles that name the app are read once, here: a host registered
+  // before main.tsx loaded, and it never changes (host/registry.ts productName)
   registerAction({
     id: "app.hide",
-    title: PLATFORM === "web" ? "Close current view" : "Hide Rotli",
+    title: PLATFORM === "web" ? "Close current view" : `Hide ${productName()}`,
     transient: PLATFORM === "web",
     defaultChord: "Esc",
     run: () => {
@@ -186,7 +189,7 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "app.toggleWindow",
     platforms: ["desktop"],
-    title: "Open or hide Rotli",
+    title: `Open or hide ${productName()}`,
     defaultChord: "Alt+Space",
     global: true,
     run: () => void toggleMainWindow(),

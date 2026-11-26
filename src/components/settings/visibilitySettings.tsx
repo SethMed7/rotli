@@ -3,6 +3,7 @@
 // chrome in src/lib/hideable.ts, grouped by where it sits. Each description
 // says how to reach it without the button, so hiding never removes anything.
 
+import { productName } from "../../host/registry";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { HIDEABLE, type HideId, type Hidden, hideDescription } from "../../lib/hideable";
 import { SHOW_HOTKEYS } from "../../lib/hotkeyHint";
@@ -45,9 +46,9 @@ export function VisibilitySection({
   const count = items.filter((item) => hidden[item.id]).length;
   return (
     <>
-      <h4 className="sethead">Show in Rotli</h4>
+      <h4 className="sethead">{`Show in ${productName()}`}</h4>
       <p className="setnote">
-        Hide what you don’t use. Nothing goes away: what a hidden button opens stays in Rotli.
+        {`Hide what you don’t use. Nothing goes away: what a hidden button opens stays in ${productName()}.`}
       </p>
       {groups.map((group) => (
         <section key={group} aria-label={group}>

@@ -12,6 +12,14 @@ import type { ComponentType, ReactNode } from "react";
 /** A Settings row's glyph, the same shape as Rotli's own (components/glyphs). */
 export type HostGlyph = (props: { size?: number }) => ReactNode;
 
+/** What Settings hands a host pane's component. */
+export interface HostPaneProps {
+  /** Shows another Settings pane, Rotli's or the host's. A pane this build
+   * doesn't show right now does nothing. An id no pane has throws under the
+   * dev server and does nothing in a built app. */
+  openPane: (id: string) => void;
+}
+
 /** One Settings pane a host adds. */
 export interface HostSettingsPane {
   /** Unique among every pane, Rotli's included. */
@@ -26,7 +34,15 @@ export interface HostSettingsPane {
    * build doesn't show: just before About. */
   after?: string;
   /** The pane's body, below its heading. */
-  Pane: ComponentType;
+  Pane: ComponentType<HostPaneProps>;
+  /** Whether the pane shows right now; absent, always. False takes away its
+   * nav row and every way to open it. Settings calls it while rendering, so it
+   * must be cheap, change nothing and not throw. */
+  visible?: () => boolean;
+  /** For a `visible` that changes while Settings is open: call `onChange` when
+   * it may answer differently, and return the unsubscribe. A zustand store's
+   * `subscribe` is one. */
+  subscribeVisible?: (onChange: () => void) => () => void;
 }
 
 /** The built-in panes a host can add blocks to. */
@@ -45,7 +61,7 @@ export interface HostPaneBlock {
 export interface HostWords {
   /** Where the standalone build offers "Check for updates". */
   updates?: string;
-  /** The app's name at the foot of Settings' nav, where Rotli says "Rotli". */
+  /** The app's name where Settings says "Rotli" and means this app. */
   productName?: string;
   /** The version beside that name; the bundle's version when absent. */
   version?: string;
@@ -85,12 +101,14 @@ export interface AppHost {
 export const DEFAULT_UPDATES_WORDS = "Updates arrive with this app";
 export const DEFAULT_PRODUCT_NAME = "Rotli";
 export const DEFAULT_ABOUT_LABEL = "About Rotli";
-export const DEFAULT_CONNECTIONS_LEAD =
-  "Choose the outside services Rotli can contact. Each connection is explicit and never changes destination after a failure.";
+const connectionsLeadFor = (name: string) =>
+  `Choose the outside services ${name} can contact. Each connection is explicit and never changes destination after a failure.`;
+export const DEFAULT_CONNECTIONS_LEAD = connectionsLeadFor(DEFAULT_PRODUCT_NAME);
 
+const dockDetailFor = (name: string) => `Otherwise ${name} lives in the menu bar only.`;
 export const DEFAULT_DOCK_ROW = {
   label: "Show in the Dock",
-  detail: "Otherwise Rotli lives in the menu bar only.",
+  detail: dockDetailFor(DEFAULT_PRODUCT_NAME),
 } as const;
 
 export interface HostRegistry {
@@ -154,9 +172,30 @@ export function paneBlocks(
     .map((block) => block.Block);
 }
 
-/** The app's name where Rotli says "Rotli" in Settings. */
+/** The app's name where Settings says "Rotli" and means this app. The first
+ * read locks the registry, so nothing may read it before the host registers.
+ * After that it is safe, module loads included: a host registers before
+ * main.tsx loads, and app.tsx reads it as it loads (the two action titles). */
 export function productName(host: AppHost | null = appHost()): string {
   return host?.words?.productName ?? DEFAULT_PRODUCT_NAME;
+}
+
+/** What a host build says about system-wide shortcuts, which it never takes:
+ * the note in General and the hint on a Keybindings row. With no name given,
+ * Rotli's words. A named host says it takes none, because "they stay with
+ * <name>" would say the opposite. */
+export function noShortcutsWords(host: AppHost | null = appHost()): { note: string; row: string } {
+  const name = host?.words?.productName;
+  const keeps = "Either way the menu-bar icon stays.";
+  return name === undefined
+    ? {
+        note: `${keeps} System-wide shortcuts stay with Rotli, so open this app from its menu-bar icon.`,
+        row: "system-wide shortcuts stay with Rotli",
+      }
+    : {
+        note: `${keeps} ${name} takes no system-wide shortcuts, so open it from its menu-bar icon.`,
+        row: `${name} takes no system-wide shortcuts`,
+      };
 }
 
 /** The About pane's row and heading. */
@@ -166,7 +205,7 @@ export function aboutLabel(host: AppHost | null = appHost()): string {
 
 /** The Connections pane's opening paragraph; empty means none. */
 export function connectionsLead(host: AppHost | null = appHost()): string {
-  return host?.words?.connectionsLead ?? DEFAULT_CONNECTIONS_LEAD;
+  return host?.words?.connectionsLead ?? connectionsLeadFor(productName(host));
 }
 
 /** The label a host puts on Rotli's own section headings, or null for none. */
@@ -182,7 +221,7 @@ export function plainPaneHeads(host: AppHost | null = appHost()): boolean {
 /** The Dock switch's words, or null where a host retired the row. */
 export function dockRow(host: AppHost | null = appHost()): { label: string; detail: string } | null {
   const row = host?.words?.dockRow;
-  return row === null ? null : { ...DEFAULT_DOCK_ROW, ...row };
+  return row === null ? null : { ...DEFAULT_DOCK_ROW, detail: dockDetailFor(productName(host)), ...row };
 }
 
 /** What stands in for About's wording: undefined keeps Rotli's own. */

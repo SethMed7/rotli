@@ -6,7 +6,15 @@
 // the chord is taken).
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { guideOs } from "../ai/connectorGuides";
 import { makeTauriHost } from "../ai/host";
@@ -38,7 +46,17 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
-import { aboutLabel, appHost, dockRow, notesOn, plainPaneHeads, updatesWords } from "../host/registry";
+import {
+  type HostPaneProps,
+  aboutLabel,
+  appHost,
+  dockRow,
+  noShortcutsWords,
+  notesOn,
+  plainPaneHeads,
+  productName,
+  updatesWords,
+} from "../host/registry";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -150,7 +168,7 @@ import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
 import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
-import { type NavEntry, settingsNav } from "./settings/settingsNav";
+import { type NavEntry, hiddenPanes, opensPane, settingsNav, watchPanes } from "./settings/settingsNav";
 import { SidebarLookSettings } from "./settings/sidebarLookSettings";
 import { SwitchKnob, Toggle } from "./settings/toggle";
 import { SettingsNavUpdates, useAppVersion } from "./settings/updatesNav";
@@ -267,7 +285,7 @@ function HotkeysPane() {
       return (
         <div className="hkrow" key={action.id}>
           <span className="hklabel">{action.title}</span>
-          <span className="hkconflict">system-wide shortcuts stay with Rotli</span>
+          <span className="hkconflict">{noShortcutsWords().row}</span>
           <button
             type="button"
             className="hkchord"
@@ -312,12 +330,11 @@ function HotkeysPane() {
   return (
     <>
       <PaneHead title="Keybindings" char="notes" motif="hotkeys" />
-      <p className="lead">Every shortcut in Rotli is yours to rebind. Click a chord, press the new keys.</p>
+      <p className="lead">{`Every shortcut in ${productName()} is yours to rebind. Click a chord, press the new keys.`}</p>
       <section className="hksection">
         <div className="hkhead">Hold ⌘</div>
         <p className="setnote">
-          Hold ⌘ for a moment and Rotli shows you what you can press — as badges pinned to the controls
-          themselves, or as one grouped list.
+          {`Hold ⌘ for a moment and ${productName()} shows you what you can press — as badges pinned to the controls themselves, or as one grouped list.`}
         </p>
         <Seg
           value={hotkeyPeek}
@@ -457,8 +474,7 @@ function GeneralPane() {
       {PLATFORM === "desktop" && (
         <>
           <p className="lead">
-            Rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
-            living in it.
+            {`${productName()} is a visitor by default — summon it, write, dismiss it. Make it a resident when you’re living in it.`}
           </p>
           <div className="swgroup">
             <Toggle
@@ -491,10 +507,7 @@ function GeneralPane() {
               rebindable in Keybindings.
             </p>
           ) : (
-            <p className="setnote">
-              Either way the menu-bar icon stays. System-wide shortcuts stay with Rotli, so open this app from
-              its menu-bar icon.
-            </p>
+            <p className="setnote">{noShortcutsWords().note}</p>
           )}
         </>
       )}
@@ -510,7 +523,7 @@ function GeneralPane() {
         <input
           className="aikey-input"
           type="text"
-          placeholder="How should Rotli address you?"
+          placeholder={`How should ${productName()} address you?`}
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
@@ -742,7 +755,7 @@ function GeneralPane() {
         <Toggle
           on={templatePresets}
           title="Offer built-in templates"
-          desc="/template lists Rotli's own starters — meeting notes, a daily note, a project brief and more — after the templates in your Templates folder. They are never saved into your vault."
+          desc={`/template lists ${productName()}'s own starters — meeting notes, a daily note, a project brief and more — after the templates in your Templates folder. They are never saved into your vault.`}
           onChange={() => setTemplatePresets(!templatePresets)}
         />
         <Toggle
@@ -761,8 +774,9 @@ function GeneralPane() {
 
       <h4 className="sethead">Checkboxes</h4>
       <p className="lead">
-        A task can be in progress, not just done or not — write <code>- [/]</code> and Rotli draws the box
-        half-filled. Choose what a <em>click</em> on the box does.
+        A task can be in progress, not just done or not — write <code>- [/]</code>
+        {` and ${productName()} draws the box half-filled. Choose what a `}
+        <em>click</em> on the box does.
       </p>
       <Seg
         value={taskCycle}
@@ -795,8 +809,7 @@ function GeneralPane() {
       {PLATFORM === "desktop" ? (
         <>
           <p className="lead">
-            Switch to a separate demo library with sample content — for screenshots or trying things out. Your
-            real notes are never touched; toggling relaunches Rotli.
+            {`Switch to a separate demo library with sample content — for screenshots or trying things out. Your real notes are never touched; toggling relaunches ${productName()}.`}
           </p>
           <Toggle
             on={demo}
@@ -964,12 +977,11 @@ function AppearancePane() {
     <>
       <PaneHead title="Appearance" char="board" motif="appearance" />
       <p className="appearance-intro">
-        Shape Rotli into a workspace that feels like yours. Every family is tuned for readable light and dark
-        work.
+        {`Shape ${productName()} into a workspace that feels like yours. Every family is tuned for readable light and dark work.`}
       </p>
 
       <h4 className="sethead">Color scheme</h4>
-      <p className="lead">Choose a fixed mode, or let Rotli follow your Mac.</p>
+      <p className="lead">{`Choose a fixed mode, or let ${productName()} follow your Mac.`}</p>
       <div className="appearance-mode-grid" role="radiogroup" aria-label="Color scheme">
         {(["system", "light", "dark"] as const).map((mode) => {
           const environments =
@@ -1018,8 +1030,7 @@ function AppearancePane() {
 
       <h4 className="sethead">Primary color</h4>
       <p className="lead">
-        The first option belongs to the environment. Presets and your custom hue follow you across themes
-        while Rotli keeps contrast safe.
+        {`The first option belongs to the environment. Presets and your custom hue follow you across themes while ${productName()} keeps contrast safe.`}
       </p>
       <AccentRow />
 
@@ -1186,14 +1197,14 @@ function BrainCard({
               type="button"
               className={`ghostbtn${removeArmed ? " danger" : ""}`}
               disabled={busy}
-              aria-label={removeArmed ? `Confirm removing ${inst.label} from Rotli` : undefined}
+              aria-label={removeArmed ? `Confirm removing ${inst.label} from ${productName()}` : undefined}
               onBlur={() => setRemoveArmed(false)}
               onClick={() => {
                 if (removeArmed) onForget();
                 else setRemoveArmed(true);
               }}
             >
-              {removeArmed ? "Remove vault?" : "Remove from Rotli"}
+              {removeArmed ? "Remove vault?" : `Remove from ${productName()}`}
             </button>
           )}
         </div>
@@ -1284,9 +1295,8 @@ function LocationPane() {
     <>
       <PaneHead title="Location" char="local" motif="location" />
       <p className="lead">
-        Your <b>vault</b> is one folder of plain Markdown and conventional files on this Mac. Rotli adds its
-        organization and retrieval layer without taking ownership; you choose whether the on-device Librarian
-        keeps it tidy. Rotli never holds your notes hostage.
+        Your <b>vault</b>
+        {` is one folder of plain Markdown and conventional files on this Mac. ${productName()} adds its organization and retrieval layer without taking ownership; you choose whether the on-device Librarian keeps it tidy. ${productName()} never holds your notes hostage.`}
       </p>
 
       {/* —— the one folder —— */}
@@ -1380,9 +1390,9 @@ function LocationPane() {
 
       {canManageLocations && (
         <p className="setnote">
-          <b>Choose folder…</b> takes a Rotli vault (used in place), an empty folder (your notes move there),
-          or any folder (used as-is). The hidden <code>.rotli/</code> is just an index — deleting it loses
-          nothing but a rebuild.
+          <b>Choose folder…</b>
+          {` takes a ${productName()} vault (used in place), an empty folder (your notes move there), or any folder (used as-is). The hidden `}
+          <code>.rotli/</code> is just an index — deleting it loses nothing but a rebuild.
         </p>
       )}
 
@@ -1391,12 +1401,10 @@ function LocationPane() {
         <>
           <h4 className="sethead">Connected vaults</h4>
           <p className="lead">
-            Connect another Rotli vault to make it available in the vault switcher. Rotli shows and searches
-            only one active vault at a time.
+            {`Connect another ${productName()} vault to make it available in the vault switcher. ${productName()} shows and searches only one active vault at a time.`}
           </p>
           <p className="setnote">
-            Removing a connected vault only disconnects it from Rotli. Its folder and files stay exactly where
-            they are.
+            {`Removing a connected vault only disconnects it from ${productName()}. Its folder and files stay exactly where they are.`}
           </p>
           {candidates.length > 0 && (
             <>
@@ -1424,7 +1432,7 @@ function LocationPane() {
           )}
           {linkedLibraries.length === 0 ? (
             <p className="setnote">
-              No other vaults connected. Your current vault is all Rotli shows and searches.
+              {`No other vaults connected. Your current vault is all ${productName()} shows and searches.`}
             </p>
           ) : (
             linkedLibraries.map((inst) => (
@@ -1993,7 +2001,7 @@ function ChatPane() {
             setVerify({ state: "idle" });
           }}
         >
-          <option value="">Rotli picks (this Mac's default)</option>
+          <option value="">{`${productName()} picks (this Mac's default)`}</option>
           {available.map((model) => (
             <option value={model.id} key={model.id}>
               {model.label}
@@ -2331,8 +2339,7 @@ function BraveKeyRow() {
         )}
       </div>
       <p className="setnote websearch-keynote">
-        Rotli never displays a saved key. Brave&rsquo;s current plans and account limits are set by Brave;
-        check its dashboard for the terms that apply to you.
+        {`${productName()} never displays a saved key. Brave’s current plans and account limits are set by Brave; check its dashboard for the terms that apply to you.`}
       </p>
       {note && (
         <p
@@ -2556,11 +2563,7 @@ function ModelsPane() {
           Official routes only, with no hidden workaround
         </h4>
         <p className="setnote">
-          Rotli enables a connected provider only through that company&rsquo;s published client or integration
-          route. Authentication stays in the official app on this Mac: Rotli does not present provider logins,
-          copy credentials, or replay browser sessions. Provider terms can change and this is not a legal
-          guarantee; Rotli reviews these boundaries and disables a route instead of silently working around a
-          restriction.
+          {`${productName()} enables a connected provider only through that company’s published client or integration route. Authentication stays in the official app on this Mac: ${productName()} does not present provider logins, copy credentials, or replay browser sessions. Provider terms can change and this is not a legal guarantee; Rotli reviews these boundaries and disables a route instead of silently working around a restriction.`}
         </p>
         <p className="setnote">
           <b>Antigravity</b> runs through Google&rsquo;s official ACP agent (the registry build), never the
@@ -2783,10 +2786,10 @@ function SecurityPane() {
     <>
       <PaneHead title="Security" char="local" motif="security" />
       <p className="lead">
-        A <b>secure note</b> is one Rotli treats as private from AI. Some notes become secure on their own —
-        quick captures (<b>⌥C</b>) are secure at birth, and a note that looks like it holds a secret (an API
-        key, a card number) is flagged when Rotli reads it. You can also mark any note secure yourself from
-        its metadata panel or the note menu.
+        A <b>secure note</b>
+        {` is one ${productName()} treats as private from AI. Some notes become secure on their own — quick captures (`}
+        <b>⌥C</b>
+        {`) are secure at birth, and a note that looks like it holds a secret (an API key, a card number) is flagged when ${productName()} reads it. You can also mark any note secure yourself from its metadata panel or the note menu.`}
       </p>
       <span className="setsubhead">What secure means</span>
       <p className="setnote">
@@ -2817,9 +2820,8 @@ function SecurityPane() {
         read it. It means <b>no AI may edit it</b>, ever, cloud or on-device. Secure hides; locked protects.
       </p>
       <p className="setnote">
-        <b>The Librarian never touches them.</b> Rotli&rsquo;s organizer skips secure notes entirely — it
-        doesn&rsquo;t read, move, or tag them, even when it&rsquo;s allowed to read other notes. It skips
-        locked notes too.
+        <b>The Librarian never touches them.</b>
+        {` ${productName()}’s organizer skips secure notes entirely — it doesn’t read, move, or tag them, even when it’s allowed to read other notes. It skips locked notes too.`}
       </p>
       <p className="setnote">
         <b>Secrets are found by patterns, not AI.</b> The detector is on-device pattern matching — key shapes,
@@ -2848,9 +2850,7 @@ function BrowserPane() {
     <>
       <PaneHead title="Browser" char="searching" motif="browser" />
       <p className="lead">
-        Open links and run quick searches inside Rotli. The browser chrome and start page follow your current
-        light or dark environment; websites still control their own appearance. Each page is a normal Rotli
-        tab, and ⌘T or the tab-strip plus opens another private page while you browse.
+        {`Open links and run quick searches inside ${productName()}. The browser chrome and start page follow your current light or dark environment; websites still control their own appearance. Each page is a normal ${productName()} tab, and ⌘T or the tab-strip plus opens another private page while you browse.`}
       </p>
 
       <PinnedSitesSettings />
@@ -2891,8 +2891,7 @@ function BrowserPane() {
         <div>
           <h4 id="browser-privacy-title">Every browser tab is private</h4>
           <p>
-            Cookies, site data, and history are discarded when the tab closes. This browser is for quick
-            research without leaving Rotli, not a replacement for your everyday browser.
+            {`Cookies, site data, and history are discarded when the tab closes. This browser is for quick research without leaving ${productName()}, not a replacement for your everyday browser.`}
           </p>
         </div>
       </section>
@@ -2929,28 +2928,58 @@ function AboutRotliPane() {
 
 /** A host's pane: its heading is the banner's scenery alone (no character,
  * no object), then the host's own body. */
-function HostPane({ entry }: { entry: NavEntry }) {
+function HostPane({ entry, openPane }: { entry: NavEntry } & HostPaneProps) {
   if (!entry.host) return null;
   const { Pane, title, label } = entry.host;
   return (
     <>
       <SettingsBanner title={title ?? label} />
-      <Pane />
+      <Pane openPane={openPane} />
     </>
   );
 }
 
+// the hidden host panes as one string, so React can tell when they change
+const watchHostPanes = (onChange: () => void) => watchPanes(appHost(), onChange);
+const hiddenNow = () => JSON.stringify(hiddenPanes(appHost()));
+const navFor = (hidden: string) => settingsNav(PLATFORM, appHost(), JSON.parse(hidden) as string[]);
+
 export function SettingsSurface() {
-  // the nav is fixed for the app's life: a host registers before the first read
-  const nav = useMemo(() => settingsNav(PLATFORM, appHost()), []);
+  // a host registers before the first read, so the nav changes only when one
+  // of its panes shows or hides
+  const hidden = useSyncExternalStore(watchHostPanes, hiddenNow, hiddenNow);
+  const nav = useMemo(() => navFor(hidden), [hidden]);
   const withNotes = notesOn();
-  const [pane, setPane] = useState<string>("general");
+  const [selected, setPane] = useState<string>("general");
+  // counts the switches nobody made on the nav: a pane's link, or a pane that
+  // hid while it was open
+  const [handoffs, setHandoffs] = useState(0);
+  const navRef = useRef<HTMLElement>(null);
+  // a pane that hid while it was open gives way to General, for good
+  const pane = nav.some((entry) => entry.id === selected) ? selected : "general";
+  if (pane !== selected) {
+    setPane(pane);
+    setHandoffs((count) => count + 1);
+  }
+  // a host pane's link: judged on what shows at the moment of the click, which
+  // may have changed since this render
+  const openPane = useCallback((id: string) => {
+    if (!opensPane(id, navFor(hiddenNow()), appHost(), !!import.meta.env.DEV)) return;
+    setPane(id);
+    setHandoffs((count) => count + 1);
+  }, []);
+  // such a switch can take the focused control with it, dropping focus on the
+  // page: the new pane's nav row takes it. Focus that survived stays put.
+  useEffect(() => {
+    if (handoffs === 0 || document.activeElement !== document.body) return;
+    navRef.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus();
+  }, [handoffs]);
   // a surface elsewhere asked for a SPECIFIC pane (the Librarian's gear →
   // Settings → Librarian, 2026-07-31) — consume the one-shot request
   const paneRequest = useUiStore((s) => s.settingsPaneRequest);
   useEffect(() => {
     if (!paneRequest) return;
-    if (nav.some((p) => p.id === paneRequest)) setPane(paneRequest);
+    if (opensPane(paneRequest, nav, appHost(), false)) setPane(paneRequest);
     useUiStore.getState().setSettingsPaneRequest(null);
   }, [nav, paneRequest]);
   const hostEntry = nav.find((entry) => entry.id === pane && entry.host);
@@ -2958,7 +2987,7 @@ export function SettingsSurface() {
   return (
     <div className="settings">
       <h2 className="sr-only">Settings</h2>
-      <nav className="set-nav" aria-label="Settings sections">
+      <nav className="set-nav" aria-label="Settings sections" ref={navRef}>
         {/* without notes, Settings is the whole window: nothing to go back to */}
         {withNotes && (
           <button type="button" className="set-back" onClick={() => dispatch("app.settings")}>
@@ -3004,7 +3033,7 @@ export function SettingsSurface() {
             {pane === "location" && <LocationPane />}
             {pane === "connections" && <ConnectionsPane />}
             {pane === "about" && <AboutRotliPane />}
-            {hostEntry && <HostPane key={hostEntry.id} entry={hostEntry} />}
+            {hostEntry && <HostPane key={hostEntry.id} entry={hostEntry} openPane={openPane} />}
           </div>
         </div>
       </div>

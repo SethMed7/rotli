@@ -6,7 +6,7 @@
 import type { ReactNode } from "react";
 
 import { WEB_SEARCH_PROVIDERS, webSearchProviderInfo } from "../../ai/searchProvider";
-import { connectionsLead } from "../../host/registry";
+import { connectionsLead, productName } from "../../host/registry";
 import { COMING_SOON_CAPTION } from "../../lib/featurePolicy";
 import { useUiStore } from "../../state/ui";
 import { CheckGlyph, CopyGlyph } from "../glyphs";
@@ -32,10 +32,10 @@ vault — NOT this repo. The README is the ONLY doc that stays in the repo.
 • Do not create or leave project docs in this repo's docs/ folder.`;
 
 /** Named connections a stable build withholds, in the provider list grammar. */
-export const COMING_SOON_CONNECTIONS = [
-  { id: "grokbot", label: "Grok Bot plug-in", detail: "Connect Rotli to Grok Bot" },
+export const comingSoonConnections = (name = productName()) => [
+  { id: "grokbot", label: "Grok Bot plug-in", detail: `Connect ${name} to Grok Bot` },
   { id: "mcp", label: "MCP", detail: "Let outside agents read and write this vault over MCP" },
-] as const;
+];
 
 function WebResearchSection({ braveKeyRow }: { braveKeyRow: ReactNode }) {
   const provider = useUiStore((state) => state.webSearchProvider);
@@ -75,14 +75,12 @@ function WebResearchSection({ braveKeyRow }: { braveKeyRow: ReactNode }) {
       </fieldset>
       {selected.needsKey && braveKeyRow}
       <p className="setnote websearch-privacy">
-        Searches go straight from this Mac to <b>{selected.label}</b>, and Rotli reads the result pages it
-        cites. Their privacy terms apply. Rotli never ships a shared key and never switches providers after a
-        failure.
+        Searches go straight from this Mac to <b>{selected.label}</b>
+        {`, and ${productName()} reads the result pages it cites. Their privacy terms apply. ${productName()} never ships a shared key and never switches providers after a failure.`}
       </p>
       {!selected.needsKey && (
         <p className="setnote websearch-availability">
-          No account needed. DuckDuckGo&rsquo;s result pages can change or go down; Rotli tells you when that
-          happens.
+          {`No account needed. DuckDuckGo’s result pages can change or go down; ${productName()} tells you when that happens.`}
         </p>
       )}
     </section>
@@ -98,7 +96,7 @@ function ComingSoonConnections() {
       </h4>
       <p className="set-soon">{COMING_SOON_CAPTION}</p>
       <ul className="websearch-options connections-soon">
-        {COMING_SOON_CONNECTIONS.map((row) => (
+        {comingSoonConnections().map((row) => (
           <li className="websearch-option is-soon" aria-disabled="true" key={row.id}>
             <span className="websearch-optioncopy">
               <span className="websearch-optionname">{row.label}</span>
@@ -121,7 +119,7 @@ function ClaudeDocsExtension() {
         <NotesSectionTag />
       </h4>
       <p className="setnote">
-        Extend Rotli&rsquo;s corpus workflows without giving another service ownership of your notes.
+        {`Extend ${productName()}’s corpus workflows without giving another service ownership of your notes.`}
       </p>
       <div className="claudecmd">
         <div className="claudecmd-intro">
@@ -149,7 +147,7 @@ function ClaudeDocsExtension() {
           <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
         </div>
         <span className={`claudecmd-status ${copyState === "failed" ? "failed" : ""}`} aria-live="polite">
-          {copyState === "failed" ? "Rotli couldn’t access the clipboard. Try copying again." : ""}
+          {copyState === "failed" ? `${productName()} couldn’t access the clipboard. Try copying again.` : ""}
         </span>
       </div>
     </section>

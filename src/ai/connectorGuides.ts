@@ -4,6 +4,7 @@
 // the same steps, so the story is told once. Commands are the tools' own
 // official ones; Rotli never installs or signs in on the user's behalf.
 
+import { DEFAULT_PRODUCT_NAME } from "../host/registry";
 import type { CliDetect } from "../lib/tauri";
 import type { ProviderId } from "./models";
 
@@ -72,23 +73,27 @@ const INSTALL: Record<
   },
 };
 
-const LOGIN: Record<Exclude<ProviderId, "antigravity">, { command: string; detail: string }> = {
+const LOGIN: Record<
+  Exclude<ProviderId, "antigravity">,
+  { command: string; detail: (app: string) => string }
+> = {
   claude: {
     command: "claude auth login",
-    detail: "Sign in with your Claude account. Rotli never sees the credential.",
+    detail: (app) => `Sign in with your Claude account. ${app} never sees the credential.`,
   },
   codex: {
     command: "codex login",
-    detail: "Sign in with your ChatGPT account. Rotli never sees the credential.",
+    detail: (app) => `Sign in with your ChatGPT account. ${app} never sees the credential.`,
   },
   cursor: {
     command: "agent login",
-    detail: "Sign in with your Cursor account. Rotli uses Cursor's read-only Ask mode.",
+    detail: (app) => `Sign in with your Cursor account. ${app} uses Cursor's read-only Ask mode.`,
   },
 };
 
-/** The steps for one lane on one OS. Antigravity has its own card. */
-export function connectorGuide(lane: ProviderId, os: GuideOs): GuideStep[] {
+/** The steps for one lane on one OS, naming the running app `app`.
+ * Antigravity has its own card. */
+export function connectorGuide(lane: ProviderId, os: GuideOs, app = DEFAULT_PRODUCT_NAME): GuideStep[] {
   if (lane === "antigravity") return [];
   const install = INSTALL[lane][os];
   const login = LOGIN[lane];
@@ -99,11 +104,11 @@ export function connectorGuide(lane: ProviderId, os: GuideOs): GuideStep[] {
       ...(install.command ? { command: install.command } : {}),
       detail: install.detail,
     },
-    { id: "login", title: "Sign in, in your terminal", command: login.command, detail: login.detail },
+    { id: "login", title: "Sign in, in your terminal", command: login.command, detail: login.detail(app) },
     {
       id: "check",
-      title: "Come back to Rotli",
-      detail: "Rotli notices on its own; Check again asks right now.",
+      title: `Come back to ${app}`,
+      detail: `${app} notices on its own; Check again asks right now.`,
     },
   ];
 }
