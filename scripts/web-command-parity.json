@@ -399,6 +399,7 @@
         "summon",
         "toggle_main_window",
         "toggle_quick_window",
+        "workspace_return_open_request",
         "workspace_take_open_request"
       ]
     },

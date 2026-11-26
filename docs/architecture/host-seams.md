@@ -665,11 +665,6 @@ shows "Hide …" only, since it leaves system-wide chords out.
   so a host build on a home whose file system refuses `flock` (an NFS mount
   with `nolocks`, some network homes) never starts. That fails closed on
   purpose: without the lock, two processes could rewrite one support folder.
-- **A request sent during first run can be lost.** The webview consumes the
-  mailbox as soon as it mounts, setup screen included. If setup then switches
-  vaults, the opened tab is dropped and the request is already gone. This
-  predates the lock and happens in the standalone build too; a fix that holds
-  the request until setup ends is separate work.
 
 ## Proof
 

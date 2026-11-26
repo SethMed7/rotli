@@ -56,7 +56,6 @@ import {
   onSummonChat,
   setAppIcon,
   setHideOnBlur,
-  workspaceTakeOpenRequest,
 } from "./lib/tauri";
 import {
   onCorpusChanged,
@@ -97,6 +96,7 @@ import { invalidateChatFolders } from "./services/chatFolders";
 import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
 import { refreshActiveVault } from "./state/activeVault";
 import { routeOpenRequest } from "./state/openRequest";
+import { openRequestGate } from "./state/openRequestGate";
 import { runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { applyImageOutline, useAppearanceLook } from "./state/appearanceLook";
@@ -298,39 +298,28 @@ function MainShell() {
   // sidecars, then activates the app — Rust forwards that activation as
   // "rotli:open-request" (perf audit 2026-07-30, #15: this was a 750ms poll
   // for the app's lifetime, ~115k IPC calls/day). Consume once at startup for
-  // a request queued while Rotli wasn't running, then on each event.
+  // a request queued while Rotli wasn't running, then on each event; a setup
+  // screen holds it until setup ends (state/openRequestGate.ts).
   useEffect(() => {
     if (!isTauri()) return;
-    let stopped = false;
-    let reading = false;
-    const consume = () => {
-      if (reading || stopped) return;
-      reading = true;
-      void workspaceTakeOpenRequest()
-        .then((request) => {
-          if (!request || stopped) return;
-          return routeOpenRequest(request, {
-            switchVault,
-            refreshActiveVault,
-            open: (item) => {
-              useUiStore.getState().setContentView("panes");
-              usePanesStore.getState().openSummary(item);
-            },
-            fail: (message) => useUiStore.getState().setRowActionError(message),
-          });
-        })
-        .catch(() => {})
-        .finally(() => {
-          reading = false;
-        });
-    };
-    consume();
-    const unlisten = onOpenRequest(consume);
+    const detach = openRequestGate.attach((request) =>
+      routeOpenRequest(request, {
+        switchVault,
+        refreshActiveVault,
+        open: (item) => {
+          useUiStore.getState().setContentView("panes");
+          usePanesStore.getState().openSummary(item);
+        },
+        fail: (message) => useUiStore.getState().setRowActionError(message),
+      }),
+    );
+    const unlisten = onOpenRequest(() => void openRequestGate.consume());
     return () => {
-      stopped = true;
       unlisten();
+      detach();
     };
   }, []);
+  useEffect(() => void openRequestGate.setSetupShown(inSetup), [inSetup]);
   useEffect(() => onOpenNotice((message) => useUiStore.getState().setRowActionError(message)), []);
 
   // Agents reach Word documents through this window (ai/agentRequests.ts).

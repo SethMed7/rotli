@@ -34,6 +34,11 @@ fn valid_id(id: &str) -> bool {
         && !id.chars().any(char::is_control)
 }
 
+/// An id and kind the open mailbox accepts from outside Rust.
+pub(crate) fn valid_open(id: &str, kind: &str) -> bool {
+    valid_id(id) && matches!(kind, "note" | "board" | "file")
+}
+
 pub fn parse(url: &tauri::Url) -> Option<DeepLink> {
     if url.scheme() == "file" {
         let path = url.to_file_path().ok()?;
@@ -58,7 +63,7 @@ pub fn parse(url: &tauri::Url) -> Option<DeepLink> {
     }
     match url.host_str() {
         Some("open") => {
-            if !matches!(kind.as_str(), "note" | "board" | "file") {
+            if !valid_open(&id, &kind) {
                 return None;
             }
             Some(DeepLink::Open { id, kind })

@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`rotli open` during setup is no longer lost.** A request that arrived while
+  first run (or any setup or vault screen) was showing was used up behind that
+  screen, and choosing a vault then closed the tab it had opened. Rotli now
+  waits until setup is done and opens it in the vault you chose, including one
+  sent while the vault is still being copied. If the vault switch fails, the
+  request is kept for later. `rotli://` links and files opened from Finder wait
+  the same way.
+
 ## [1.9.7] - 2026-11-24
 
 ### Added

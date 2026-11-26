@@ -154,7 +154,11 @@ owns the threat side.
   registry names, which passes the vault refusal again; a host has no raw
   roots. A planted mailbox was already read at the next launch or
   activation. The nudge adds only timing: it fires on demand while the app
-  runs.
+  runs. The webview can write the mailbox in one case:
+  `workspace_return_open_request` queues back a request it took before a setup
+  vault switch that didn't happen. Rust checks the id and kind as it does a
+  `rotli://` link's, never replaces a waiting request, and neither raises the
+  window nor nudges. It queues only an open the webview could perform itself.
 - **Controls.** A host build is one process per support folder: an exclusive
   `flock` on `<support folder>/instance/lock`, taken before the Tauri
   builder, stops a second process (a stray build with the same bundle ID,
