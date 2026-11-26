@@ -38,7 +38,7 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
-import { aboutLabel, appHost, notesOn, plainPaneHeads, updatesWords } from "../host/registry";
+import { aboutLabel, appHost, dockRow, notesOn, plainPaneHeads, updatesWords } from "../host/registry";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -403,6 +403,7 @@ function GeneralPane() {
   const setStayOpen = useUiStore((s) => s.setStayOpen);
   const showInDock = useUiStore((s) => s.showInDock);
   const setShowInDock = useUiStore((s) => s.setShowInDock);
+  const dock = dockRow();
   const spellcheck = useUiStore((s) => s.spellcheck);
   const setSpellcheck = useUiStore((s) => s.setSpellcheck);
   const templatePresets = useUiStore((s) => s.templatePresets);
@@ -470,16 +471,18 @@ function GeneralPane() {
                 void setHideOnBlur(!next);
               }}
             />
-            <Toggle
-              on={showInDock}
-              title="Show in the Dock"
-              desc="Otherwise Rotli lives in the menu bar only."
-              onChange={() => {
-                const next = !showInDock;
-                setShowInDock(next);
-                void setDockVisible(next);
-              }}
-            />
+            {dock && (
+              <Toggle
+                on={showInDock}
+                title={dock.label}
+                desc={dock.detail}
+                onChange={() => {
+                  const next = !showInDock;
+                  setShowInDock(next);
+                  void setDockVisible(next);
+                }}
+              />
+            )}
           </div>
           {OWNS_SHARED_STATE ? (
             <p className="setnote">

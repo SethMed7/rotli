@@ -6,6 +6,7 @@ import appIconClay from "../../assets/appIcons/clay.png";
 import appIconDefault from "../../assets/appIcons/default.png";
 import appIconPaper from "../../assets/appIcons/paper.png";
 import appIconTesven from "../../assets/appIcons/tesven.png";
+import { dockRow } from "../../host/registry";
 import { PLATFORM, type Platform } from "../../lib/featurePolicy";
 import { setAppIcon } from "../../services/appIcon";
 import { type AppIcon, useUiStore } from "../../state/ui";
@@ -23,6 +24,8 @@ const APP_ICONS: { id: AppIcon; label: string; src: string }[] = [
 export function AppIconSettings({ platform = PLATFORM }: { platform?: Platform }) {
   const appIcon = useUiStore((s) => s.appIcon);
   const setAppIconState = useUiStore((s) => s.setAppIcon);
+  // the line points at General's switch by the words it carries there
+  const dock = dockRow();
   return (
     <>
       <h4 className="sethead">App icon</h4>
@@ -31,7 +34,13 @@ export function AppIconSettings({ platform = PLATFORM }: { platform?: Platform }
       ) : (
         <>
           <p className="lead">
-            Pick the Dock icon — it shows when <b>Show in the Dock</b> is on.
+            {dock ? (
+              <>
+                Pick the Dock icon — it shows when <b>{dock.label}</b> is on.
+              </>
+            ) : (
+              "Pick the Dock icon."
+            )}
           </p>
           <div className="appicon-row" role="group" aria-label="App icon">
             {APP_ICONS.map(({ id, label, src }) => (

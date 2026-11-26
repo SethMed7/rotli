@@ -24,7 +24,7 @@ test("desktop keeps all released icon choices and the saved selection", () => {
   // toggle buttons (aria-pressed) belong in a group; a radiogroup needs radios
   expect(html).toContain('role="group" aria-label="App icon"');
   expect(html).not.toContain("radiogroup");
-  expect(html).toContain("Pick the Dock icon");
+  expect(html).toContain("Pick the Dock icon — it shows when <b>Show in the Dock</b> is on.");
   for (const name of ["Default", "Paper", "Charcoal", "Clay", "Black", "Tesven"])
     expect(html).toContain(`<span class="appicon-label">${name}</span>`);
   expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);

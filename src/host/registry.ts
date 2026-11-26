@@ -56,6 +56,13 @@ export interface HostWords {
   /** A label on each of Rotli's own Connections section headings, to say they
    * belong to its notes; absent, no label. */
   notesSectionTag?: string;
+  /** General's "Show in the Dock" switch: its label and its explanation (each
+   * Rotli's when absent; an empty detail shows none), or null for no row. */
+  dockRow?: { label?: string; detail?: string } | null;
+  /** What the About pane says. A string is one paragraph in place of all of
+   * Rotli's wording and links; null or empty drops them. The version row stays
+   * either way. */
+  aboutBody?: string | null;
 }
 
 export interface AppHost {
@@ -80,6 +87,11 @@ export const DEFAULT_PRODUCT_NAME = "Rotli";
 export const DEFAULT_ABOUT_LABEL = "About Rotli";
 export const DEFAULT_CONNECTIONS_LEAD =
   "Choose the outside services Rotli can contact. Each connection is explicit and never changes destination after a failure.";
+
+export const DEFAULT_DOCK_ROW = {
+  label: "Show in the Dock",
+  detail: "Otherwise Rotli lives in the menu bar only.",
+} as const;
 
 export interface HostRegistry {
   register(host: AppHost): void;
@@ -165,6 +177,17 @@ export function notesSectionTag(host: AppHost | null = appHost()): string | null
 /** Whether built-in pane heads drop the quokka and its object. */
 export function plainPaneHeads(host: AppHost | null = appHost()): boolean {
   return host?.paneHeads === "plain";
+}
+
+/** The Dock switch's words, or null where a host retired the row. */
+export function dockRow(host: AppHost | null = appHost()): { label: string; detail: string } | null {
+  const row = host?.words?.dockRow;
+  return row === null ? null : { ...DEFAULT_DOCK_ROW, ...row };
+}
+
+/** What stands in for About's wording: undefined keeps Rotli's own. */
+export function aboutBody(host: AppHost | null = appHost()): string | null | undefined {
+  return host?.words?.aboutBody;
 }
 
 /** The version a host supplies, or null to show the bundle's own. */

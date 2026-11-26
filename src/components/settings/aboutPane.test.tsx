@@ -15,13 +15,18 @@ test("About names the installed version and links the website by its exact URL",
   expect(markup.includes('href="https://sethmedina.com"')).toBe(true);
   expect(markup.includes("Website — sethmedina.com")).toBe(true);
   expect(markup.includes("Rotli 0.95.1")).toBe(true);
+  // with no host: Rotli's opening paragraph, then the version row, as shipped
+  expect(markup).toStartWith('<p class="lead">Rotli is a warm, local-first notes app for the Mac');
+  expect(markup).toContain(
+    'onto your files, never their owner.</p><div class="setselect-row"><span>Rotli 0.95.1</span></div>',
+  );
 });
 
 test("without a bundle version the pane says where to find it instead of inventing one", () => {
   const markup = renderToStaticMarkup(
     <AboutPane version={null} feedbackUrl={FEEDBACK} onOpenUrl={() => {}} />,
   );
-  expect(markup.includes("version shown in the Mac app")).toBe(true);
+  expect(markup).toContain("<span>Rotli — version shown in the Mac app</span>");
   expect(/Rotli \d/.test(markup)).toBe(false);
 });
 

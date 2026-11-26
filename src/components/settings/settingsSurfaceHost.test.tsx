@@ -48,6 +48,8 @@ await mock.module("../../host/registry", () => ({
   plainPaneHeads: (given: AppHost | null = host) => registry.plainPaneHeads(given),
   connectionsLead: (given: AppHost | null = host) => registry.connectionsLead(given),
   notesSectionTag: (given: AppHost | null = host) => registry.notesSectionTag(given),
+  dockRow: (given: AppHost | null = host) => registry.dockRow(given),
+  aboutBody: (given: AppHost | null = host) => registry.aboutBody(given),
 }));
 // SSR runs no effects, so the surface starts on the pane under test
 const startAt = (initial: unknown) => (initial === "general" ? selectedPane : initial);
@@ -57,6 +59,7 @@ await mock.module("react", () => ({
 }));
 const { SettingsSurface } = await import("../settingsSurface");
 const { ConnectionsSettings } = await import("./connectionsSettings");
+const { DEFAULT_DOCK_ROW } = registry;
 afterAll(async () => {
   await mock.module("react", () => react);
   await mock.module("../../host/registry", () => registry);
@@ -178,4 +181,59 @@ test("a host's order, name, version and About label replace Rotli's", () => {
   expect(html).toContain('<span class="set-nav-version">Synthetic App 2.0.1</span>');
   expect(html.indexOf("Synthetic closing block.")).toBeGreaterThan(html.indexOf("About Synthetic</h3>"));
   expect(html).not.toContain("About Rotli");
+});
+
+/** Renders `pane` with `extra` words over the host's own, then restores them. */
+const renderWith = (extra: AppHost["words"], pane: string) => {
+  const words = host.words;
+  host.words = { ...words, ...extra };
+  selectedPane = pane;
+  try {
+    return render();
+  } finally {
+    host.words = words!;
+  }
+};
+const switchTitles = (html: string) =>
+  [...html.matchAll(/<span class="swt">([^<]+)<\/span>/g)].map((m) => m[1]);
+
+test("a host rewords the Dock row, and the App icon line follows its label", () => {
+  const row = { label: "A synthetic switch", detail: "A synthetic explanation." };
+  const general = renderWith({ dockRow: row }, "general");
+  expect(switchTitles(general)).toContain(row.label);
+  expect(general).toContain(`<span class="swd">${row.detail}</span>`);
+  expect(general).not.toContain(DEFAULT_DOCK_ROW.label);
+  expect(renderWith({ dockRow: row }, "appearance")).toContain(`it shows when <b>${row.label}</b> is on.`);
+});
+
+test("a host that retires the Dock row loses only that row and its mention", () => {
+  const standalone = switchTitles(renderWith({}, "general"));
+  expect(standalone).toContain(DEFAULT_DOCK_ROW.label);
+  expect(switchTitles(renderWith({ dockRow: null }, "general"))).toEqual(
+    standalone.filter((title) => title !== DEFAULT_DOCK_ROW.label),
+  );
+  const appearance = renderWith({ dockRow: null }, "appearance");
+  expect(appearance).toContain('<p class="lead">Pick the Dock icon.</p>');
+});
+
+test("a host replaces or drops About's wording; the version row and its blocks stay", () => {
+  const version = "<span>Synthetic App 2.0.1</span></div>";
+  const replaced = renderWith({ aboutBody: "A synthetic paragraph." }, "about");
+  expect(replaced).toContain(
+    `<p class="lead">A synthetic paragraph.</p><div class="setselect-row">${version}`,
+  );
+  const dropped = renderWith({ aboutBody: null }, "about");
+  expect(dropped).not.toContain('<p class="lead">');
+  for (const html of [replaced, dropped]) {
+    // no link, heading or note of Rotli's is left behind
+    expect([html.includes("<a "), html.includes("sethead"), html.includes('class="setnote">The')]).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(html).toContain(version);
+    expect(html).toContain('<h3 class="set-banner-title">About Synthetic</h3>');
+    expect(html).toContain("Synthetic closing block.");
+  }
+  expect(renderWith({}, "about")).toContain('<a class="ghostbtn about-link"');
 });

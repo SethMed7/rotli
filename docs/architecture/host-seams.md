@@ -343,6 +343,20 @@ on its first read, so a late registration throws. A host can give:
   (development builds, `lib/featurePolicy.ts`), Remote agents and Extensions. A
   release build of a host therefore shows Web research and Coming soon. A
   host's own blocks are never tagged.
+- **`words.dockRow`**: General's "Show in the Dock" switch.
+  `{ label?, detail? }` rewords it, each falling back to Rotli's, and an empty
+  `detail` shows none. Appearance's App icon line names the switch by the same
+  label. `null` retires the switch and shortens that line to "Pick the Dock
+  icon." It changes words and the row only: the switch, when shown, still sets
+  Rotli's saved Dock setting, and Rotli still applies that setting at first run
+  and at launch with the row retired. The lead and note around the switches
+  stay Rotli's.
+- **`words.aboutBody`**: what the About pane says. A string is one paragraph in
+  place of all of Rotli's wording: the lead, the website link, "Built in" with
+  its editor credits, and the feedback link and its note. `null` or an empty
+  string drops all of that. Either way the heading, the host's `about` blocks
+  and the version row stay. The version row shows `productName` and `version`
+  where a host gave them.
 - **`aboutGlyph`**: the About row's glyph, where Rotli shows its quokka.
 
 ## Not built yet
@@ -435,15 +449,18 @@ This list says only what was run.
   fences only. The notes-off window, a host pane, pane blocks, the nav order
   and the host's words are proven by server-side rendering only.
 
-- **Standalone Settings after the pane-head and Connections words**
-  (2026-11-25, browser lane, synthetic data, no host): every pane was captured
-  before and after, three runs each, in the development and the stable channel.
-  The DOM matched in all 66 after shots, ids minted per run aside. 31 shots
-  matched a before run pixel for pixel, and every pane had at least one that
-  did in each channel; the rest differed by at most 38 pixels, none by more than
-  one step in a colour channel, which this renderer also does between two runs
-  of one tree. A synthetic host injected in the test browser showed plain heads, its
-  own lead and three tagged headings, in the light theme.
+- **Standalone Settings after the pane heads, Connections, Dock row and About
+  words** (2026-11-25, browser lane, synthetic data, no host): every pane was
+  captured before and after, three runs each, in the development and the stable
+  channel. The DOM matched in all 66 after shots, ids minted per run aside. 32
+  shots matched a before run pixel for pixel; the rest differed by at most 60
+  pixels, none by more than one step in a colour channel. Every pane had an
+  exact shot in each channel except AI Models in the stable one, which had none
+  in five runs. Its three before runs differ from each other too, at the same
+  card edges.
+- **The same words under a synthetic host**, injected in the test browser only:
+  plain heads, a replaced Connections lead, tagged headings, a reworded Dock
+  row and a replaced About paragraph, in the light theme.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run
