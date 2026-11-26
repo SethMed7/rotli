@@ -481,14 +481,15 @@ fn launch_secures_the_registry_and_writers_mark_their_roots() {
     let after_launch = [
         ("lib.rs", "fn corpus_reveal(", "host_registry::live_root("),
         ("lib.rs", "fn corpus_choose_folder_blocking(", "host_registry::live_root("),
-        ("lib.rs", "fn refresh_vault_blocking(", "host_registry::live_root("),
+        ("lib.rs", "fn refresh_vault_blocking(", "host_registry::live_reopen("),
         ("lib.rs", "fn corpus_switch_vault_blocking(", "host_registry::live_root("),
         ("lib.rs", "fn corpus_init_memex_blocking(", "host_registry::live_root("),
         ("lib.rs", "async fn corpus_inspect_folder(", "if !app_identity::owns_shared_state() {\n            reject_privileged_root("),
         ("lib.rs", "fn corpus_list_config(", "host_registry::live_config("),
         ("vault_import.rs", "fn copy_vault_blocking(", "host_registry::live_root("),
         ("vault_location.rs", "pub(crate) fn picker_start(", "host_registry::live_root("),
-        ("memex.rs", "pub(crate) fn registered_root(", "host_registry::require_live("),
+        ("memex.rs", "pub(crate) fn registered_root(", "host_registry::live_roots("),
+        ("memex.rs", "fn registered_write_root(", "host_registry::live_config("),
     ];
     let unvetted: Vec<_> = after_launch.iter().filter(|(file, f, gate)| !body_of(&src(file), f).contains(gate)).collect();
     assert!(unvetted.is_empty(), "these take a folder from the registry after launch: {unvetted:?}");

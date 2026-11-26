@@ -6957,6 +6957,14 @@ impl ImportAuthorizations {
     }
 }
 
+/// One open route: its id, its store's root, and its store's own flags.
+pub(crate) struct OpenRoot {
+    pub(crate) id: String,
+    pub(crate) root: PathBuf,
+    pub(crate) adopted: bool,
+    pub(crate) read_only: bool,
+}
+
 impl CorpusState {
     pub(crate) fn contains_root(&self, root_id: &str) -> Result<bool, String> {
         Ok(self
@@ -7023,6 +7031,24 @@ impl CorpusState {
         reg.stores.remove(root_id);
         watch::stop_watching(&root);
         Ok(root)
+    }
+
+    /// Every open vault route (never a file opened from Finder) as its store
+    /// sees itself. A host build trusts this over a registry re-read after
+    /// launch (host_registry.rs).
+    pub(crate) fn open_roots(&self) -> Result<Vec<OpenRoot>, String> {
+        let reg = self.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+        Ok(reg
+            .stores
+            .iter()
+            .filter(|(_, store)| store.raw.is_none())
+            .map(|(id, store)| OpenRoot {
+                id: id.clone(),
+                root: store.root().to_path_buf(),
+                adopted: store.adopted,
+                read_only: store.perms_read_only,
+            })
+            .collect())
     }
 
     /// Resolve an already-open route by its filesystem identity. Native picker

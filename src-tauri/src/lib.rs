@@ -1024,7 +1024,7 @@ fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
 /// The corpus, enriched with whether it IS a memex (derived, never stored) + its
 /// write perms — so the UI/service can treat a memex corpus as the active write
 /// target.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct CorpusView {
     abs_path: std::path::PathBuf,
@@ -1072,7 +1072,7 @@ fn root_brain_enabled(root: &std::path::Path) -> bool {
 
 /// The whole Location config — the one folder (+ whether it's a brain) + connected
 /// brains + active brain. Replaces corpus_list_roots + memex_list_instances.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct CorpusConfigView {
     corpus: CorpusView,
@@ -1249,7 +1249,9 @@ fn corpus_status(app: AppHandle) -> bool {
 /// The whole Location config. Migrates the four legacy files in on first read.
 #[tauri::command]
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
-    let cfg = host_registry::live_config(&app, corpus::ensure_corpus_config(&app)); // vault bind (live): host_registry::live_config
+    let Some(cfg) = host_registry::live_config(&app, corpus::ensure_corpus_config(&app)) else { // vault bind (live): host_registry::live_config
+        return CorpusConfigView::default(); // a host build with no open vault shows none
+    };
     let development_read_only = development_read_only(&app);
     // An imported vault is not a memex to the webview: its notes go through the
     // corpus store, never the memex note lanes (wiki/_inbox). Its Librarian
@@ -1451,21 +1453,7 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
     let lane = vault_lane();
     let state = app.state::<corpus::CorpusState>();
     let active = id == corpus::DEFAULT_ROOT_ID;
-    let config = corpus::ensure_corpus_config(&app); // vault bind (live): host_registry::live_root below
-    let (root, adopted) = if active {
-        (state.default_root_path()?, config.corpus.adopted)
-    } else {
-        let connected = config
-            .brains
-            .iter()
-            .find(|vault| vault.id == id)
-            .ok_or_else(|| "no such connected vault".to_string())?;
-        if !state.contains_root(&id)? {
-            return Err("the connected vault is not open".into());
-        }
-        let root = host_registry::live_root(&app, &id, Some(connected.abs_path.clone()));
-        (root.ok_or("the connected vault is not open")?, false)
-    };
+    let (root, adopted) = host_registry::live_reopen(&app, &id, corpus::ensure_corpus_config(&app))?; // vault bind (live): host_registry::live_reopen
     if !root.is_dir() {
         if active {
             drop(lane);

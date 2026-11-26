@@ -1204,7 +1204,7 @@ fn connected_vault_ids() -> Result<Vec<String>, String> {
 fn read_config(path: &Path) -> Option<CorpusConfig> {
     fs::read_to_string(path)  // raw read (outside-vault): app config outside any vault
         .ok()
-        .and_then(|raw| serde_json::from_str::<CorpusConfig>(&raw).ok())
+        .and_then(|raw| serde_json::from_str::<CorpusConfig>(&raw).ok()) // vault bind (delegated): a registry reader
 }
 
 fn targets_from_config(config: CorpusConfig) -> Vec<RootTarget> {
