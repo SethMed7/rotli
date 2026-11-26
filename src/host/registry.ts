@@ -59,9 +59,9 @@ export interface HostWords {
   /** General's "Show in the Dock" switch: its label and its explanation (each
    * Rotli's when absent; an empty detail shows none), or null for no row. */
   dockRow?: { label?: string; detail?: string } | null;
-  /** What the About pane says. A string is one paragraph in place of all of
-   * Rotli's wording and links; null or empty drops them. The version row stays
-   * either way. */
+  /** What the About pane says. A string is one paragraph in place of Rotli's
+   * sentences, website link and feedback link; null or empty drops them. The
+   * version row and the third-party credits stay either way. */
   aboutBody?: string | null;
 }
 

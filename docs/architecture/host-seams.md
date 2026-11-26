@@ -356,11 +356,13 @@ on its first read, so a late registration throws. A host can give:
   and at launch with the row retired. The lead and note around the switches
   stay Rotli's.
 - **`words.aboutBody`**: what the About pane says. A string is one paragraph in
-  place of all of Rotli's wording: the lead, the website link, "Built in" with
-  its editor credits, and the feedback link and its note. `null` or an empty
-  string drops all of that. Either way the heading, the host's `about` blocks
-  and the version row stay. The version row shows `productName` and `version`
-  where a host gave them.
+  place of Rotli's own: the lead, the website link, and the feedback link and
+  its note. `null` or an empty string drops them. Either way the heading, the
+  host's `about` blocks, the version row and the "Built in" credits stay. The
+  credits are attribution for third-party editors the host app ships too
+  (Excalidraw, Univer), so no word removes them. The version row and the
+  credits' sentence use `productName`, and the version row `version`, where a
+  host gave them.
 - **`aboutGlyph`**: the About row's glyph, where Rotli shows its quokka.
 
 ## Not built yet
@@ -456,15 +458,15 @@ This list says only what was run.
 - **Standalone Settings after the pane heads, Connections, Dock row and About
   words** (2026-11-25, browser lane, synthetic data, no host): every pane was
   captured before and after, three runs each, in the development and the stable
-  channel. The DOM matched in all 66 after shots, ids minted per run aside. 32
-  shots matched a before run pixel for pixel; the rest differed by at most 60
-  pixels, none by more than one step in a colour channel. Every pane had an
-  exact shot in each channel except AI Models in the stable one, which had none
-  in five runs. Its three before runs differ from each other too, at the same
-  card edges.
+  channel. The DOM matched in all 66 after shots, ids minted per run aside.
+  Pixels differed by at most 60, never more than one step in a colour channel.
+  In the development channel one after run matched a before run on all 11
+  panes. In the stable channel one of six after runs matched on 10; Security
+  differed by 9 pixels, as many as two before runs differ by in the
+  development channel.
 - **The same words under a synthetic host**, injected in the test browser only:
   plain heads, a replaced Connections lead, tagged headings, a reworded Dock
-  row and a replaced About paragraph, in the light theme.
+  row, and a replaced About paragraph above the credits, in the light theme.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run

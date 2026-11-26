@@ -59,6 +59,7 @@ await mock.module("react", () => ({
 }));
 const { SettingsSurface } = await import("../settingsSurface");
 const { ConnectionsSettings } = await import("./connectionsSettings");
+const { BUILT_IN, ROTLI_WEBSITE_URL } = await import("./aboutPane");
 const { DEFAULT_DOCK_ROW } = registry;
 afterAll(async () => {
   await mock.module("react", () => react);
@@ -216,7 +217,7 @@ test("a host that retires the Dock row loses only that row and its mention", () 
   expect(appearance).toContain('<p class="lead">Pick the Dock icon.</p>');
 });
 
-test("a host replaces or drops About's wording; the version row and its blocks stay", () => {
+test("a host replaces or drops About's wording; version, credits and its blocks stay", () => {
   const version = "<span>Synthetic App 2.0.1</span></div>";
   const replaced = renderWith({ aboutBody: "A synthetic paragraph." }, "about");
   expect(replaced).toContain(
@@ -225,12 +226,16 @@ test("a host replaces or drops About's wording; the version row and its blocks s
   const dropped = renderWith({ aboutBody: null }, "about");
   expect(dropped).not.toContain('<p class="lead">');
   for (const html of [replaced, dropped]) {
-    // no link, heading or note of Rotli's is left behind
-    expect([html.includes("<a "), html.includes("sethead"), html.includes('class="setnote">The')]).toEqual([
-      false,
-      false,
-      false,
-    ]);
+    // the third-party credits stay: attribution for code the host ships
+    for (const editor of BUILT_IN) expect(html).toContain(`href="${editor.url}">${editor.name}</a>`);
+    expect(html).toContain("live inside Synthetic App and save");
+    // no website link, feedback link or note of Rotli's is left behind
+    expect([
+      html.includes(ROTLI_WEBSITE_URL),
+      html.includes("about-link"),
+      html.includes('class="setnote">The'),
+      html.includes("inside Rotli"),
+    ]).toEqual([false, false, false, false]);
     expect(html).toContain(version);
     expect(html).toContain('<h3 class="set-banner-title">About Synthetic</h3>');
     expect(html).toContain("Synthetic closing block.");

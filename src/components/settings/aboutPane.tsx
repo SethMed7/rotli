@@ -1,7 +1,8 @@
 // Settings → About Rotli: the app, its version, and where it comes from. The
 // version and the external-link opener come from settingsSurface (the native
 // adapter owner), so this pane stays presentation only. A host build may
-// replace or drop the wording around the version row (host/registry.ts).
+// replace or drop Rotli's wording and links (host/registry.ts); the version
+// row and the third-party credits stay.
 import { aboutBody, hostVersion, productName } from "../../host/registry";
 import { ExternalLinkGlyph } from "../glyphs";
 
@@ -25,7 +26,7 @@ export function AboutPane({
   feedbackUrl: string;
   onOpenUrl: (url: string) => void;
 }) {
-  // undefined: Rotli's own words and links; anything else is a host's
+  // undefined: Rotli's own words and links; anything else is a host's wording
   const hostBody = aboutBody();
   const rotli = hostBody === undefined;
   const name = productName();
@@ -46,38 +47,41 @@ export function AboutPane({
         <span>{shown ? `${name} ${shown}` : `${name} — version shown in the Mac app`}</span>
       </div>
       {rotli && (
+        <a
+          className="ghostbtn about-link"
+          href={ROTLI_WEBSITE_URL}
+          onClick={(event) => {
+            event.preventDefault();
+            onOpenUrl(ROTLI_WEBSITE_URL);
+          }}
+        >
+          <span>Website — sethmedina.com</span>
+          <ExternalLinkGlyph size={13} />
+        </a>
+      )}
+      {/* attribution for code every build ships, a host's included */}
+      <h4 className="sethead">Built in</h4>
+      <p className="setnote">
+        {`Two open-source editors live inside ${name} and save to ordinary files in your vault:`}{" "}
+        {BUILT_IN.map((editor, index) => (
+          <span key={editor.name}>
+            <a
+              className="about-inline-link"
+              href={editor.url}
+              onClick={(event) => {
+                event.preventDefault();
+                onOpenUrl(editor.url);
+              }}
+            >
+              {editor.name}
+            </a>{" "}
+            {editor.what}
+            {index === BUILT_IN.length - 1 ? "." : ", and "}
+          </span>
+        ))}
+      </p>
+      {rotli && (
         <>
-          <a
-            className="ghostbtn about-link"
-            href={ROTLI_WEBSITE_URL}
-            onClick={(event) => {
-              event.preventDefault();
-              onOpenUrl(ROTLI_WEBSITE_URL);
-            }}
-          >
-            <span>Website — sethmedina.com</span>
-            <ExternalLinkGlyph size={13} />
-          </a>
-          <h4 className="sethead">Built in</h4>
-          <p className="setnote">
-            Two open-source editors live inside Rotli and save to ordinary files in your vault:{" "}
-            {BUILT_IN.map((editor, index) => (
-              <span key={editor.name}>
-                <a
-                  className="about-inline-link"
-                  href={editor.url}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    onOpenUrl(editor.url);
-                  }}
-                >
-                  {editor.name}
-                </a>{" "}
-                {editor.what}
-                {index === BUILT_IN.length - 1 ? "." : ", and "}
-              </span>
-            ))}
-          </p>
           <a
             className="ghostbtn about-link"
             href={feedbackUrl}
