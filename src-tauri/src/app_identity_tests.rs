@@ -105,6 +105,8 @@ fn rotli_words_are_neutral_until_a_host_supplies_its_own() {
     }
     assert_eq!(stays_with_rotli(), words().shared_state);
     assert_eq!(no_keychain(), words().no_keychain);
+    // no first note of its own: the seeding keeps Rotli's, under any identifier
+    assert_eq!((defaults.welcome_note.as_deref(), welcome_note()), (None, None));
 }
 
 fn folder(base: &Path, relative: &str) -> PathBuf {

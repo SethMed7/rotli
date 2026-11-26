@@ -230,13 +230,43 @@ passes:
 - **extra plugins**, registered after Rotli's own in the order given. A host's
   commands are plugin commands, because Tauri allows one invoke handler and
   that one is Rotli's;
-- **`HostWords`**: the sentences shown where it declines shared state, where it
-  has no Keychain, and where it refuses an existing vault. Rotli's defaults are
-  neutral.
+- **`HostWords`**: its own words. `shared_state`, `no_keychain` and
+  `existing_vault` are the sentences shown where it declines shared state, where
+  it has no Keychain, and where it refuses an existing vault; Rotli's defaults
+  are neutral. `welcome_note` is the first note written into an empty notes
+  folder, a host's scratch vault included (see "The welcome note" below).
 
 Only Rotli's own binary (`src-tauri/src/main.rs`) expands Rotli's Tauri
 context. The library never does, so a host crate builds without Rotli's
 `dist/`. A fence (`app_host::tests`) keeps it that way.
+
+### The welcome note
+
+`welcome_note: Option<String>` is the whole Markdown body, `# Title` first and
+no frontmatter. That heading names the note, and the title names its file, as
+for any note: `# Welcome to Synthetic` is written as
+`Inbox/welcome-to-synthetic.md`. `None`, the default, writes Rotli's own
+`Inbox/welcome-to-rotli.md`.
+
+```rust
+rotli_lib::run_with_host(rotli_lib::AppHost::new(context).words(rotli_lib::HostWords {
+    welcome_note: Some(include_str!("welcome.md").into()),
+    ..Default::default()
+}))
+```
+
+- It is written once, at a folder's first run. A folder already seeded keeps
+  the note it has.
+- **A vault made from the folder panel still gets Rotli's.** Picking an empty
+  folder there scaffolds a memex with `Welcome to Rotli.md` and its lessons
+  from `src/assets/welcome.json`, as does Settings → Open welcome folder for the
+  lessons. `welcome_note` doesn't reach that catalog.
+- Only the app reads host words. The headless CLI never calls `run_with_host`,
+  so an empty folder it opens first gets Rotli's note.
+
+**For a host repinning:** `HostWords` is a public struct, and a new field breaks
+any literal that names every field. A host that builds `HostWords { … }` without
+`..Default::default()` must add `welcome_note` (`None` keeps today's note).
 
 ### Building a host crate
 
@@ -305,6 +335,7 @@ on its first read, so a late registration throws. A host can give:
 
 - **Hosts can't add yet:** sidebar fronts, first-run steps, or other windows
   or pages.
+- **Hosts can't replace the Welcome catalog** (see "The welcome note").
 - **The notes rows of General and Connections** still show when notes are off.
 - **Not proven yet:** a plugin command passing the capability ACL in a live
   host webview, and one copy of React across two repos at run time.

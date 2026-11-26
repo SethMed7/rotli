@@ -26,9 +26,9 @@ pub(crate) use app_identifier;
 pub(crate) const APP_IDENTIFIER: &str = app_identifier!();
 pub(crate) const STANDALONE_IDENTIFIER: &str = "com.rotli.app";
 
-/// The sentences a person reads where a host build declines Rotli's shared
-/// state. Rotli's defaults are neutral; a host supplies its own wording
-/// (`app_host::AppHost::words`).
+/// The words a host build may make its own: the sentences a person reads where
+/// it declines Rotli's shared state, and its welcome note. Rotli's defaults are
+/// neutral; a host supplies its own (`app_host::AppHost::words`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostWords {
     /// Any refused shared-state action (LaunchAgents, shortcuts, Finder).
@@ -37,6 +37,10 @@ pub struct HostWords {
     pub no_keychain: String,
     /// A folder that is already a Rotli vault.
     pub existing_vault: String,
+    /// The first note of a new notes folder, as its whole Markdown body with
+    /// `# Title` first: the heading names the note and its file. `None` writes
+    /// Rotli's own.
+    pub welcome_note: Option<String>,
 }
 
 impl Default for HostWords {
@@ -47,6 +51,7 @@ impl Default for HostWords {
                 .into(),
             existing_vault: "Rotli already uses this folder as a vault, so this app won't open it. Choose another folder."
                 .into(),
+            welcome_note: None,
         }
     }
 }
@@ -66,6 +71,11 @@ fn words() -> &'static HostWords {
 /// Shown where a host build refuses shared state.
 pub(crate) fn stays_with_rotli() -> String {
     words().shared_state.clone()
+}
+
+/// A host's own first note, if it supplied one.
+pub(crate) fn welcome_note() -> Option<&'static str> {
+    words().welcome_note.as_deref()
 }
 
 /// Shown where a host build refuses the Keychain.

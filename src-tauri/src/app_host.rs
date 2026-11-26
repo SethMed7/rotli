@@ -2,9 +2,9 @@
 //! `run_with_host` with no host. A host build is a top crate that depends on
 //! this library and starts it with its own Tauri context (bundle ID, bundle
 //! name, capability files, front end), extra plugins whose commands are its
-//! own, and the sentences a person reads where it declines Rotli's shared
-//! state. The bundle ID is fixed at build time (`build.rs`,
-//! `app_identity.rs`); the app exits at launch if the context names another.
+//! own, and its own words (`HostWords`: its refusals and its welcome note).
+//! The bundle ID is fixed at build time (`build.rs`, `app_identity.rs`); the
+//! app exits at launch if the context names another.
 //! (docs/architecture/host-seams.md)
 
 use tauri::plugin::TauriPlugin;
@@ -33,7 +33,7 @@ impl AppHost {
         self
     }
 
-    /// The sentences a person reads where this build declines shared state.
+    /// This build's own words, in place of Rotli's.
     #[must_use]
     pub fn words(mut self, words: HostWords) -> Self {
         self.words = words;
