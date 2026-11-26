@@ -38,7 +38,7 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
-import { aboutLabel, appHost, notesOn, updatesWords } from "../host/registry";
+import { aboutLabel, appHost, notesOn, plainPaneHeads, updatesWords } from "../host/registry";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -162,8 +162,10 @@ import { WelcomeSettings } from "./welcomeSettings";
 
 /** A settings pane heading: since 2026-09-29 a banner with the theme's
  * scenery, the pane's own motif, and the person's quokka in it
- * (settings/settingsBanner.tsx). */
+ * (settings/settingsBanner.tsx). Every built-in pane's heading comes through
+ * here; a host that asked for plain heads gets the scenery alone. */
 function PaneHead({ title, char, motif }: { title: string; char: CharacterName; motif: BannerMotif }) {
+  if (plainPaneHeads()) return <SettingsBanner title={title} />;
   return <SettingsBanner title={title} pose={char} motif={motif} />;
 }
 

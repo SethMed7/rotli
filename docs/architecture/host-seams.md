@@ -316,10 +316,14 @@ on its first read, so a late registration throws. A host can give:
   heading, and blocks in one place render in the order given. Any other pane
   or place throws at registration. With no host, nothing extra renders, not
   even a wrapper.
-- **Pane heads.** Rotli's panes keep their quokka pose and motif. A host pane's
-  heading is the banner's scenery with no character and no object
-  (`SettingsBanner` without `pose` or `motif`), so this repository holds no
-  host art.
+- **Pane heads.** A host pane's heading is the banner's scenery with no
+  character and no object (`SettingsBanner` without `pose` or `motif`), so this
+  repository holds no host art.
+- **`paneHeads`**: `"rotli"`, the default, keeps each built-in pane's quokka
+  pose and motif. `"plain"` gives every built-in pane the same heading as a host
+  pane. Every built-in head renders through `PaneHead`
+  (`settingsSurface.tsx`). It changes headings only: Appearance's Chat buddy
+  studio is part of that pane's body and still draws the quokka.
 - **`notes: false`**: Settings without notes. The window is just Settings. It
   has no "Back to notes", none of Rotli's first-run or vault screens, and no
   notes panes (Keybindings, Browser, Librarian, Security, AI Models, Chat,
@@ -329,6 +333,16 @@ on its first read, so a late registration throws. A host can give:
   which replaces "About Rotli" as the nav row and the pane's heading. The
   About pane's body stays Rotli's; a host adds to it with `paneBlocks`.
   Rotli's defaults are exactly today's text.
+- **`words.connectionsLead`**: the paragraph that opens Connections, between a
+  host's `before` blocks and Web research. A string replaces Rotli's; an empty
+  string hides it.
+- **`words.notesSectionTag`**: a plain text label after each of Rotli's own
+  Connections headings (`.set-section-tag`), to say those sections belong to
+  Rotli's notes. Absent or empty, there is no label. The headings are Web
+  research, then either Coming soon or, only when the build has `agents`
+  (development builds, `lib/featurePolicy.ts`), Remote agents and Extensions. A
+  release build of a host therefore shows Web research and Coming soon. A
+  host's own blocks are never tagged.
 - **`aboutGlyph`**: the About row's glyph, where Rotli shows its quokka.
 
 ## Not built yet
@@ -421,6 +435,15 @@ This list says only what was run.
   fences only. The notes-off window, a host pane, pane blocks, the nav order
   and the host's words are proven by server-side rendering only.
 
+- **Standalone Settings after the pane-head and Connections words**
+  (2026-11-25, browser lane, synthetic data, no host): every pane was captured
+  before and after, three runs each, in the development and the stable channel.
+  The DOM matched in all 66 after shots, ids minted per run aside. 31 shots
+  matched a before run pixel for pixel, and every pane had at least one that
+  did in each channel; the rest differed by at most 38 pixels, none by more than
+  one step in a colour channel, which this renderer also does between two runs
+  of one tree. A synthetic host injected in the test browser showed plain heads, its
+  own lead and three tagged headings, in the light theme.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run
@@ -438,5 +461,6 @@ This list says only what was run.
   folder before the helper starts),
   `breve_dev_roots.rs` and `app_host.rs`.
 - **TypeScript:** `src/lib/appIdentity.test.ts`, `src/host/registry.test.ts`,
-  `src/components/settings/settingsNav.test.ts` and
+  `src/components/settings/settingsNav.test.ts`,
+  `src/components/settings/connectionsSettings.test.tsx` and
   `src/components/settings/settingsSurfaceHost.test.tsx`.

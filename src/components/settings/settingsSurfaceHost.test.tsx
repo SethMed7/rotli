@@ -45,6 +45,9 @@ await mock.module("../../host/registry", () => ({
   productName: (given: AppHost | null = host) => registry.productName(given),
   aboutLabel: (given: AppHost | null = host) => registry.aboutLabel(given),
   hostVersion: (given: AppHost | null = host) => registry.hostVersion(given),
+  plainPaneHeads: (given: AppHost | null = host) => registry.plainPaneHeads(given),
+  connectionsLead: (given: AppHost | null = host) => registry.connectionsLead(given),
+  notesSectionTag: (given: AppHost | null = host) => registry.notesSectionTag(given),
 }));
 // SSR runs no effects, so the surface starts on the pane under test
 const startAt = (initial: unknown) => (initial === "general" ? selectedPane : initial);
@@ -53,6 +56,7 @@ await mock.module("react", () => ({
   useState: (initial: unknown) => react.useState(startAt(initial)),
 }));
 const { SettingsSurface } = await import("../settingsSurface");
+const { ConnectionsSettings } = await import("./connectionsSettings");
 afterAll(async () => {
   await mock.module("react", () => react);
   await mock.module("../../host/registry", () => registry);
@@ -85,9 +89,63 @@ test("a host pane is its scenery heading with no character, then the host's body
   expect(html).toContain("Synthetic host pane body.");
 });
 
-test("Rotli's own pane keeps its character under a host", () => {
-  selectedPane = "general";
-  expect(render()).toContain("set-banner-quokka");
+/** Every built-in pane's heading banner, with notes on so none is left out. */
+const builtInHeads = () => {
+  host.notes = true;
+  try {
+    return settingsNav("desktop", host)
+      .filter((entry) => !entry.host)
+      .map((entry) => {
+        selectedPane = entry.id;
+        const head = render().match(/data-banner="[^:"]+:([^"]+)">.*?<\/h3>/s);
+        return { id: entry.id, motif: head?.[1], quokka: head?.[0].includes("set-banner-quokka") };
+      });
+  } finally {
+    host.notes = false;
+  }
+};
+
+test("Rotli's own panes keep their character and object under a host", () => {
+  const heads = builtInHeads();
+  expect(heads.length).toBeGreaterThan(8);
+  expect(heads.filter((head) => !head.quokka || !head.motif || head.motif === "scenery")).toEqual([]);
+});
+
+test("a host that asks for plain heads gets scenery alone on every built-in pane", () => {
+  host.paneHeads = "plain";
+  try {
+    expect(builtInHeads().filter((head) => head.quokka !== false || head.motif !== "scenery")).toEqual([]);
+  } finally {
+    delete host.paneHeads;
+  }
+});
+
+test("a host words or hides the Connections lead and tags each of Rotli's own sections", () => {
+  const words = host.words;
+  const connections = (agents: boolean) =>
+    renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <ConnectionsSettings agents={agents} braveKeyRow={null} />
+      </QueryClientProvider>,
+    );
+  const tag = ' <span class="set-section-tag">Synthetic tag</span>';
+  const headings = (agents: boolean) =>
+    [...connections(agents).matchAll(/<h4 class="set-subhead"[^>]*>(.*?)<\/h4>/g)].map((match) => match[1]);
+  try {
+    // Rotli's own headings, stable then with agents, as they read before any word
+    const untagged = [false, true].map(headings);
+    expect(untagged.map((list) => list.length)).toEqual([2, 3]);
+    host.words = { ...words, connectionsLead: "Synthetic lead.", notesSectionTag: "Synthetic tag" };
+    selectedPane = "connections";
+    expect(render()).toContain('<p class="lead">Synthetic lead.</p>');
+    expect([false, true].map(headings)).toEqual(untagged.map((list) => list.map((heading) => heading + tag)));
+    host.words = { ...words, connectionsLead: "" };
+    expect(connections(false)).not.toContain('class="lead"');
+    expect(connections(false)).toStartWith('<section class="aisection">');
+    expect(connections(true)).not.toContain("set-section-tag");
+  } finally {
+    host.words = words!;
+  }
 });
 
 test("a host's blocks sit below the heading, before and after Rotli's own body", () => {
