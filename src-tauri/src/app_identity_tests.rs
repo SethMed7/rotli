@@ -408,7 +408,7 @@ fn body_of<'a>(source: &'a str, signature: &str) -> &'a str {
 fn launch_checks_identity_then_settles_scratch_before_binding_anything() {
     let lib = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs")).unwrap();
     let launch = &lib[lib.find("fn launch(").expect("launch exists")..];
-    let lock = launch.find("single_instance::hold_at_launch()").expect("launch takes the instance lock");
+    let lock = launch.find("single_instance::hold_at_launch(&context.config().identifier)").expect("launch takes the instance lock");
     assert!(lock < launch.find("tauri::Builder::default()").unwrap(), "the lock precedes the builder");
     let main = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/main.rs")).unwrap();
     assert!(main.find("run_headless_if_requested(").unwrap() < main.find("rotli_lib::run(").unwrap());

@@ -75,13 +75,19 @@ per support folder (`src-tauri/src/single_instance.rs`).
 
 - **The lock.** The first thing `launch()` does, before the Tauri builder,
   any plugin or any window, is take an exclusive `flock` on
-  `<support folder>/instance/lock` and keep it for the process's life. The
-  folder is private (0700) and the file 0600. The support folder comes from
-  `HOME` there, since Tauri doesn't exist yet; setup then checks that Tauri's
-  `app_config_dir` is the same folder before anything else touches it, and
-  exits 73 if not. A missing `HOME` exits 73 too. On macOS both read `HOME`:
-  Tauri 2.11's `app_config_dir` is `dirs::config_dir()` joined with the
-  identifier, and `dirs` 6 makes that `$HOME/Library/Application Support`.
+  `<support folder>/instance/lock` and keep it for the process's life. Only a
+  binary whose Tauri context names the ID it was compiled for takes it
+  (`single_instance::takes_lock`): a stale build whose context names another
+  ID writes nothing there, never nudges the real app, and setup stops it
+  with 78 as before. The folder is made 0700 and the file 0600, an older
+  file included, each through a descriptor opened without following a link.
+- **The support folder** comes from `HOME` there, since Tauri doesn't exist
+  yet. Setup checks that Tauri's `app_config_dir` is the same folder before
+  Rotli's own setup touches it, and exits 73 if not; plugin setup hooks, a
+  host's included, have already run during `build()`. A missing `HOME` exits
+  73 too. On macOS both read `HOME`: Tauri 2.11's `app_config_dir` is
+  `dirs::config_dir()` joined with the identifier, and `dirs` 6 makes that
+  `$HOME/Library/Application Support`.
 - **A second process** that can't take the lock runs no launch setup. It
   writes `<support folder>/instance/nudge` and exits with status **75**
   (`EX_TEMPFAIL`), whether or not the nudge could be written; its stderr line
@@ -101,20 +107,20 @@ per support folder (`src-tauri/src/single_instance.rs`).
   `notify`, not recursive). On a nudge it does what a Reopen does for `open`
   in the standalone build: it shows the main window and emits
   `rotli:open-request`, so the webview consumes the `rotli open` mailbox. A
-  nudge carries no request, so a forged one can only bring the window forward
-  and make the webview read the mailbox. A host build has no deep-link plugin
-  and Finder hands it no files, so a second launch has no argv or link to
-  pass on.
+  nudge carries no request. A host build has no deep-link plugin and Finder
+  hands it no files, so a second launch has no argv or link to pass on. For
+  what a forged nudge and mailbox can reach, see the threat model's
+  host-identity boundary.
 - **Why `flock` and not Tauri's single-instance plugin.** On macOS the plugin
   (read from its `v2` branch source on 2026-11-26, not a pinned release)
   binds a socket in `/tmp` named from the bundle ID (`.` and `-` turned into
   `_`): one socket per bundle ID for every HOME on the machine, not one per
   support folder. It detects a holder by connecting, then removes the file
-  and binds, so two launches at the same moment can both win. A `flock` is atomic, per folder, and released by the
-  kernel. A Unix socket in the support folder would give the sender an
-  answer, but `sun_path` is 104 bytes on macOS and a sandbox HOME plus
-  `Library/Application Support/<bundle ID>/instance/…` can pass that, so the
-  channel is a watched file instead.
+  and binds, so two launches at the same moment can both win. A `flock` is
+  atomic, per folder, and released by the kernel. A Unix socket in the
+  support folder would give the sender an answer, but `sun_path` is 104 bytes
+  on macOS and a sandbox HOME plus `Library/Application Support/<bundle
+  ID>/instance/…` can pass that, so the channel is a watched file instead.
 
 ### `rotli open` under a host
 
@@ -578,32 +584,64 @@ on its first read, so a late registration throws. A host can give:
 - **A probe at the wrong moment slows a launch.** A launch that meets the
   CLI's probe waits it out; one that meets a real holder waits two seconds
   before it exits 75.
+- **A home without file locks doesn't start.** Any `flock` error exits 73,
+  so a host build on a home whose file system refuses `flock` (an NFS mount
+  with `nolocks`, some network homes) never starts. That fails closed on
+  purpose: without the lock, two processes could rewrite one support folder.
+- **A request sent during first run can be lost.** The webview consumes the
+  mailbox as soon as it mounts, setup screen included. If setup then switches
+  vaults, the opened tab is dropped and the request is already gone. This
+  predates the lock and happens in the standalone build too; a fix that holds
+  the request until setup ends is separate work.
 
 ## Proof
 
 This list says only what was run.
 
-- **One process per support folder (2026-11-26).**
-  `single_instance_tests.rs`: a second claim on one support folder is
-  refused and the next succeeds once the first descriptor closes; each
-  folder has its own lock; a launch waits out a brief holder; the CLI's probe
-  sees a holder and writes nothing; a linked support folder is refused with
-  nothing written to its target; a link at the lock or its folder is set
-  aside, not followed; the folder is 0700 and the file 0600; a nudge reaches
-  the holder's watcher (polling backend under test); the standalone ID takes
-  no lock and creates nothing; `rotli open`'s plan for each identity, holder
-  and binary path; and a source fence that the plan comes before the request
-  is queued. `launch_checks_identity_then_settles_scratch_before_binding_anything`
-  (`app_identity_tests.rs`) now also fences the lock before the Tauri builder,
-  the headless CLI before `launch()`, and the support-folder check before the
-  scratch vault. Before the fix, 11 of the first 14 tests failed. Each fence
-  was mutation-checked (the lock moved after the builder, the folder check
-  moved after the scratch vault, the request written before the plan) and
-  failed. Run in the standalone build and
-  under `ROTLI_APP_IDENTIFIER=com.example.host`. **Not run live:** no app
-  was launched, so a real second launch, a crash's release of the lock,
-  FSEvents delivery of the nudge and `open -a <bundle>` are proven by unit
-  tests and kernel semantics only.
+- **One process per support folder, live (2026-11-26, at `0a1a3da0`).** The
+  host lead ran a Developer ID signed host build from two bundle copies,
+  each binary run directly in a sandbox HOME. All six steps passed:
+  1. A first launch came up.
+  2. A second launch of the same binary exited 75 after about 2 s, and the
+     holder stayed the only process.
+  3. A second bundle copy at another path exited 75 the same way.
+  4. `open` with a holder exited 0 and launched nothing; the holder's
+     FSEvents watcher consumed the request within 4 s.
+  5. `open` with no holder launched the bundle containing the CLI's binary,
+     with the caller's HOME.
+  6. After `kill -9`, an immediate relaunch took the lock and started.
+
+  `open` from a binary outside an `.app` exited 1 and queued nothing.
+  **Not run live:** the exit-73 paths (a linked support folder, a missing
+  `HOME`, a support-folder mismatch), a home without file locks, and a
+  request sent during first run.
+- **One process per support folder, tests (2026-11-26).**
+  `single_instance_tests.rs`:
+  - a second claim on one support folder is refused, and the next succeeds
+    once the first descriptor closes; each folder has its own lock;
+  - a launch waits out a brief holder; the CLI's probe sees a holder and
+    writes nothing;
+  - a linked support folder is refused with nothing written to its target;
+    a link at the lock or its folder is set aside, not followed;
+  - the folder is 0700 and the file 0600, an older looser file included; a
+    spawned child doesn't keep the lock;
+  - a nudge reaches the holder's watcher (polling backend under test);
+  - the standalone ID takes no lock and creates nothing, and its real
+    `open_plan()` is `open -a rotli`; a context naming another ID takes no
+    lock;
+  - `rotli open`'s plan for each identity, holder and binary path, and a
+    source fence that the plan comes before the request is queued.
+
+  `launch_checks_identity_then_settles_scratch_before_binding_anything`
+  (`app_identity_tests.rs`) also fences the lock before the Tauri builder,
+  the headless CLI before `launch()`, and the support-folder check before
+  the scratch vault. The red run used a stub module with the old behaviour
+  (no lock, `open -b <ID>`), so every test compiled; 11 of the first 14
+  failed. Each fence and each later guard was mutation-checked and failed:
+  the lock after the builder, the folder check after the scratch vault, the
+  request written before the plan, an older lock file left loose, and a
+  lock taken whatever the context's ID. Run in the standalone build and
+  under `ROTLI_APP_IDENTIFIER=com.example.host`.
 
 - **The after-launch flags (2026-11-25, after `36b36f5b`).**
   `after_launch_a_host_takes_only_the_roots_it_has_open` rewrites the

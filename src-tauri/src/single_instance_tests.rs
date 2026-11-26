@@ -201,12 +201,58 @@ fn rotli_open_plans_by_identity_and_holder() {
     }
 }
 
-/// This build's own answer, without reading HOME: the identity decides.
+/// The standalone build's real `open_plan()` reads neither HOME nor its own
+/// path and still says `open -a rotli`; a host build's reads HOME, so it is
+/// covered through `plan_for` above.
 #[test]
-fn this_build_opens_as_its_identity() {
-    let standalone = crate::app_identity::owns_shared_state();
-    let expected = if standalone { "rotli" } else { BUNDLE };
-    assert_eq!(plan_for(standalone, false, Path::new(BUNDLED)), Ok(OpenPlan::Launch(vec!["-a".into(), expected.into()])));
+fn the_standalone_open_is_still_open_a_rotli() {
+    if !crate::app_identity::owns_shared_state() {
+        return;
+    }
+    assert_eq!(open_plan(), Ok(OpenPlan::Launch(vec!["-a".into(), "rotli".into()])));
+}
+
+/// A launch takes the lock only as the identity it was compiled for: a
+/// context naming another ID (the stale-cache case setup stops with 78)
+/// takes none, so it can't nudge the real app or exit 75.
+#[test]
+fn only_a_matching_host_identity_takes_the_lock() {
+    let host = !crate::app_identity::owns_shared_state();
+    assert_eq!(takes_lock(crate::app_identity::APP_IDENTIFIER), host);
+    assert!(!takes_lock("com.example.mismatched"));
+    assert!(!takes_lock(STANDALONE_IDENTIFIER), "the standalone ID never takes it");
+}
+
+/// The lock file is opened close-on-exec, so a child (the relaunch waiter,
+/// `open`, an agent CLI) never keeps it: once the holder lets go, the next
+/// launch takes it while the child still runs.
+#[cfg(unix)]
+#[test]
+fn a_spawned_child_does_not_keep_the_lock() {
+    let temp = tempfile::tempdir().unwrap();
+    let support = support_in(&temp);
+    let lock = held(try_claim_with(&support, 0));
+    let mut child = std::process::Command::new("sleep").arg("5").spawn().unwrap();
+    drop(lock);
+    let next = try_claim_with(&support, 0);
+    let _ = child.kill();
+    let _ = child.wait();
+    held(next);
+}
+
+/// A lock file left with a looser mode is tightened to 0600.
+#[cfg(unix)]
+#[test]
+fn an_existing_lock_file_is_made_private() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let support = support_in(&temp);
+    std::fs::create_dir_all(support.join(FOLDER)).unwrap();
+    let path = support.join(FOLDER).join(LOCK);
+    std::fs::write(&path, "").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o666)).unwrap();
+    let _lock = held(try_claim_with(&support, 0));
+    assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
 }
 
 fn source(file: &str) -> String {

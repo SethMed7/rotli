@@ -91,13 +91,24 @@ fn instance_folder(support: &Path) -> Result<PathBuf, String> {
         }
         Err(_) => make_folder(&folder)?,
     }
+    make_private(&folder, true).map_err(|e| format!("{} ({e})", folder.display()))?;
+    Ok(folder)
+}
+
+/// Set `path`'s mode through a descriptor opened without following a link,
+/// so a link swapped in after the checks above is refused, never chmodded.
+fn make_private(path: &Path, folder: bool) -> std::io::Result<()> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o700))
-            .map_err(|e| format!("{} ({e})", folder.display()))?;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let flags = if folder { libc::O_NOFOLLOW | libc::O_DIRECTORY } else { libc::O_NOFOLLOW };
+        // raw read (outside-vault): opened only to set the mode of an instance file or folder
+        let opened = OpenOptions::new().read(true).custom_flags(flags).open(path)?;
+        opened.set_permissions(std::fs::Permissions::from_mode(if folder { 0o700 } else { 0o600 }))?;
     }
-    Ok(folder)
+    #[cfg(not(unix))]
+    let _ = (path, folder);
+    Ok(())
 }
 
 fn make_folder(folder: &Path) -> Result<(), String> {
@@ -136,7 +147,15 @@ fn lock_file(folder: &Path) -> Result<File, String> {
     if std::fs::symlink_metadata(&path).is_ok_and(|meta| !meta.is_file()) {
         crate::app_identity::set_aside(&path)?;
     }
-    open_lock(&path, true).map_err(|e| format!("open {} ({e})", path.display()))
+    let file = open_lock(&path, true).map_err(|e| format!("open {} ({e})", path.display()))?;
+    // the mode on create applies only to a new file; an older one is tightened too
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("{} ({e})", path.display()))?;
+    }
+    Ok(file)
 }
 
 /// Take the lock on `support`, retrying `retries` times while another
@@ -231,11 +250,20 @@ fn support_at_home() -> Result<PathBuf, String> {
     Ok(crate::app_identity::support_dir(Path::new(&home)))
 }
 
+/// Whether a launch whose Tauri context names `configured` takes the lock:
+/// a host build compiled for that same ID. A binary whose context names
+/// another ID (a stale build cache) takes none and writes nothing here; setup
+/// stops it with 78, so it never nudges the real app or exits 75.
+pub(crate) fn takes_lock(configured: &str) -> bool {
+    !crate::app_identity::owns_shared_state() && crate::app_identity::matches_runtime(configured)
+}
+
 /// First thing in `launch()`, before the Tauri builder: a host build takes
 /// its lock or stops. A second process nudges the holder and exits 75; a lock
-/// that can't be taken safely exits 73. The standalone build returns at once.
-pub(crate) fn hold_at_launch() {
-    if crate::app_identity::owns_shared_state() {
+/// that can't be taken safely exits 73, a home whose file system has no
+/// `flock` (some network homes) included. The standalone build returns at once.
+pub(crate) fn hold_at_launch(configured: &str) {
+    if !takes_lock(configured) {
         return;
     }
     let unsafe_lock = |error: String| -> ! {

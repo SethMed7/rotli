@@ -143,28 +143,42 @@ owns the threat side.
   (`app_identity::refuse_existing_vault`), which refuses a folder that is,
   sits in, or holds an unmarked vault. The standalone build writes and reads
   no mark.
-- **Controls.** A host build is one process per support folder: an
-  exclusive `flock` on `<support folder>/instance/lock`, taken before the Tauri
+- **The nudge and the mailbox.** A host build also acts on two files a
+  support-folder writer can plant: `instance/nudge` makes the running app
+  raise its main window and read the `rotli open` mailbox, and for a host
+  that mailbox (`<default root>/.rotli/workspace-open.json`) usually sits in
+  the support folder too, in the scratch vault. The read side doesn't check
+  the request's `kind` again, or whether the item is visible to remote
+  agents; only the CLI's write does. A planted request can still only open
+  an item in the current vault, or switch to a connected vault the vetted
+  registry names, which passes the vault refusal again; a host has no raw
+  roots. A planted mailbox was already read at the next launch or
+  activation. The nudge adds only timing: it fires on demand while the app
+  runs.
+- **Controls.** A host build is one process per support folder: an exclusive
+  `flock` on `<support folder>/instance/lock`, taken before the Tauri
   builder, stops a second process (a stray build with the same bundle ID,
   say) before it runs any launch setup, and `rotli open` nudges the holder or
-  opens its own bundle, never another build by ID. At launch every registry file is vetted before any root is
-  read and again after the bookmark repair; a refused file is set aside
-  whole, and a launch that can't vet it exits 73. After launch a host takes
-  roots, and their adopted and active flags and a connected vault's
-  read-only flag, only from its open stores; the current vault's write right
-  comes from its own `memex.json`, never the registry. The helper and the CLI vet each root on every load and walk below
-  it once per process. `check:vault-binds` makes every call that turns a path
-  into a root, and every registry read, say why it is safe, ties a refused or
-  live reason to the same variable, and pins the count per file. It is a
-  tripwire, not a proof.
+  opens its own bundle, never another build by ID. At launch every registry
+  file is vetted before any root is read and again after the bookmark
+  repair; a refused file is set aside whole, and a launch that can't vet it
+  exits 73. After launch a host takes roots, and their adopted and active
+  flags and a connected vault's read-only flag, only from its open stores;
+  the current vault's write right comes from its own `memex.json`, never the
+  registry. The helper and the CLI vet each root on every load and walk
+  below it once per process. `check:vault-binds` makes every call that turns
+  a path into a root, and every registry read, say why it is safe, ties a
+  refused or live reason to the same variable, and pins the count per file.
+  It is a tripwire, not a proof.
 - **What it can't stop.** A same-user process with general write access can
   forge the mark inside a Rotli vault next to a planted registry. The mark
   travels with copies and synced replicas of a host's folder. A folder a
   host marked stays its own after a person also opens it in standalone
   Rotli. A writer of the support folder can replace the instance lock file
   while a holder runs, and a build from before the lock doesn't take it, so
-  the lock stops a second launch of this build, not a hostile writer. Between the vetting and the bind there is a time-of-check gap that
-  only a same-user process can race, and a vault made inside an open root
+  the lock stops a second launch of this build, not a hostile writer.
+  Between the vetting and the bind there is a time-of-check gap that only a
+  same-user process can race, and a vault made inside an open root
   while the app runs is seen only at the next launch (by the helper and the
   CLI, only when the process restarts). A registry rewritten after launch
   can still name an open added folder as a connected vault, which opens the

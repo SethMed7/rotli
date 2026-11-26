@@ -2058,7 +2058,7 @@ pub fn run_with_host(host: AppHost) {
 fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>) {
     // A host build is one process per support folder: a second one runs no
     // plugin, window or setup step (single_instance.rs; exits 75 or 73).
-    single_instance::hold_at_launch();
+    single_instance::hold_at_launch(&context.config().identifier);
     // before any window exists: the webview reads this default at creation
     spellcheck::enable_continuous_spellcheck_by_default();
     let builder = tauri::Builder::default()
@@ -2389,7 +2389,9 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             #[cfg(all(target_os = "macos", debug_assertions))]
             apply_dev_dock_icon(app.handle());
 
-            // The lock taken in launch() must cover the folder Tauri uses.
+            // The lock taken in launch() must cover the folder Tauri uses,
+            // checked before Rust's own setup touches it (plugin setup hooks
+            // have already run in build()).
             single_instance::confirm_support_folder(app.handle());
             // A host build's first run binds its scratch vault (and only it),
             // once it is a real, empty folder this build made. If it can't be
