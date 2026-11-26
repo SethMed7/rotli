@@ -223,6 +223,20 @@ fn normal(answer: &str, root: &Path, known: &BTreeSet<String>) -> String {
             text = text.replace(&shown, "<vault>");
         }
     }
+    // revisions first, so the number mask below never reaches one; a known
+    // revision is held aside and put back verbatim
+    let mut kept = Vec::new();
+    text = regex::Regex::new(r"fnv1a64:[0-9a-f]+")
+        .unwrap()
+        .replace_all(&text, |found: &regex::Captures| {
+            if known.contains(&found[0]) {
+                kept.push(found[0].to_string());
+                format!("\u{0}{}\u{0}", kept.len() - 1)
+            } else {
+                "<revision>".to_string()
+            }
+        })
+        .into_owned();
     let patterns = [
         (r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?", "<time>"),
         (r"\b\d{10,}\b", "<number>"),
@@ -232,16 +246,19 @@ fn normal(answer: &str, root: &Path, known: &BTreeSet<String>) -> String {
     for (pattern, with) in patterns {
         text = regex::Regex::new(pattern).unwrap().replace_all(&text, with).into_owned();
     }
-    regex::Regex::new(r"fnv1a64:[0-9a-f]+")
+    regex::Regex::new("\u{0}(\\d+)\u{0}")
         .unwrap()
-        .replace_all(&text, |found: &regex::Captures| {
-            if known.contains(&found[0]) {
-                found[0].to_string()
-            } else {
-                "<revision>".to_string()
-            }
-        })
+        .replace_all(&text, |found: &regex::Captures| kept[found[1].parse::<usize>().unwrap()].clone())
         .into_owned()
+}
+
+#[test]
+fn a_revision_of_only_digits_is_masked_as_a_revision() {
+    // about one revision in two thousand is sixteen decimal digits; the
+    // number mask must not reach it before the revision mask does
+    let known: BTreeSet<String> = ["fnv1a64:1234567890123456".to_string()].into();
+    let shown = normal("kept fnv1a64:1234567890123456 new fnv1a64:9876543210987654", Path::new("/nowhere"), &known);
+    assert_eq!(shown, "kept fnv1a64:1234567890123456 new <revision>");
 }
 
 /// Run one call against `temp`, recording its answer and its effects.
