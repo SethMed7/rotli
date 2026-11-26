@@ -270,13 +270,47 @@ passes:
 - **extra plugins**, registered after Rotli's own in the order given. A host's
   commands are plugin commands, because Tauri allows one invoke handler and
   that one is Rotli's;
-- **`HostWords`**: the sentences shown where it declines shared state, where it
-  has no Keychain, and where it refuses an existing vault. Rotli's defaults are
-  neutral.
+- **`HostWords`**: its own words. `shared_state`, `no_keychain` and
+  `existing_vault` are the sentences shown where it declines shared state, where
+  it has no Keychain, and where it refuses an existing vault; Rotli's defaults
+  are neutral. `welcome_note` is the first note written into an empty notes
+  folder, a host's scratch vault included (see "The welcome note" below).
 
 Only Rotli's own binary (`src-tauri/src/main.rs`) expands Rotli's Tauri
 context. The library never does, so a host crate builds without Rotli's
 `dist/`. A fence (`app_host::tests`) keeps it that way.
+
+### The welcome note
+
+`welcome_note: Option<String>` is the whole Markdown body, `# Title` first and
+no frontmatter. That heading names the note, and the title names its file, as
+for any note: `# Welcome to Synthetic` is written as
+`Inbox/welcome-to-synthetic.md`. `None`, the default, writes Rotli's own
+`Inbox/welcome-to-rotli.md`.
+
+The first line must be `# Title`, with something after the `#`. A body that
+starts any other way (its own frontmatter, a blank line, no heading) stops a
+host's debug build at launch; a release build drops it and writes Rotli's note.
+
+```rust
+rotli_lib::run_with_host(rotli_lib::AppHost::new(context).words(rotli_lib::HostWords {
+    welcome_note: Some(include_str!("welcome.md").into()),
+    ..Default::default()
+}))
+```
+
+- It is written once, at a folder's first run. A folder already seeded keeps
+  the note it has.
+- **A vault made from the folder panel still gets Rotli's.** Picking an empty
+  folder there scaffolds a memex with `Welcome to Rotli.md` and its lessons
+  from `src/assets/welcome.json`, as does Settings → Open welcome folder for the
+  lessons. `welcome_note` doesn't reach that catalog.
+- Only the app reads host words. The headless CLI never calls `run_with_host`,
+  so an empty folder it opens first gets Rotli's note.
+
+**For a host repinning:** `HostWords` is a public struct, and a new field breaks
+any literal that names every field. A host that builds `HostWords { … }` without
+`..Default::default()` must add `welcome_note` (`None` keeps today's note).
 
 ### Building a host crate
 
@@ -326,10 +360,14 @@ on its first read, so a late registration throws. A host can give:
   heading, and blocks in one place render in the order given. Any other pane
   or place throws at registration. With no host, nothing extra renders, not
   even a wrapper.
-- **Pane heads.** Rotli's panes keep their quokka pose and motif. A host pane's
-  heading is the banner's scenery with no character and no object
-  (`SettingsBanner` without `pose` or `motif`), so this repository holds no
-  host art.
+- **Pane heads.** A host pane's heading is the banner's scenery with no
+  character and no object (`SettingsBanner` without `pose` or `motif`), so this
+  repository holds no host art.
+- **`paneHeads`**: `"rotli"`, the default, keeps each built-in pane's quokka
+  pose and motif. `"plain"` gives every built-in pane the same heading as a host
+  pane. Every built-in head renders through `PaneHead`
+  (`settingsSurface.tsx`). It changes headings only: Appearance's Chat buddy
+  studio is part of that pane's body and still draws the quokka.
 - **`notes: false`**: Settings without notes. The window is just Settings. It
   has no "Back to notes", none of Rotli's first-run or vault screens, and no
   notes panes (Keybindings, Browser, Librarian, Security, AI Models, Chat,
@@ -339,12 +377,39 @@ on its first read, so a late registration throws. A host can give:
   which replaces "About Rotli" as the nav row and the pane's heading. The
   About pane's body stays Rotli's; a host adds to it with `paneBlocks`.
   Rotli's defaults are exactly today's text.
+- **`words.connectionsLead`**: the paragraph that opens Connections, between a
+  host's `before` blocks and Web research. A string replaces Rotli's; an empty
+  string hides it.
+- **`words.notesSectionTag`**: a plain text label after each of Rotli's own
+  Connections headings (`.set-section-tag`), to say those sections belong to
+  Rotli's notes. Absent or empty, there is no label. The headings are Web
+  research, then either Coming soon or, only when the build has `agents`
+  (development builds, `lib/featurePolicy.ts`), Remote agents and Extensions. A
+  release build of a host therefore shows Web research and Coming soon. A
+  host's own blocks are never tagged.
+- **`words.dockRow`**: General's "Show in the Dock" switch.
+  `{ label?, detail? }` rewords it, each falling back to Rotli's, and an empty
+  `detail` shows none. Appearance's App icon line names the switch by the same
+  label. `null` retires the switch and shortens that line to "Pick the Dock
+  icon." It changes words and the row only: the switch, when shown, still sets
+  Rotli's saved Dock setting, and Rotli still applies that setting at first run
+  and at launch with the row retired. The lead and note around the switches
+  stay Rotli's.
+- **`words.aboutBody`**: what the About pane says. A string is one paragraph in
+  place of Rotli's own: the lead, the website link, and the feedback link and
+  its note. `null` or an empty string drops them. Either way the heading, the
+  host's `about` blocks, the version row and the "Built in" credits stay. The
+  credits are attribution for third-party editors the host app ships too
+  (Excalidraw, Univer), so no word removes them. The version row and the
+  credits' sentence use `productName`, and the version row `version`, where a
+  host gave them.
 - **`aboutGlyph`**: the About row's glyph, where Rotli shows its quokka.
 
 ## Not built yet
 
 - **Hosts can't add yet:** sidebar fronts, first-run steps, or other windows
   or pages.
+- **Hosts can't replace the Welcome catalog** (see "The welcome note").
 - **The notes rows of General and Connections** still show when notes are off.
 - **Not proven yet:** a plugin command passing the capability ACL in a live
   host webview, and one copy of React across two repos at run time.
@@ -459,6 +524,18 @@ This list says only what was run.
   fences only. The notes-off window, a host pane, pane blocks, the nav order
   and the host's words are proven by server-side rendering only.
 
+- **Standalone Settings after the pane heads, Connections, Dock row and About
+  words** (2026-11-25, browser lane, synthetic data, no host): every pane was
+  captured before and after, three runs each, in the development and the stable
+  channel. The DOM matched in all 66 after shots, ids minted per run aside.
+  Pixels differed by at most 60, never more than one step in a colour channel.
+  In the development channel one after run matched a before run on all 11
+  panes. In the stable channel one of six after runs matched on 10; Security
+  differed by 9 pixels, as many as two before runs differ by in the
+  development channel.
+- **The same words under a synthetic host**, injected in the test browser only:
+  plain heads, a replaced Connections lead, tagged headings, a reworded Dock
+  row, and a replaced About paragraph above the credits, in the light theme.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run
@@ -476,5 +553,6 @@ This list says only what was run.
   folder before the helper starts),
   `breve_dev_roots.rs` and `app_host.rs`.
 - **TypeScript:** `src/lib/appIdentity.test.ts`, `src/host/registry.test.ts`,
-  `src/components/settings/settingsNav.test.ts` and
+  `src/components/settings/settingsNav.test.ts`,
+  `src/components/settings/connectionsSettings.test.tsx` and
   `src/components/settings/settingsSurfaceHost.test.tsx`.

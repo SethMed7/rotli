@@ -888,6 +888,13 @@
   color: var(--text);
   margin: 26px 0 6px;
 }
+/* A host's label after one of Rotli's own section headings. */
+.set-section-tag {
+  margin-inline-start: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
 .aikey {
   display: flex;
   align-items: center;

@@ -2747,7 +2747,7 @@ impl CorpusStore {
             store.ensure_reserved_folders()?;
         }
         if fresh && !read_only {
-            store.first_run()?;
+            store.first_run(crate::app_identity::welcome_note())?;
         }
         Ok(store)
     }
@@ -3976,11 +3976,12 @@ impl CorpusStore {
             .map(|(meta, _)| meta)
     }
 
-    /// First run: the corpus is born with Inbox and ONE warm welcome note.
+    /// First run: the corpus is born with Inbox and ONE warm welcome note, a
+    /// host's own when it supplied one (`HostWords::welcome_note`).
     /// No demo notes on disk — the in-memory demo corpus stays browser-only.
-    fn first_run(&mut self) -> Result<(), String> {
+    fn first_run(&mut self, host_note: Option<&str>) -> Result<(), String> {
         fs::create_dir_all(self.root.join("Inbox")).map_err(|e| format!("create Inbox: {e}"))?;
-        self.create("Inbox", WELCOME_BODY)?;
+        self.create("Inbox", host_note.unwrap_or(WELCOME_BODY))?;
         Ok(())
     }
 
@@ -8903,6 +8904,10 @@ mod note_guard_tests;
 mod list_secure_tests;
 
 #[cfg(test)]
+#[path = "corpus_first_run_tests.rs"]
+mod first_run_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -9497,7 +9502,7 @@ mod tests {
     }
 
     /// Fresh corpus (first run happens: Inbox + welcome note exist).
-    fn fresh() -> (TempDir, CorpusStore) {
+    pub(super) fn fresh() -> (TempDir, CorpusStore) {
         let dir = TempDir::new().unwrap();
         let mut store = CorpusStore::open(dir.path().join("corpus")).unwrap();
         store.os_trash = false; // never touch the real Trash from tests
@@ -10814,35 +10819,6 @@ mod tests {
             fs::read(&abs).unwrap(),
             [0xC3, 0x28, b'r', b'e', b'a', b'l']
         );
-    }
-
-    #[test]
-    fn first_run_creates_inbox_and_one_welcome_note() {
-        let (_dir, mut store) = fresh();
-        assert!(store.root().join("Inbox").is_dir());
-        assert!(store.root().join(DOT_DIR).is_dir());
-        let list = store.list().unwrap();
-        assert_eq!(
-            list.notes.len(),
-            1,
-            "exactly ONE welcome note, no demo corpus"
-        );
-        let welcome = &list.notes[0];
-        assert_eq!(welcome.folder_id, "Inbox");
-        assert_eq!(welcome.title, "Welcome to rotli");
-        // it opens cleanly elsewhere: valid fence, body below
-        let rel = store.index.get(&welcome.id).unwrap();
-        let text = fs::read_to_string(store.root().join(rel)).unwrap();
-        assert!(text.starts_with("---\nid: "));
-        assert!(text.contains("\n---\n\n# Welcome to rotli"));
-        // and the editor sees no frontmatter
-        let doc = store.read(&welcome.id).unwrap();
-        assert!(doc.body.starts_with("# Welcome to rotli"));
-        // opening the same root again is NOT a first run
-        drop(store);
-        let mut again = CorpusStore::open(_dir.path().join("corpus")).unwrap();
-        again.os_trash = false;
-        assert_eq!(again.list().unwrap().notes.len(), 1);
     }
 
     #[test]

@@ -45,6 +45,11 @@ await mock.module("../../host/registry", () => ({
   productName: (given: AppHost | null = host) => registry.productName(given),
   aboutLabel: (given: AppHost | null = host) => registry.aboutLabel(given),
   hostVersion: (given: AppHost | null = host) => registry.hostVersion(given),
+  plainPaneHeads: (given: AppHost | null = host) => registry.plainPaneHeads(given),
+  connectionsLead: (given: AppHost | null = host) => registry.connectionsLead(given),
+  notesSectionTag: (given: AppHost | null = host) => registry.notesSectionTag(given),
+  dockRow: (given: AppHost | null = host) => registry.dockRow(given),
+  aboutBody: (given: AppHost | null = host) => registry.aboutBody(given),
 }));
 // SSR runs no effects, so the surface starts on the pane under test
 const startAt = (initial: unknown) => (initial === "general" ? selectedPane : initial);
@@ -53,6 +58,9 @@ await mock.module("react", () => ({
   useState: (initial: unknown) => react.useState(startAt(initial)),
 }));
 const { SettingsSurface } = await import("../settingsSurface");
+const { ConnectionsSettings } = await import("./connectionsSettings");
+const { BUILT_IN, ROTLI_WEBSITE_URL } = await import("./aboutPane");
+const { DEFAULT_DOCK_ROW } = registry;
 afterAll(async () => {
   await mock.module("react", () => react);
   await mock.module("../../host/registry", () => registry);
@@ -85,9 +93,63 @@ test("a host pane is its scenery heading with no character, then the host's body
   expect(html).toContain("Synthetic host pane body.");
 });
 
-test("Rotli's own pane keeps its character under a host", () => {
-  selectedPane = "general";
-  expect(render()).toContain("set-banner-quokka");
+/** Every built-in pane's heading banner, with notes on so none is left out. */
+const builtInHeads = () => {
+  host.notes = true;
+  try {
+    return settingsNav("desktop", host)
+      .filter((entry) => !entry.host)
+      .map((entry) => {
+        selectedPane = entry.id;
+        const head = render().match(/data-banner="[^:"]+:([^"]+)">.*?<\/h3>/s);
+        return { id: entry.id, motif: head?.[1], quokka: head?.[0].includes("set-banner-quokka") };
+      });
+  } finally {
+    host.notes = false;
+  }
+};
+
+test("Rotli's own panes keep their character and object under a host", () => {
+  const heads = builtInHeads();
+  expect(heads.length).toBeGreaterThan(8);
+  expect(heads.filter((head) => !head.quokka || !head.motif || head.motif === "scenery")).toEqual([]);
+});
+
+test("a host that asks for plain heads gets scenery alone on every built-in pane", () => {
+  host.paneHeads = "plain";
+  try {
+    expect(builtInHeads().filter((head) => head.quokka !== false || head.motif !== "scenery")).toEqual([]);
+  } finally {
+    delete host.paneHeads;
+  }
+});
+
+test("a host words or hides the Connections lead and tags each of Rotli's own sections", () => {
+  const words = host.words;
+  const connections = (agents: boolean) =>
+    renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <ConnectionsSettings agents={agents} braveKeyRow={null} />
+      </QueryClientProvider>,
+    );
+  const tag = ' <span class="set-section-tag">Synthetic tag</span>';
+  const headings = (agents: boolean) =>
+    [...connections(agents).matchAll(/<h4 class="set-subhead"[^>]*>(.*?)<\/h4>/g)].map((match) => match[1]);
+  try {
+    // Rotli's own headings, stable then with agents, as they read before any word
+    const untagged = [false, true].map(headings);
+    expect(untagged.map((list) => list.length)).toEqual([2, 3]);
+    host.words = { ...words, connectionsLead: "Synthetic lead.", notesSectionTag: "Synthetic tag" };
+    selectedPane = "connections";
+    expect(render()).toContain('<p class="lead">Synthetic lead.</p>');
+    expect([false, true].map(headings)).toEqual(untagged.map((list) => list.map((heading) => heading + tag)));
+    host.words = { ...words, connectionsLead: "" };
+    expect(connections(false)).not.toContain('class="lead"');
+    expect(connections(false)).toStartWith('<section class="aisection">');
+    expect(connections(true)).not.toContain("set-section-tag");
+  } finally {
+    host.words = words!;
+  }
 });
 
 test("a host's blocks sit below the heading, before and after Rotli's own body", () => {
@@ -120,4 +182,63 @@ test("a host's order, name, version and About label replace Rotli's", () => {
   expect(html).toContain('<span class="set-nav-version">Synthetic App 2.0.1</span>');
   expect(html.indexOf("Synthetic closing block.")).toBeGreaterThan(html.indexOf("About Synthetic</h3>"));
   expect(html).not.toContain("About Rotli");
+});
+
+/** Renders `pane` with `extra` words over the host's own, then restores them. */
+const renderWith = (extra: AppHost["words"], pane: string) => {
+  const words = host.words;
+  host.words = { ...words, ...extra };
+  selectedPane = pane;
+  try {
+    return render();
+  } finally {
+    host.words = words!;
+  }
+};
+const switchTitles = (html: string) =>
+  [...html.matchAll(/<span class="swt">([^<]+)<\/span>/g)].map((m) => m[1]);
+
+test("a host rewords the Dock row, and the App icon line follows its label", () => {
+  const row = { label: "A synthetic switch", detail: "A synthetic explanation." };
+  const general = renderWith({ dockRow: row }, "general");
+  expect(switchTitles(general)).toContain(row.label);
+  expect(general).toContain(`<span class="swd">${row.detail}</span>`);
+  expect(general).not.toContain(DEFAULT_DOCK_ROW.label);
+  expect(renderWith({ dockRow: row }, "appearance")).toContain(`it shows when <b>${row.label}</b> is on.`);
+});
+
+test("a host that retires the Dock row loses only that row and its mention", () => {
+  const standalone = switchTitles(renderWith({}, "general"));
+  expect(standalone).toContain(DEFAULT_DOCK_ROW.label);
+  expect(switchTitles(renderWith({ dockRow: null }, "general"))).toEqual(
+    standalone.filter((title) => title !== DEFAULT_DOCK_ROW.label),
+  );
+  const appearance = renderWith({ dockRow: null }, "appearance");
+  expect(appearance).toContain('<p class="lead">Pick the Dock icon.</p>');
+});
+
+test("a host replaces or drops About's wording; version, credits and its blocks stay", () => {
+  const version = "<span>Synthetic App 2.0.1</span></div>";
+  const replaced = renderWith({ aboutBody: "A synthetic paragraph." }, "about");
+  expect(replaced).toContain(
+    `<p class="lead">A synthetic paragraph.</p><div class="setselect-row">${version}`,
+  );
+  const dropped = renderWith({ aboutBody: null }, "about");
+  expect(dropped).not.toContain('<p class="lead">');
+  for (const html of [replaced, dropped]) {
+    // the third-party credits stay: attribution for code the host ships
+    for (const editor of BUILT_IN) expect(html).toContain(`href="${editor.url}">${editor.name}</a>`);
+    expect(html).toContain("live inside Synthetic App and save");
+    // no website link, feedback link or note of Rotli's is left behind
+    expect([
+      html.includes(ROTLI_WEBSITE_URL),
+      html.includes("about-link"),
+      html.includes('class="setnote">The'),
+      html.includes("inside Rotli"),
+    ]).toEqual([false, false, false, false]);
+    expect(html).toContain(version);
+    expect(html).toContain('<h3 class="set-banner-title">About Synthetic</h3>');
+    expect(html).toContain("Synthetic closing block.");
+  }
+  expect(renderWith({}, "about")).toContain('<a class="ghostbtn about-link"');
 });

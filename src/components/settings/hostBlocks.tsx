@@ -1,8 +1,21 @@
-// A host's blocks inside one of Rotli's own Settings panes, before or after
-// its body (src/host/registry.ts paneBlocks). With no host this renders
-// nothing at all, so Rotli's panes are exactly as they were.
+// What a host adds inside one of Rotli's own Settings panes
+// (src/host/registry.ts): blocks before or after its body, and a label on its
+// section headings. With no host these render nothing at all, so Rotli's panes
+// are exactly as they were.
 
-import { type BlockPane, paneBlocks } from "../../host/registry";
+import { type BlockPane, notesSectionTag, paneBlocks } from "../../host/registry";
+
+/** The host's label after one of Rotli's own section headings, if it gave one. */
+export function NotesSectionTag() {
+  const tag = notesSectionTag();
+  if (!tag) return null;
+  return (
+    <>
+      {" "}
+      <span className="set-section-tag">{tag}</span>
+    </>
+  );
+}
 
 export function HostBlocks({ pane, place }: { pane: BlockPane; place: "before" | "after" }) {
   const blocks = paneBlocks(pane, place);

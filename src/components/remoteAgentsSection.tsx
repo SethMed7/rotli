@@ -17,6 +17,7 @@ import {
 } from "../services/remoteAgent";
 import { useUiStore } from "../state/ui";
 import { CopyGlyph } from "./glyphs";
+import { NotesSectionTag } from "./settings/hostBlocks";
 
 export function RemoteAgentsSection() {
   const native = remoteAgentsNative();
@@ -96,6 +97,7 @@ export function RemoteAgentsSection() {
         <div>
           <h4 className="set-subhead" id="remote-agents-title">
             Remote agents
+            <NotesSectionTag />
           </h4>
           <p className="setnote">
             Let a cloud MCP client reach this Mac through your relay. Notes stay in the vault; Rotli must be
