@@ -5,6 +5,9 @@
       "private": 1,
       "vetted": 1
     },
+    "breve_dev_roots.rs": {
+      "standalone": 1
+    },
     "corpus.rs": {
       "delegated": 18,
       "no-root": 6,
@@ -19,7 +22,8 @@
     },
     "helper_vault.rs": {
       "delegated": 1,
-      "refused": 2,
+      "no-root": 1,
+      "refused": 1,
       "vetted": 2
     },
     "host_registry.rs": {
@@ -33,8 +37,7 @@
       "vetted": 10
     },
     "memex.rs": {
-      "live": 1,
-      "no-root": 1
+      "live": 2
     },
     "open_requests.rs": {
       "standalone": 3
@@ -49,7 +52,7 @@
       "vetted": 1
     },
     "workspace.rs": {
-      "delegated": 2,
+      "delegated": 3,
       "no-root": 2,
       "private": 1,
       "vetted": 4

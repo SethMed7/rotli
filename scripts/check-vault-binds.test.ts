@@ -31,6 +31,23 @@ describe("check:vault-binds", () => {
         .sink,
     ).toBe("lib::activate_vault_path_live");
     expect(SINKS.every((sink) => /^(?:\.\w+|\w+::\w+)$/.test(sink))).toBe(true);
+    // through an alias, a plain or glob `use`, or passed as a value
+    const sinkIn = (head: string, call: string) =>
+      bindCalls(`${head}\nfn a() {\n    ${call};\n}\n`, "lib.rs")[0]?.sink;
+    expect(sinkIn("use crate::corpus::CorpusStore as Store;", "Store::open(root)")).toBe("CorpusStore::open");
+    expect(sinkIn("type Opened = crate::corpus::CorpusStore;", "Opened::open(root)")).toBe(
+      "CorpusStore::open",
+    );
+    expect(sinkIn("use crate::corpus::{self as c};", "c::add_folder(app, root)")).toBe("corpus::add_folder");
+    expect(sinkIn("use crate::corpus::{resolve_corpus, x};", "resolve_corpus(app)")).toBe(
+      "corpus::resolve_corpus",
+    );
+    expect(sinkIn("use crate::corpus::*;", "relocate(&a, &b)")).toBe("corpus::relocate");
+    expect(sinkIn("", "paths.map(crate::corpus::CorpusStore::open)")).toBe("CorpusStore::open");
+    expect(sinkIn("use crate::corpus::Other as Store;", "Store::open(root)")).toBeUndefined();
+    expect(sinkIn("", "let c = serde_json::from_str::<crate::corpus::CorpusConfig>(&raw)")).toBe(
+      "serde_json::<CorpusConfig>",
+    );
   });
 
   test("refused and delegated are checked, not only counted", () => {
@@ -44,6 +61,13 @@ describe("check:vault-binds", () => {
       "nothing in fn pick refuses",
     );
     expect(refused("    reject_privileged_root(app, abs)?;\n").problem).toBeNull();
+    // a refusal of another path, or in a block that has closed, covers nothing
+    expect(refused("    reject_privileged_root(app, &other)?;\n").problem).toContain(
+      "refuses this call's path",
+    );
+    expect(refused("    if picked {\n        reject_privileged_root(app, abs)?;\n    }\n").problem).toContain(
+      "in a block that encloses it",
+    );
     const delegated = (name: string) =>
       bindCalls(
         `fn ${name}(root: PathBuf) {\n    CorpusStore::open(root) // vault bind (delegated): callers\n}\n`,
@@ -66,6 +90,13 @@ describe("check:vault-binds", () => {
       )[0].problem;
     expect(read("")).toContain("marked live, but fn pick");
     expect(read("    let p = host_registry::live_root(app, DEFAULT_ROOT_ID, Some(p));\n")).toBeNull();
+    // the live call takes another value, or sits in one branch only
+    expect(read("    let q = host_registry::live_root(app, DEFAULT_ROOT_ID, None);\n")).toContain(
+      "marked live",
+    );
+    expect(read("    if a { p } else { host_registry::live_root(app, id, Some(p)) };\n")).toContain(
+      "the read's own block",
+    );
     const target = (body: string) =>
       bindCalls(
         `fn switch(app: &AppHandle) {\n    let c = corpus::ensure_corpus_config(app); // vault bind (refused): below\n${body}}\n`,

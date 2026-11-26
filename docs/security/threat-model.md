@@ -146,17 +146,24 @@ owns the threat side.
 - **Controls.** At launch every registry file is vetted before any root is
   read and again after the bookmark repair; a refused file is set aside
   whole, and a launch that can't vet it exits 73. After launch a host takes
-  roots only from its open stores. The helper and the CLI vet each root on
-  every load and walk below it once per process. `check:vault-binds` makes
-  every call that turns a path into a root, and every registry read, say why
-  it is safe, and pins the count per file.
+  roots, and their adopted and active flags and a connected vault's
+  read-only flag, only from its open stores; the current vault's write right
+  comes from its own `memex.json`, never the registry. The helper and the CLI vet each root on every load and walk below
+  it once per process. `check:vault-binds` makes every call that turns a path
+  into a root, and every registry read, say why it is safe, ties a refused or
+  live reason to the same variable, and pins the count per file. It is a
+  tripwire, not a proof.
 - **What it can't stop.** A same-user process with general write access can
   forge the mark inside a Rotli vault next to a planted registry. The mark
   travels with copies and synced replicas of a host's folder. A folder a
   host marked stays its own after a person also opens it in standalone
   Rotli. Between the vetting and the bind there is a time-of-check gap that
   only a same-user process can race, and a vault made inside an open root
-  while the app runs is seen only at the next launch.
+  while the app runs is seen only at the next launch (by the helper and the
+  CLI, only when the process restarts). A registry rewritten after launch
+  can still name an open added folder as a connected vault, which opens the
+  memex write lane there if the folder holds a valid `memex.json`; it is the
+  host's own folder.
 - **Residual risk, accepted 2026-11-25.**
   - **Asset and abuse case:** a Rotli vault, opened by a host build because a
     hostile same-user process forged the mark inside it next to a planted
