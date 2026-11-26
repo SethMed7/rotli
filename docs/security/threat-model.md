@@ -146,8 +146,9 @@ owns the threat side.
 - **Controls.** At launch every registry file is vetted before any root is
   read and again after the bookmark repair; a refused file is set aside
   whole, and a launch that can't vet it exits 73. After launch a host takes
-  roots, and their adopted, read-only and active flags, only from its open
-  stores. The helper and the CLI vet each root on every load and walk below
+  roots, and their adopted and active flags and a connected vault's
+  read-only flag, only from its open stores; the current vault's write right
+  comes from its own `memex.json`, never the registry. The helper and the CLI vet each root on every load and walk below
   it once per process. `check:vault-binds` makes every call that turns a path
   into a root, and every registry read, say why it is safe, ties a refused or
   live reason to the same variable, and pins the count per file. It is a

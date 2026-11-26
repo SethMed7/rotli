@@ -263,6 +263,23 @@ fn after_launch_a_host_takes_only_the_roots_it_has_open() {
     if crate::memex::memex_write_allowed(&shown, &work) {
         holes.push("a rewritten brain.perms opens the memex write lane on a read-only vault".into());
     }
+    // #332 review: the registry may spell an open route's folder another way
+    // (a link, a trailing `.`), and a folder's adopted flag is rewritten too
+    #[cfg(unix)]
+    {
+        let spelled = home.path().join("work link");
+        std::os::unix::fs::symlink(&work, &spelled).unwrap();
+        let shown = live_config_for(HOST, Some(&state), rewritten(vec![brain("work", &spelled.join("."))])).unwrap();
+        if shown.brains.iter().map(|brain| &brain.abs_path).collect::<Vec<_>>() != [&work] {
+            holes.push("an open vault the registry spells through a link is dropped from Settings".into());
+        }
+        let mut folders = rewritten(Vec::new());
+        folders.folders = vec![CorpusRoot { id: "work".into(), label: "F".into(), abs_path: spelled, adopted: true }];
+        let shown = live_config_for(HOST, Some(&state), folders).unwrap();
+        if shown.folders.len() != 1 || shown.folders.iter().any(|folder| folder.adopted || folder.abs_path != work) {
+            holes.push("Settings takes a folder's adopted flag or spelling from a rewritten registry".into());
+        }
+    }
     if live_config_for(HOST, Some(&open_state(false)), planted.clone()).is_some() {
         holes.push("with no open default store, Settings reads the registry's current vault".into());
     }

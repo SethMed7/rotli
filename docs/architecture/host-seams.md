@@ -202,9 +202,12 @@ same refusal as a folder a person picks. `host_registry.rs` owns this.
   - the roots Settings lists and reads markers and settings from
     (`live_config`): the current vault is the open default store, a connected
     vault or folder shows only while its route is open at that folder, each
-    with its store's adopted and read-only flags, and the active vault only
-    when it is one of those. With no open default store, Settings shows no
-    vault;
+    with its store's adopted flag (and a connected vault with its store's
+    read-only flag), and the active vault only when it is one of those. With
+    no open default store, Settings shows no vault. The current vault has no
+    registry write right: its write right comes from the vault's own
+    `memex.json` on disk (`memex::memex_write_allowed`), as in the standalone
+    build;
   - the folder a picker starts in, and Reveal in Finder.
 
   Inspecting a picked folder meets the refusal first, because the picker
@@ -366,7 +369,10 @@ on its first read, so a late registration throws. A host can give:
   only from its open stores, but nothing re-walks an open root: a vault made
   or moved inside one while the app runs is seen at the next launch. The
   registry writers rewrite the registry they read, so an entry planted while
-  the app runs is carried forward and vetted at the next launch. There is
+  the app runs is carried forward and vetted at the next launch. Only the
+  app's launch (`host_registry::secure_registry`, twice, around the bookmark
+  repair) ever sets a registry file aside; the CLI and the MCP server vet it
+  in memory and write nothing. There is
   also a short window between the vetting and the bind (TOCTOU) that only a
   same-user process can race.
 - **The helper and the CLI walk once per process.** `walked_once` remembers
