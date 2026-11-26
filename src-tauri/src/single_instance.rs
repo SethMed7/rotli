@@ -296,7 +296,6 @@ pub(crate) fn listen(app: &tauri::AppHandle) {
 }
 
 /// The `.app` an executable runs from: exactly `X.app/Contents/MacOS/<bin>`.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn app_bundle_of(exe: &Path) -> Option<PathBuf> {
     exe.parent()
         .filter(|parent| parent.file_name() == Some("MacOS".as_ref()))
@@ -332,7 +331,6 @@ pub(crate) fn plan_for(standalone: bool, holder_running: bool, exe: &Path) -> Re
 }
 
 /// This process's plan. Only a host build reads HOME and its own path.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn open_plan() -> Result<OpenPlan, String> {
     if crate::app_identity::owns_shared_state() {
         return plan_for(true, false, Path::new(""));
@@ -345,7 +343,6 @@ pub(crate) fn open_plan() -> Result<OpenPlan, String> {
 }
 
 /// Carry out `open_plan`'s answer.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn bring_forward(plan: OpenPlan) -> Result<(), String> {
     match plan {
         OpenPlan::Nudge => nudge(&support_at_home()?),

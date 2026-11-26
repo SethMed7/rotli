@@ -79,7 +79,9 @@ per support folder (`src-tauri/src/single_instance.rs`).
   folder is private (0700) and the file 0600. The support folder comes from
   `HOME` there, since Tauri doesn't exist yet; setup then checks that Tauri's
   `app_config_dir` is the same folder before anything else touches it, and
-  exits 73 if not. A missing `HOME` exits 73 too.
+  exits 73 if not. A missing `HOME` exits 73 too. On macOS both read `HOME`:
+  Tauri 2.11's `app_config_dir` is `dirs::config_dir()` joined with the
+  identifier, and `dirs` 6 makes that `$HOME/Library/Application Support`.
 - **A second process** that can't take the lock runs no launch setup. It
   writes `<support folder>/instance/nudge` and exits with status **75**
   (`EX_TEMPFAIL`), whether or not the nudge could be written; its stderr line
@@ -104,10 +106,11 @@ per support folder (`src-tauri/src/single_instance.rs`).
   and Finder hands it no files, so a second launch has no argv or link to
   pass on.
 - **Why `flock` and not Tauri's single-instance plugin.** On macOS the plugin
-  binds `/tmp/<bundle ID>_si.sock`: one socket per bundle ID for every HOME on
-  the machine, not one per support folder. It detects a holder by
-  connecting, then removes the file and binds, so two launches at the same
-  moment can both win. A `flock` is atomic, per folder, and released by the
+  (read from its `v2` branch source on 2026-11-26, not a pinned release)
+  binds a socket in `/tmp` named from the bundle ID (`.` and `-` turned into
+  `_`): one socket per bundle ID for every HOME on the machine, not one per
+  support folder. It detects a holder by connecting, then removes the file
+  and binds, so two launches at the same moment can both win. A `flock` is atomic, per folder, and released by the
   kernel. A Unix socket in the support folder would give the sender an
   answer, but `sun_path` is 104 bytes on macOS and a sandbox HOME plus
   `Library/Application Support/<bundle ID>/instance/…` can pass that, so the
