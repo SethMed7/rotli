@@ -5,7 +5,7 @@
 // (docs/architecture/host-seams.md, "Held for the page").
 
 import { hiddenPanes, opensPane, settingsNav } from "../components/settings/settingsNav";
-import { type AppHost, appHost } from "../host/registry";
+import { type AppHost, appHost, notesOn } from "../host/registry";
 import { type Platform, PLATFORM } from "../lib/featurePolicy";
 import { type HeldForPage, hostPageReady, isTauri, listenHere, showMainWindow } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
@@ -28,11 +28,14 @@ export function settingsPaneOpens(
   }
 }
 
-/** Settings on `id`, through the same store request the app's own links use. */
-export function openSettingsOn(id: string): void {
+/** Settings on `id`, through the same store request the app's own links use.
+ * A host without notes has Settings as its whole window already, so only the
+ * pane changes: the open flag would switch its titlebar to the Settings
+ * identity. */
+export function openSettingsOn(id: string, host: AppHost | null = appHost()): void {
   const ui = useUiStore.getState();
   ui.setSettingsPaneRequest(id);
-  ui.setSettingsOpen(true);
+  if (notesOn(host)) ui.setSettingsOpen(true);
 }
 
 export interface SettingsRequestSteps {
@@ -43,7 +46,7 @@ export interface SettingsRequestSteps {
 
 const SETTINGS_STEPS: SettingsRequestSteps = {
   opens: (id) => settingsPaneOpens(id),
-  open: openSettingsOn,
+  open: (id) => openSettingsOn(id),
   show: () => showMainWindow(),
 };
 

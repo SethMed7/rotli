@@ -122,3 +122,28 @@ test("a notice held during a cold launch shows once the page listens", async ({ 
   await expect(page.locator(".sb-error-text")).toHaveText(`⚠ ${sentence}`);
   await snap(page, "host-8-cold-notice-shown");
 });
+
+test("without notes, a request changes the pane and leaves the window's chrome alone", async ({ page }) => {
+  await page.route(
+    (url) => url.pathname === "/",
+    async (route) => {
+      const response = await route.fetch();
+      const body = (await response.text()).replace(
+        '<script type="module" src="/src/main.tsx">',
+        '<script type="module" src="/e2e/host-panes.fixture.ts"></script>$&',
+      );
+      await route.fulfill({ response, body });
+    },
+  );
+  await page.goto("/?notes=off");
+  await expect(heading(page)).toHaveText("General");
+  // Settings is the window, but the open flag was never set: no "Back to notes"
+  await expect(page.getByRole("button", { name: "Back to notes", exact: true })).toHaveCount(0);
+  await snap(page, "host-9-notes-off-before-request");
+  expect(await requestSettings(page, "links")).toBe(true);
+  await expect(heading(page)).toHaveText("Links");
+  expect(await settingsOpen(page)).toBe(false);
+  await snap(page, "host-10-notes-off-host-pane");
+  expect(await requestSettings(page, "brain")).toBe(false);
+  await expect(heading(page)).toHaveText("Links");
+});

@@ -70,6 +70,14 @@ test("the app's own route: the store's pane request, with Settings open", () => 
   expect(useUiStore.getState().settingsOpen).toBe(true);
 });
 
+test("without notes, Settings is already the window: only the pane changes", () => {
+  openSettingsOn("synthetic", host(false));
+  expect(useUiStore.getState().settingsPaneRequest).toBe("synthetic");
+  // the flag would switch the titlebar to its Settings identity in a host
+  // whose window has never had it set
+  expect(useUiStore.getState().settingsOpen).toBe(false);
+});
+
 test("what was held is delivered in the order it came", () => {
   const log: string[] = [];
   deliverHeld(

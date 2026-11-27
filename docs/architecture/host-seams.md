@@ -561,7 +561,9 @@ rotli_lib::host::open_settings(app, "appearance");        // a built-in pane
   open and the window doesn't come forward. For one that does, the page
   sets the same store request the app's own links use
   (`setSettingsPaneRequest`, then `setSettingsOpen(true)`) and then asks
-  Rust to show the window (`show_main_window`).
+  Rust to show the window (`show_main_window`). In a host without notes,
+  Settings is already the whole window, so only the pane request is set:
+  the open flag would switch the titlebar to its Settings identity.
 - **The route.** No Rust-to-page Settings event existed, so there is one
   now, `rotli:open-settings`, and it ends in that existing store route.
 - **A cold launch.** A request made before the page listens (from a host
@@ -935,14 +937,16 @@ This list says only what was run.
     (built-in, host, hidden, notes-off, web, unknown with and without the
     dev warning); a request that opens nothing opens no Settings and shows
     no window; the store route; listen-then-take order; held items in order;
-    the double mount; a mount torn down mid-answer.
+    the double mount; a mount torn down mid-answer; a host without notes
+    gets the pane and no open flag.
   - Each new test failed first against stubs with the old behaviour; the
     red runs are saved with the PR's evidence.
   - Browser lane (`e2e/host-settings-requests.spec.ts`, synthetic host): a
     request lands on Appearance and on a host pane; an unknown id and a
     hidden pane leave notes showing and Settings closed (with the dev
     warning); a hidden pane leaves an open Settings where it is; a held
-    notice shows in the sidebar once the page listens. The spec calls the
+    notice shows in the sidebar once the page listens; a host without notes
+    changes pane with its chrome as it was. The spec calls the
     functions the listeners call: the event transport and Rust's hold are
     proven by unit tests only.
   - Standalone, browser lane: notes, Settings › General and Settings ›
