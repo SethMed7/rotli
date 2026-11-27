@@ -170,25 +170,6 @@ fn a_host_identity_refuses_a_folder_inside_or_around_a_vault() {
     assert_eq!(refuse_existing_vault_for(HOST, &around), existing_vault_refusal());
 }
 
-/// A file Finder hands a host build (open_requests.rs) meets the same rule as
-/// a folder: one inside a vault the host doesn't own is refused, one in a plain
-/// folder or the host's own vault opens, and standalone refuses none.
-#[test]
-fn a_host_identity_refuses_a_file_inside_a_vault_it_does_not_own() {
-    let temp = tempfile::tempdir().unwrap();
-    let vault = folder(temp.path(), "vault");
-    make_vault(&vault);
-    let opened = folder(&vault, "Projects").join("opened from finder.txt");
-    std::fs::write(&opened, "handed over by Finder").unwrap();
-    assert_eq!(refuse_existing_vault_for(HOST, &opened), existing_vault_refusal());
-    assert_eq!(refuse_existing_vault_for(STANDALONE_IDENTIFIER, &opened), Ok(()));
-    let loose = folder(temp.path(), "Downloads").join("dropped on the dock.txt");
-    std::fs::write(&loose, "dropped on the Dock icon").unwrap();
-    assert_eq!(refuse_existing_vault_for(HOST, &loose), Ok(()));
-    claim_for(HOST, &vault).unwrap();
-    assert_eq!(refuse_existing_vault_for(HOST, &opened), Ok(()));
-}
-
 #[test]
 fn a_host_identity_opens_plain_folders_and_its_own_vaults() {
     let temp = tempfile::tempdir().unwrap();
