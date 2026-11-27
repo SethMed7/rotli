@@ -412,7 +412,7 @@ fn launch_checks_identity_then_settles_scratch_before_binding_anything() {
     assert!(lock < launch.find("tauri::Builder::default()").unwrap(), "the lock precedes the builder");
     let main = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/main.rs")).unwrap();
     assert!(main.find("run_headless_if_requested(").unwrap() < main.find("rotli_lib::run(").unwrap());
-    let setup = &lib[lib.find(".setup(|app| {").expect("setup exists")..];
+    let setup = &lib[lib.find(".setup(move |app| {").expect("setup exists")..];
     let identity = setup.find("app_identity::matches_runtime(").unwrap();
     let mismatch_exit = setup.find("std::process::exit(78)").unwrap();
     let locked_folder = setup.find("single_instance::confirm_support_folder(").expect("setup confirms the locked folder");
@@ -470,7 +470,7 @@ fn every_root_choice_meets_the_vault_refusal() {
 fn launch_secures_the_registry_and_writers_mark_their_roots() {
     let src = |file: &str| std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join(file)).unwrap();
     let lib = src("lib.rs");
-    let setup = &lib[lib.find(".setup(|app| {").expect("setup exists")..];
+    let setup = &lib[lib.find(".setup(move |app| {").expect("setup exists")..];
     let repair = setup.find("vault_location::repair_vault_locations(").unwrap();
     let secure = setup.find("host_registry::secure_registry(").expect("the launch secures the registry");
     let first_read = setup.find("corpus::is_configured(app.handle())").unwrap();

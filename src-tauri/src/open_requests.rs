@@ -53,32 +53,69 @@ pub(crate) fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
 /// A file macOS handed Rotli opens in a tab without joining a vault (the
 /// raw mount, corpus_raw.rs; docs/design/open-in-rotli.md stage 1). The root
 /// id is the grant: only this OS event mounts a path. A folder opens in its
-/// own window (stage 2, folder_window.rs).
+/// own window (stage 2, folder_window.rs). Standalone Rotli gets these from
+/// its deep-link plugin, a host build from its run loop (host.rs); a host
+/// build opens neither inside a vault it doesn't own (host-seams.md).
 fn open_from_finder(app: &AppHandle, path: &std::path::Path) {
     if path.is_dir() {
-        crate::folder_window::open(app, path); // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
+        // off the run loop: a host build's vault refusal walks the folder
+        let (app, dir) = (app.clone(), path.to_path_buf());
+        std::thread::spawn(move || {
+            if let Err(message) = crate::reject_privileged_root(&app, &dir) {
+                return crate::folder_window::refused(&app, &message);
+            }
+            crate::folder_window::open(&app, &dir); // vault bind (refused): reject_privileged_root above; mount_and_show refuses again before it binds
+        });
         return;
     }
     let Ok(cache) = app.path().app_cache_dir() else { return };
-    let Ok(file) = std::fs::canonicalize(path) else { return };
-    let root_id = corpus::raw::raw_root_id(&file);
     let state = app.state::<corpus::CorpusState>();
-    let (id, kind) = {
+    let mounted = {
         let Ok(mut registry) = state.0.lock() else { return };
-        if !registry.contains(&root_id) {
-            let Ok(store) = corpus::CorpusStore::open_raw_file(&file, &cache.join("opened-files")) else { // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
-                return;
-            };
-            if registry.insert(root_id.clone(), store).is_err() {
-                return;
-            }
-            // an image or video previews over asset://: this one file, never its folder
-            let _ = app.asset_protocol_scope().allow_file(&file); // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
-        }
-        let Some(item) = registry.raw_item(&root_id) else { return };
-        item
+        let assets = app.asset_protocol_scope();
+        mount_opened_file(crate::app_identity::APP_IDENTIFIER, &mut registry, &cache, path, Some(&assets))
     };
-    queue_open_request(app, &format!("{root_id}:{id}"), kind);
+    match mounted {
+        Ok(Some((id, kind))) => queue_open_request(app, &id, kind),
+        Ok(None) => {}
+        Err(notice) => {
+            let _ = app.emit_to("main", "rotli:open-notice", notice);
+            SummonIntent::ShowMain.perform(app);
+        }
+    }
+}
+
+/// The file macOS handed `identifier`'s build, mounted as a raw root of its own
+/// in `registry` behind the vault refusal, with `assets` granted its preview.
+/// Gives the open request's id and kind, `None` when the file can't be read
+/// or mounted, or the notice to show when the build refuses it: the host's
+/// own `existing_vault` sentence, alone, since it is written to stand alone
+/// (standalone Rotli never refuses here). A file meets
+/// only the vault refusal, not `reject_privileged_root`: the person chose it
+/// in Finder, as in standalone Rotli.
+fn mount_opened_file(
+    identifier: &str,
+    registry: &mut corpus::CorpusRegistry,
+    cache: &Path,
+    path: &Path,
+    assets: Option<&tauri::scope::fs::Scope>,
+) -> Result<Option<(String, &'static str)>, String> {
+    let Ok(file) = std::fs::canonicalize(path) else { return Ok(None) };
+    crate::app_identity::refuse_existing_vault_for(identifier, &file)?;
+    let root_id = corpus::raw::raw_root_id(&file);
+    if !registry.contains(&root_id) {
+        let Ok(store) = corpus::CorpusStore::open_raw_file(&file, &cache.join("opened-files")) else { // vault bind (refused): refuse_existing_vault_for above
+            return Ok(None);
+        };
+        if registry.insert(root_id.clone(), store).is_err() {
+            return Ok(None);
+        }
+        // an image or video previews over asset://: this one file, never its folder
+        if let Some(assets) = assets {
+            let _ = assets.allow_file(&file); // vault bind (refused): refuse_existing_vault_for above
+        }
+    }
+    Ok(registry.raw_item(&root_id).map(|(id, kind)| (format!("{root_id}:{id}"), kind)))
 }
 
 /// The one-shot open mailbox `rotli open` and rotli:// links share.
@@ -140,6 +177,36 @@ mod tests {
 
     fn mailed(root: &Path) -> Option<String> {
         std::fs::read_to_string(mailbox(root)).ok()
+    }
+
+    /// A file macOS hands a host build mounts as its own raw root only when no
+    /// vault the host doesn't own holds it; standalone owns every vault.
+    #[test]
+    fn a_finder_file_mounts_unless_a_vault_the_build_does_not_own_holds_it() {
+        const HOST: &str = "com.example.host";
+        let temp = tempfile::tempdir().unwrap();
+        let cache = temp.path().join("cache");
+        let vault = temp.path().join("vault");
+        std::fs::create_dir_all(vault.join(".rotli")).unwrap();
+        std::fs::create_dir_all(vault.join("Projects")).unwrap();
+        let in_vault = vault.join("Projects/plan.md");
+        std::fs::write(&in_vault, "# Plan\n").unwrap();
+        let loose = temp.path().join("handed-over.md");
+        std::fs::write(&loose, "# Handed over by Finder\n").unwrap();
+        let root_of = |file: &Path| corpus::raw::raw_root_id(&std::fs::canonicalize(file).unwrap());
+
+        let mut registry = corpus::CorpusRegistry::new(corpus::DEFAULT_ROOT_ID.to_string());
+        let refused = mount_opened_file(HOST, &mut registry, &cache, &in_vault, None);
+        assert_eq!(refused, Err(crate::app_identity::existing_vault_refusal()), "the host's sentence alone");
+        assert!(!registry.contains(&root_of(&in_vault)), "nothing mounted");
+
+        let opened = mount_opened_file(HOST, &mut registry, &cache, &loose, None).unwrap().expect("mounted");
+        assert!(opened.0.starts_with(&format!("{}:", root_of(&loose))), "{opened:?}");
+        assert!(registry.contains(&root_of(&loose)));
+
+        let standalone = crate::app_identity::STANDALONE_IDENTIFIER;
+        assert!(mount_opened_file(standalone, &mut registry, &cache, &in_vault, None).unwrap().is_some());
+        assert!(registry.contains(&root_of(&in_vault)));
     }
 
     #[test]
