@@ -235,6 +235,39 @@ describe("check:ipc — the front end and the handler", () => {
   });
 });
 
+describe("check:ipc — the rest of its refusals", () => {
+  test("a handler that is not a generate_handler! list fails", () => {
+    const root = tree();
+    edit(root, LIB, (s) =>
+      s.replace(".invoke_handler(tauri::generate_handler![", ".invoke_handler(handlers(generate!["),
+    );
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("could not find Tauri generate_handler! registry");
+  });
+
+  test("a list that is not an array fails", () => {
+    const root = tree();
+    edit(root, LIST, (source) =>
+      JSON.stringify({ ...(JSON.parse(source) as AppCommands), webviews: "main" }),
+    );
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('"webviews" must be an array');
+  });
+
+  // the uncalled baseline may only shrink: a name that left it must be deleted
+  test("an uncalled-baseline name that is now called fails", () => {
+    const root = tree();
+    rmSync(join(root, "src"));
+    cpSync(join(repo, "src"), join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/zzCaller.ts"), 'invoke("local_model_default");\n');
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("UNCALLED_BASELINE lists commands that are now called or gone");
+  });
+});
+
 describe("check:ipc — which webviews the list may name", () => {
   // `*` in the list would hand every command to every local webview
   test("a wildcard label fails, whatever the capability is for", () => {
