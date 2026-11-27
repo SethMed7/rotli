@@ -554,7 +554,8 @@ Then `tauri build` works, and the binary gets the deployment target from
 
 ## Scoping Rotli's commands
 
-**A host that adds local webviews of its own must do this.** Standalone
+**A host that adds local webviews of its own must do this, and close what
+"What command permissions don't cover" lists.** Standalone
 Rotli's `build.rs` declares no app manifest, and a host's doesn't by default.
 Without one, Tauri 2.11 checks permissions only for plugin commands and for
 remote origins. Rotli's own commands (`corpus_read`,
@@ -577,11 +578,20 @@ without depending on `rotli_lib`:
 - `webviews`: the webview labels and label patterns Rotli's capability files
   name. `finder_*` is a folder window.
 
-`check:ipc` fails when `commands` differs from the handler in either
-direction, when `webviews` differs from `src-tauri/capabilities/*.json`, when
-either list is unsorted or repeats a name, when a capability targets
-`windows`, when a handler entry isn't a plain path, and when a
-`#[command(rename = …)]` would register a name the list can't show.
+`check:ipc` fails when:
+
+- `commands` differs from the handler in either direction, or `webviews` from
+  `src-tauri/capabilities/**`;
+- either list is unsorted or repeats a name;
+- a label is a glob pattern other than `finder_*`. Tauri reads labels as
+  patterns, so a `*` would give every local webview every command;
+- a capability targets `windows` or grants `remote` pages, since each label it
+  names is published as one that gets every command;
+- a capability is in a shape the check doesn't read (a list of capabilities,
+  TOML, JSON5, or one written inline in a `tauri*.conf.json`);
+- there is more than one `invoke_handler` (Tauri keeps the last), a handler
+  entry isn't a plain path, or a `#[command(rename = …)]` would register a
+  name the list can't show.
 
 ### The host's `build.rs`
 
@@ -650,10 +660,14 @@ fn main() {
   them in step by hand can write this file from `build.rs` the same way. A
   Rotli window missing from it is refused every command.
 - **Host labels.** No host webview may take one of those labels or start with
-  `finder_`.
+  `finder_`, whether Rust creates it or a page does at run time. Give host
+  webviews none of `core:webview:allow-create-webview`,
+  `core:webview:allow-create-webview-window` and `core:window:allow-create`:
+  with them a page could open a `finder_…` webview on its own scheme and get
+  every command.
 - **Rotli's other capabilities** (core and plugin permissions,
   `src-tauri/capabilities/`) are unchanged by this. The host's context carries
-  its own copies, by webview label too.
+  its own copies, for Rotli's labels only, by `webviews`.
 
 ### Permission identifiers
 
@@ -683,16 +697,52 @@ For each name given to `AppManifest::commands`, `tauri-build` 2.6.3 (through
   windows, which is why the check above runs in both directions.
 - Folder windows get every command, as they do in standalone Rotli.
 - A host's own commands are plugin commands and keep their own permissions.
-- **Scoping separates webviews, not code.** The panes and blocks a host
-  registers (see "The host registry") are bundled into Rotli's front end and
-  run in Rotli's webviews, so they can call every command. A host page that
-  shouldn't have that belongs in a webview of its own.
-- **Not covered by command permissions** (read from the Tauri 2.11.5 sources,
-  not run): Tauri registers `asset:` on every webview with one app-wide scope,
-  so a host page that knows a path inside an open vault's scope can load that
-  file. And `core:default` includes `core:event`'s `emit`, so a host page
-  granted it can send events that Rotli's windows act on. Give a host webview
-  only the permissions it needs, and a `csp` that leaves `asset:` out.
+
+### What command permissions don't cover
+
+Command permissions are one layer, not a sandbox. Load into a host's webviews
+only pages the host ships, never third-party content. This list isn't claimed
+to be complete.
+
+- **Code in Rotli's webviews.** Scoping separates webviews, not code. The panes
+  and blocks a host registers (see "The host registry") are bundled into
+  Rotli's front end and run in Rotli's webviews, so they can call every
+  command. A host page that shouldn't have that belongs in a webview of its
+  own.
+- **Events: give host webviews no `core:event` permission at all.** They are a
+  way to read and a way to write, and neither needs an app command.
+  - *Read.* `listen` defaults to the target `Any`, and Tauri hands an `Any`
+    listener every event, those emitted to `main` by label included. A host
+    page that may listen gets what Rotli's windows tell each other, the text
+    of a quick capture (`rotli:capture`) among it, which Rotli files as a
+    secure note.
+  - *Write.* A page that may emit can send `rotli:capture` itself, and `main`
+    then writes a secure note into the open vault.
+  - `core:default` contains `core:event:default`. Don't copy Rotli's
+    `default.json` or `folder-windows.json` grants to a host webview.
+- **`asset:` reads files.** Tauri registers `asset:` on every webview, checks
+  one app-wide scope, and answers with the asking webview's own origin in
+  `Access-Control-Allow-Origin`. Rotli adds every open vault, folder window
+  and Finder-opened file to that scope. So a host page can `fetch()` any file
+  there whose path it knows or guesses, secure notes included.
+  - Dot-files and dot-folders, `.rotli/` among them, stay out by default. The
+    host's own `tauri.conf.json` decides:
+    `app.security.assetProtocol.scope.requireLiteralLeadingDot`, true on macOS
+    when unset. Don't set it to `false`.
+  - Tauri adds `app.security.csp` only to its own pages. A page on a host
+    scheme has no CSP unless the host's scheme handler sends one, so send one
+    that leaves `asset:` out on every page:
+
+    ```http
+    Content-Security-Policy: default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'
+    ```
+
+    `ipc:` is for the page's own commands; `default-src 'self'` keeps
+    `asset:` out of fetches, images, media and frames.
+
+The scope results come from a mock-runtime probe (see "Proof"). The event
+routing, the CORS header, the missing CSP and the header's effect are read from
+the Tauri 2.11.5 sources and the CSP rules, not run in a WKWebView.
 
 ## The host registry (front end)
 
@@ -836,8 +886,9 @@ shows "Hide …" only, since it leaves system-wide chords out.
 
 ## Not built yet
 
-- **Hosts can't add yet:** sidebar fronts, first-run steps, or other windows
-  or pages.
+- **Hosts can't add yet:** sidebar fronts or first-run steps.
+- **No seam for a host's own windows or pages.** A host plugin can still
+  create webviews of its own, and then "Scoping Rotli's commands" applies.
 - **Hosts can't replace the Welcome catalog** (see "The welcome note").
 - **The notes rows of General and Connections** still show when notes are off.
 - **Not proven yet:** a plugin command passing the capability ACL in a live
@@ -943,6 +994,11 @@ shows "Hide …" only, since it leaves system-wide chords out.
 
 This list says only what was run.
 
+- **`asset:` scope (2026-11-27).** In the same synthetic crate, after
+  `allow_directory(vault, true)` the scope allowed a note and a file under
+  `wiki/_secure/`, and refused `.rotli/main.json` and a dot-file. With
+  `requireLiteralLeadingDot: false` it allowed all four. No file was fetched
+  from a page.
 - **Command scoping (2026-11-27).** A synthetic host crate used the `build.rs`
   and capability from "Scoping Rotli's commands" with the checked-in list (222
   commands), tauri 2.11.5 and tauri-build 2.6.3, and called two stub commands
