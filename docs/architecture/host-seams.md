@@ -185,9 +185,14 @@ in two places, each on its own.
   "Opened URLs"). Both reach `open_from_finder` (`open_requests.rs`), which
   refuses before it binds anything: a folder meets `reject_privileged_root`
   (and again in its window's mount, `folder_window.rs`), and a file meets
-  `refuse_existing_vault`. So a host opens no file or folder inside a vault it
-  doesn't own, and says so in the main window. In standalone Rotli both
-  refusals behave as before.
+  only `refuse_existing_vault` (`mount_opened_file`), as in standalone Rotli,
+  where the person chose it in Finder. So a host opens no file or folder
+  inside a vault it doesn't own, and says so in the main window: the host's
+  `existing_vault` sentence alone for a file, and after "Couldn't open that
+  folder —" for a folder, whose refusal can also be another check's. In standalone Rotli both refusals behave as before. Under a host a
+  folder is walked twice, once for each check (up to 50,000 folders each, on
+  background threads): the vault-binds guard wants the refusal in the
+  function that makes the call, and `mount_and_show` keeps its own.
 - **Paths that never reach a host build.** The relay's MCP root is the vault
   the app already has open, and pairing needs the Keychain, which a host build
   refuses.
@@ -415,8 +420,9 @@ Standalone Rotli has one menu-bar item (tray id `rotli`): its mark, a menu
 with "Open rotli" and "Quit rotli", and a left click that shows or hides the
 main window. A host keeps it by default, and `HostWords::product_name`
 renames both items and the app menu's Quit ("Open Synthetic", "Quit
-Synthetic"). `None` keeps Rotli's strings exactly, lower-case included. The
-labels come from `host::open_label` and `host::quit_label`.
+Synthetic"). `None`, an empty name or one of only spaces keeps Rotli's
+strings exactly, lower-case included. The labels come from `host::open_label`
+and `host::quit_label`.
 
 A host that ships one menu-bar item of its own calls `without_tray()`. Rotli
 then builds no tray icon and no tray menu: every tray API Rotli touches is in
@@ -487,7 +493,7 @@ rotli_lib::AppHost::new(context).on_opened_urls(|app, urls| {
 ```
 
 - **What the host gets:** every URL in the event that isn't a `file:` URL,
-  in order, in one call. A `rotli://` URL is the host's too: it never reaches
+  in order, in one call (URLs held until setup come together in one call). A `rotli://` URL is the host's too: it never reaches
   Rotli's link handling in a host build. An event with no such URL makes no
   call.
 - **What Rotli keeps:** the `file:` URLs, files and folders. Rotli opens them
@@ -495,12 +501,29 @@ rotli_lib::AppHost::new(context).on_opened_urls(|app, urls| {
   (`open_from_finder`), behind the vault refusal (see "Where Rust checks").
   The host's bundle must declare the document types itself
   (`CFBundleDocumentTypes`) for Finder to offer it.
-- **Order:** `host::on_run_event` is the first statement of the run loop's
-  closure, and in it the hook runs before Rotli opens any file. A fence
-  (`the_hook_runs_before_rotlis_own_opened_handling`) keeps both.
+- **When:** never before Rotli's setup is done. AppKit can send the files a
+  launch was asked to open before the app finishes launching, so before
+  setup has checked the identity (exit 78), opened the vaults or made the
+  main window. `host::on_run_event`, the first statement of the run loop's
+  closure, holds every `Opened` URL that arrives before then
+  (`host::OpenedQueue`). Setup releases them, in the order they came, right
+  after the vaults open, where standalone sweeps its deep-link plugin's
+  `get_current()`. So the hook can run during setup, with the main window
+  made and `show_main` safe, but before Rotli's own tray (when on) and its
+  app-menu Quit exist; a host's plugins have already run their setup. After
+  setup, each event goes straight through. A file refused on a cold launch
+  emits its notice during setup, likely before the webview listens, so it
+  may show nothing (not proven either way; standalone has the same gap for
+  a refused folder).
+- **Order within an event:** the hook runs first, in one call, then Rotli
+  opens the files (`host::dispatch`, unit-tested with recording closures).
+  Fences keep the queue in front of both and the release after the identity
+  check and the vaults.
 - The hook runs on the main thread, so it should hand slow work off.
 - **Standalone** passes no hook and its deep-link plugin takes every URL, as
-  before: the run-loop path runs only when `owns_shared_state()` is false.
+  before: the run-loop path runs only when `owns_shared_state()` is false. A
+  crate that calls `run_with_host` but is built with Rotli's own bundle ID is
+  standalone, so its `on_opened_urls` hook is never called.
 
 ### Building a host crate
 
@@ -890,12 +913,16 @@ This list says only what was run.
 - **The menu-bar item and opened URLs** (2026-11-27, tests only). The labels
   are pure functions, standalone's strings pinned exactly; the shell options'
   builder; how an `Opened` event splits between the host and Rotli; source
-  fences for the hook's order and for no tray API outside `build_tray`; a file
-  inside a vault the host doesn't own refused by `refuse_existing_vault`; and
-  `check:vault-binds` on the new refusals in `open_from_finder` (each removed
-  in turn, the guard failed). No native build was launched, so a host's own
-  tray, a URL in its scheme reaching the hook, and a Finder-opened file in a
-  host build are not proven live.
+  fences for no tray API outside `build_tray`; the queue that holds `Opened`
+  URLs until setup and the fences that it comes first and drains after the
+  identity check and the vaults; `host::dispatch` (the hook once, with only
+  non-file URLs, before any file opens); `mount_opened_file` mounting a file
+  outside any vault and refusing one inside a vault the host doesn't own;
+  and `check:vault-binds` on the refusals in `open_from_finder` and
+  `mount_opened_file`. Each new test failed with its change reverted. No
+  native build was launched, so a host's own tray, a URL in its scheme
+  reaching the hook, a Finder-opened file in a host build and a cold launch
+  by a file are not proven live.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run

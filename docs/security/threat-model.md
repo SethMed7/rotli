@@ -151,8 +151,9 @@ owns the threat side.
   the request's `kind` again, or whether the item is visible to remote
   agents; only the CLI's write does. A planted request can still only open
   an item in the current vault, or switch to a connected vault the vetted
-  registry names, which passes the vault refusal again; a host has no raw
-  roots. A planted mailbox was already read at the next launch or
+  registry names, which passes the vault refusal again, or a raw root this
+  run already mounted: a file or folder macOS opened the app with, which met
+  the vault refusal when it was mounted. A planted mailbox was already read at the next launch or
   activation. The nudge adds only timing: it fires on demand while the app
   runs. The webview can write the mailbox in one case:
   `workspace_return_open_request` queues back a request it took before a setup
@@ -170,8 +171,11 @@ owns the threat side.
   flags and a connected vault's read-only flag, only from its open stores;
   the current vault's write right comes from its own `memex.json`, never the
   registry. A file or folder macOS opens a host build with (its run loop's
-  `Opened` event) meets the same vault refusal before it is mounted. The
-  helper and the CLI vet each root on every load and walk below it once per
+  `Opened` event, held until setup is done) meets the same vault refusal
+  before it is mounted. A folder also meets `reject_privileged_root`; a file
+  meets only the vault refusal, as in standalone Rotli, so a host can open a
+  file the person picks in Finder anywhere outside a vault it doesn't own,
+  dot-folders included. The helper and the CLI vet each root on every load and walk below it once per
   process. `check:vault-binds` makes every call that turns
   a path into a root, and every registry read, say why it is safe, ties a
   refused or live reason to the same variable, and pins the count per file.
