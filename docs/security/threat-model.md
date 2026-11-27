@@ -160,6 +160,14 @@ owns the threat side.
   vault switch that didn't happen. Rust checks the id and kind as it does a
   `rotli://` link's, never replaces a waiting request, and neither raises the
   window nor nudges. It queues only an open the webview could perform itself.
+- **A host's own webviews.** Rotli's app commands carry no permission check
+  unless the top crate declares an app manifest, so a host that adds local
+  webviews must scope Rotli's commands to Rotli's webviews, or the host's pages
+  can call them (read, write and delete in the open vault included). Rotli
+  publishes the command list (`src-tauri/app-commands.json`, kept in step by
+  `check:ipc`); the host's `build.rs` and capability do the scoping, which this
+  repository can't enforce. Scoping commands doesn't scope `asset:` loads or
+  events. See "Scoping Rotli's commands" in the contract.
 - **Controls.** A host build is one process per support folder: an exclusive
   `flock` on `<support folder>/instance/lock`, taken before the Tauri
   builder, stops a second process (a stray build with the same bundle ID,

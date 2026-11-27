@@ -552,6 +552,144 @@ Then `tauri build` works, and the binary gets the deployment target from
 `bundle.macOS.minimumSystemVersion`. A plain `cargo build` followed by
 `tauri bundle` doesn't get that target.
 
+## Scoping Rotli's commands
+
+**A host that adds local webviews of its own must do this.** Standalone
+Rotli's `build.rs` declares no app manifest, and a host's doesn't by default.
+Without one, Tauri 2.11 checks permissions only for plugin commands and for
+remote origins. Rotli's own commands (`corpus_read`,
+`corpus_write_file_bytes`, `app_settings_write` and the rest) then run for any
+local page, and a page on a URI scheme the host registered is local. Remote
+pages, Rotli's private browser and pinned sites among them, are refused either
+way.
+
+### The list
+
+`src-tauri/app-commands.json` is checked in so a build script can read it
+without depending on `rotli_lib`:
+
+```json
+{ "version": 1, "commands": ["agent_bridge_ready", "…"], "webviews": ["capture", "chat", "finder_*", "main", "quick"] }
+```
+
+- `commands`: every command in Rotli's `generate_handler!`, by the name the
+  front end invokes, sorted.
+- `webviews`: the webview labels and label patterns Rotli's capability files
+  name. `finder_*` is a folder window.
+
+`check:ipc` fails when `commands` differs from the handler in either
+direction, when `webviews` differs from `src-tauri/capabilities/*.json`, when
+either list is unsorted or repeats a name, when a capability targets
+`windows`, when a handler entry isn't a plain path, and when a
+`#[command(rename = …)]` would register a name the list can't show.
+
+### The host's `build.rs`
+
+`serde_json` goes in `[build-dependencies]`. Point `ROTLI_COMMANDS` at the
+list in the same Rotli checkout the host compiles, so the list and the code
+can't come from different commits.
+
+```rust
+use std::fs;
+
+/// Rotli's list, in the checkout this host pins, relative to the host crate.
+const ROTLI_COMMANDS: &str = "../rotli/src-tauri/app-commands.json";
+const COMMAND_SET: &str = "permissions/rotli-commands.toml";
+
+fn main() {
+    println!("cargo:rerun-if-changed={ROTLI_COMMANDS}");
+    let text = fs::read_to_string(ROTLI_COMMANDS).expect("read Rotli's command list");
+    let list: serde_json::Value = serde_json::from_str(&text).expect("the list is JSON");
+    assert_eq!(list["version"], 1, "unknown command list version");
+    let names: Vec<String> =
+        serde_json::from_value(list["commands"].clone()).expect("command names");
+    // with no names Tauri builds no app manifest, and so checks no app command
+    assert!(!names.is_empty(), "Rotli's command list is empty");
+
+    // one set holding every allow-<command>, so the capability names one thing
+    let allow: Vec<String> = names
+        .iter()
+        .map(|name| format!("allow-{}", name.replace('_', "-")))
+        .collect();
+    let set = format!(
+        "[[set]]\nidentifier = \"rotli-commands\"\ndescription = \"Rotli's app commands\"\npermissions = {}\n",
+        serde_json::to_string(&allow).expect("a TOML array")
+    );
+    fs::create_dir_all("permissions").expect("create permissions/");
+    if fs::read_to_string(COMMAND_SET).ok().as_deref() != Some(set.as_str()) {
+        fs::write(COMMAND_SET, set).expect("write the command set");
+    }
+
+    // AppManifest wants 'static names; a build script may leak them
+    let commands: Vec<&'static str> = names.into_iter().map(|name| &*name.leak()).collect();
+    tauri_build::try_build(
+        tauri_build::Attributes::new()
+            .app_manifest(tauri_build::AppManifest::new().commands(commands.leak())),
+    )
+    .expect("tauri build");
+}
+```
+
+### The host's capability
+
+`capabilities/rotli-commands.json`:
+
+```json
+{
+  "identifier": "rotli-commands",
+  "description": "Rotli's app commands, for Rotli's own webviews only",
+  "webviews": ["capture", "chat", "finder_*", "main", "quick"],
+  "permissions": ["rotli-commands"]
+}
+```
+
+- **`webviews`, never `windows`.** A `windows` grant covers every webview
+  inside that window, so a host page added as a child of `main` would get every
+  command.
+- **The labels** are the list's `webviews`. A host that would rather not keep
+  them in step by hand can write this file from `build.rs` the same way. A
+  Rotli window missing from it is refused every command.
+- **Host labels.** No host webview may take one of those labels or start with
+  `finder_`.
+- **Rotli's other capabilities** (core and plugin permissions,
+  `src-tauri/capabilities/`) are unchanged by this. The host's context carries
+  its own copies, by webview label too.
+
+### Permission identifiers
+
+For each name given to `AppManifest::commands`, `tauri-build` 2.6.3 (through
+`tauri-utils` 2.9.3) generates two permissions:
+
+| For `corpus_read` | Rule |
+|---|---|
+| `allow-corpus-read` | `allow-` and the command with `_` turned into `-` |
+| `deny-corpus-read` | the same with `deny-` |
+
+- They take **no prefix** in a capability. `allow-corpus_read` fails the build
+  as an invalid identifier.
+- Tauri generates **no `default` or set** for an app manifest. `rotli-commands`
+  above is a set `build.rs` writes. Listing every `allow-…` in the capability
+  works too.
+- A capability that names a permission the manifest lacks fails the build.
+- Tauri writes `permissions/autogenerated/<command>.toml` into the host crate.
+  Those files and `permissions/rotli-commands.toml` are generated, so the host
+  can leave them out of git. Tauri doesn't delete the file of a command that
+  left the list; the set no longer names it.
+
+### What changes, and what doesn't
+
+- Once the manifest exists, **every app command is checked for every webview**,
+  Rotli's included. A command missing from the grant is refused in Rotli's own
+  windows, which is why the check above runs in both directions.
+- Folder windows get every command, as they do in standalone Rotli.
+- A host's own commands are plugin commands and keep their own permissions.
+- **Not covered by command permissions** (read from the Tauri 2.11.5 sources,
+  not run): Tauri registers `asset:` on every webview with one app-wide scope,
+  so a host page that knows a path inside an open vault's scope can load that
+  file. And `core:default` includes `core:event`'s `emit`, so a host page
+  granted it can send events that Rotli's windows act on. Give a host webview
+  only the permissions it needs, and a `csp` that leaves `asset:` out.
+
 ## The host registry (front end)
 
 `src/host/registry.ts`. A host build's entry imports a module that calls
@@ -801,6 +939,17 @@ shows "Hide …" only, since it leaves system-wide chords out.
 
 This list says only what was run.
 
+- **Command scoping (2026-11-27).** A synthetic host crate used the `build.rs`
+  and capability from "Scoping Rotli's commands" with the checked-in list (222
+  commands), tauri 2.11.5 and tauri-build 2.6.3, and called two stub commands
+  under Tauri's mock runtime. `main`, `capture` and a `finder_…` window ran
+  them; a host window and a host child webview inside `main`, both on a host
+  URI scheme, were refused. With no app manifest all five ran them. A
+  `windows` grant let the child webview run them. A list without one command
+  refused it in Rotli's windows. One directly named `allow-…` granted only its
+  command, and a misspelled or unlisted identifier failed the build. **Not
+  run:** a live host build, a real WKWebView, and the `asset:` and event
+  points.
 - **One process per support folder, live (2026-11-26, at `0a1a3da0`).** The
   host lead ran a Developer ID signed host build from two bundle copies,
   each binary run directly in a sandbox HOME. All six steps passed:

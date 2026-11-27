@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const root = process.cwd();
+const root = process.env.ROTLI_CHECK_ROOT ?? process.cwd();
 const rust = readFileSync(join(root, "src-tauri/src/lib.rs"), "utf8");
 const handlerBlock = rust.match(/\.invoke_handler\(tauri::generate_handler!\[([\s\S]*?)\]\)/)?.[1];
 
@@ -10,44 +10,86 @@ if (!handlerBlock) {
   process.exit(1);
 }
 
-const registered = new Set(
-  handlerBlock
-    .split(",")
-    .map((entry) => entry.replace(/\/\/.*$/gm, "").trim())
-    .filter(Boolean)
-    .map((entry) => entry.split("::").at(-1)),
-);
-
-// Command naming: multi-segment snake_case (`corpus_read`, `local_model_start`,
-// `open_url`). 90/90 already complied when adopted (2026-07-18) — this blocks a
-// camelCase or bare single-word command from entering the registry. The stricter
-// known-domain-prefix variant was rejected: a curated domain list is a
-// maintenance knob that must be edited for every new domain (see
-// docs/development/adding-things.md, "Considered and rejected").
-const IPC_COMMAND_NAME = /^[a-z0-9]+(_[a-z0-9]+)+$/;
-// Grandfathered pre-rule names only — never add to this list for new commands.
-const IPC_NAME_GRANDFATHERED = new Set([
-  "summon", // the ⌥. quick-chat summon; shipped single-word before this rule
-]);
-const misnamed = [...registered].filter(
-  (command) => !IPC_COMMAND_NAME.test(command) && !IPC_NAME_GRANDFATHERED.has(command),
-);
-if (misnamed.length) {
-  console.error(
-    `IPC contract check failed — command names must be multi-segment snake_case:\n${misnamed.map((name) => `  - ${name}`).join("\n")}`,
-  );
+function fail(heading, lines) {
+  console.error([`IPC contract check failed — ${heading}`, ...lines.map((line) => `  - ${line}`)].join("\n"));
   process.exit(1);
 }
 
-const sourceFiles = [];
-function walk(dir) {
+// comments go first: a comma inside one must not split off a fake entry
+const entries = handlerBlock
+  .replace(/\/\/.*$/gm, "")
+  .split(",")
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+const unreadable = entries.filter((entry) => !/^(\w+::)*\w+$/.test(entry));
+if (unreadable.length) {
+  fail("cannot read a command name from these generate_handler! entries (plain paths only):", unreadable);
+}
+const registered = new Set(entries.map((entry) => entry.split("::").at(-1)));
+
+// A host build reads this list to scope Rotli's commands to Rotli's webviews
+// (docs/architecture/host-seams.md, "Scoping Rotli's commands"). Once it does,
+// Tauri refuses every command the list lacks, Rotli's own windows included.
+// It is checked first so that drift is reported as drift.
+const LIST = "src-tauri/app-commands.json";
+
+function walk(dir, pattern, found = []) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
-    if (statSync(path).isDirectory()) walk(path);
-    else if (/\.tsx?$/.test(name)) sourceFiles.push(path);
+    if (statSync(path).isDirectory()) walk(path, pattern, found);
+    else if (pattern.test(name)) found.push(path);
   }
+  return found;
 }
-walk(join(root, "src"));
+
+const renamed = walk(join(root, "src-tauri/src"), /\.rs$/).filter((file) =>
+  /#\[(?:tauri::)?command\([^\]]*\brename\s*=/.test(readFileSync(file, "utf8")),
+);
+if (renamed.length) {
+  fail(
+    `a #[command(rename = …)] renames a command, so ${LIST} would name the wrong one:`,
+    renamed.map((file) => relative(root, file)),
+  );
+}
+
+let published;
+try {
+  published = JSON.parse(readFileSync(join(root, LIST), "utf8"));
+} catch (error) {
+  fail(`cannot read ${LIST}:`, [error.message]);
+}
+if (published.version !== 1) fail(`${LIST}:`, ['"version" must be 1']);
+
+// Rotli grants by webview label, never by window: a window-wide grant reaches
+// every child webview, guest pages included (check:security pins the same for
+// the default capability).
+const labels = new Set();
+const capabilityDir = join(root, "src-tauri/capabilities");
+for (const name of readdirSync(capabilityDir)) {
+  if (!name.endsWith(".json")) fail("capabilities must be JSON files this check can read:", [name]);
+  const capability = JSON.parse(readFileSync(join(capabilityDir, name), "utf8"));
+  if (capability.windows) fail("grant by webview label, never by window:", [`${name} targets windows`]);
+  for (const label of capability.webviews ?? []) labels.add(label);
+}
+
+/** The published `key` is exactly `actual`, sorted, each name once. */
+function matchList(key, actual, absent) {
+  const listed = published[key];
+  if (!Array.isArray(listed)) fail(`${LIST}:`, [`"${key}" must be an array`]);
+  const drift = [
+    ...Array.from(actual)
+      .filter((name) => !listed.includes(name))
+      .map((name) => `missing from app-commands.json: ${name}`),
+    ...listed.filter((name) => !actual.has(name)).map((name) => `${absent}: ${name}`),
+  ];
+  if (drift.length) fail(`${LIST} "${key}" has drifted:`, drift);
+  const misplaced = listed.find((name, i) => i > 0 && !(listed[i - 1] < name));
+  if (misplaced) fail(`${LIST}:`, [`${key} must be sorted, each once (see ${misplaced})`]);
+}
+matchList("commands", registered, "listed but not registered");
+matchList("webviews", labels, "listed but in no capability");
+
+const sourceFiles = walk(join(root, "src"), /\.tsx?$/);
 
 const calls = new Map();
 const callPattern =
@@ -112,5 +154,5 @@ if (newlyUncalled.length || stale.length) {
 }
 
 console.log(
-  `check:ipc ok — ${calls.size} frontend commands resolve to ${registered.size} registered Rust handlers; ${uncalled.length} registered without a caller (baseline, may only shrink)`,
+  `check:ipc ok — ${calls.size} frontend commands resolve to ${registered.size} registered Rust handlers; ${uncalled.length} registered without a caller (baseline, may only shrink); ${LIST} matches the handler and the capabilities`,
 );
