@@ -255,7 +255,8 @@ fn an_existing_lock_file_is_made_private() {
     assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
 }
 
-fn source(file: &str) -> String {
+/// A file under `src-tauri/src`, for source fences here and in `host.rs`.
+pub(crate) fn source(file: &str) -> String {
     std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join(file)).unwrap()
 }
 

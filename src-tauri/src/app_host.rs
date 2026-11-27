@@ -2,7 +2,9 @@
 //! `run_with_host` with no host. A host build is a top crate that depends on
 //! this library and starts it with its own Tauri context (bundle ID, bundle
 //! name, capability files, front end), extra plugins whose commands are its
-//! own, and its own words (`HostWords`: its refusals and its welcome note).
+//! own, its own words (`HostWords`: its refusals, its welcome note, the name
+//! in its menus), and the shell's parts it replaces (`without_tray`,
+//! `on_opened_urls`; `host.rs`).
 //! The bundle ID is fixed at build time (`build.rs`, `app_identity.rs`); the
 //! app exits at launch if the context names another.
 //! (docs/architecture/host-seams.md)
@@ -11,19 +13,21 @@ use tauri::plugin::TauriPlugin;
 use tauri::{Context, Wry};
 
 use crate::app_identity::HostWords;
+use crate::host::ShellOptions;
 
 /// What a host hands Rotli's shell at launch.
 pub struct AppHost {
     pub(crate) context: Context<Wry>,
     pub(crate) plugins: Vec<TauriPlugin<Wry>>,
     pub(crate) words: HostWords,
+    pub(crate) shell: ShellOptions,
 }
 
 impl AppHost {
     /// A host with its own Tauri context, no extra plugins, and Rotli's
     /// neutral wording.
     pub fn new(context: Context<Wry>) -> Self {
-        Self { context, plugins: Vec::new(), words: HostWords::default() }
+        Self { context, plugins: Vec::new(), words: HostWords::default(), shell: ShellOptions::default() }
     }
 
     /// Add a plugin. Plugins register after Rotli's own, in the order given.
@@ -37,6 +41,24 @@ impl AppHost {
     #[must_use]
     pub fn words(mut self, words: HostWords) -> Self {
         self.words = words;
+        self
+    }
+
+    /// Build no menu-bar item: no tray icon and no tray menu. The host builds
+    /// its own and calls `rotli_lib::host::show_main` and `rotli_lib::host::quit`
+    /// from it.
+    #[must_use]
+    pub fn without_tray(mut self) -> Self {
+        self.shell = self.shell.without_tray();
+        self
+    }
+
+    /// Called on the run loop with each `Opened` event's URLs that aren't
+    /// files, before Rotli opens the files and folders in it. A later call
+    /// replaces an earlier one.
+    #[must_use]
+    pub fn on_opened_urls(mut self, hook: impl Fn(&tauri::AppHandle, Vec<tauri::Url>) + Send + Sync + 'static) -> Self {
+        self.shell = self.shell.on_opened_urls(Box::new(hook));
         self
     }
 }

@@ -9,6 +9,7 @@ mod ai_edit_policy;
 mod app_host;
 mod app_identity;
 mod app_settings;
+pub mod host;
 mod board;
 mod breve;
 mod chat;
@@ -98,9 +99,7 @@ use std::time::{Duration, Instant};
 use quit_flush::{QuitFlush, Scope};
 use summon::{LastBlurHide, SummonIntent};
 
-use tauri::image::Image;
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::menu::MenuItemBuilder;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -2045,17 +2044,18 @@ pub use app_identity::HostWords;
 /// `rotli` binary expands (src/main.rs). The library never expands a context
 /// itself, so a host crate links it without Rotli's front end.
 pub fn run(context: tauri::Context<tauri::Wry>) {
-    launch(context, Vec::new())
+    launch(context, Vec::new(), host::ShellOptions::default())
 }
 
 /// The shell under a host build (`app_host.rs`): its context, its plugins,
-/// its wording.
+/// its wording, its tray and opened-URL choices.
 pub fn run_with_host(host: AppHost) {
     app_identity::set_host_words(host.words);
-    launch(host.context, host.plugins)
+    launch(host.context, host.plugins, host.shell)
 }
 
-fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>) {
+fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>, shell: host::ShellOptions) {
+    let host::ShellOptions { tray, on_opened_urls: opened_urls } = shell;
     // A host build is one process per support folder: a second one runs no
     // plugin, window or setup step (single_instance.rs; exits 75 or 73).
     single_instance::hold_at_launch(&context.config().identifier);
@@ -2364,7 +2364,7 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             memex::memex_validate,
             memex::memex_pick_folder
         ])
-        .setup(|app| {
+        .setup(move |app| {
             // A stale build cache, or a host context naming another bundle ID,
             // must not give one identity the other's behaviour: stop before
             // the scratch vault is made or any folder is bound.
@@ -2642,33 +2642,10 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
                 }
             }
 
-            // Menu-bar tray: the canonical quokka mark as a TEMPLATE icon (macOS tints it).
-            // 44px = 22px logical @2x; tray-icon scales NSImage to the bar height.
-            let open = MenuItemBuilder::with_id("open", "Open rotli").build(app)?;
-            let quit = MenuItemBuilder::with_id("quit", "Quit rotli").build(app)?;
-            let menu = MenuBuilder::new(app).items(&[&open, &quit]).build()?;
-            TrayIconBuilder::with_id("rotli")
-                .icon(Image::from_bytes(include_bytes!("../icons/tray@2x.png"))?)
-                .icon_as_template(true)
-                .menu(&menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id().as_ref() {
-                    "open" => SummonIntent::ShowMain.perform(app),
-                    // let the webview flush dirty sheets/settings first (#4)
-                    "quit" => graceful_quit(app),
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        SummonIntent::ToggleMainFromTray.perform(tray.app_handle());
-                    }
-                })
-                .build(app)?;
+            // a host may build its own menu-bar item instead (host.rs)
+            if tray {
+                host::build_tray(app)?;
+            }
 
             // ⌘Q must flush before exit (#4 follow-up): the default app menu ends
             // in the PREDEFINED Quit item — native `terminate:`, which kills the
@@ -2692,7 +2669,7 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
                     Some(last @ tauri::menu::MenuItemKind::Predefined(_)) => last,
                     _ => return Err("macOS Quit menu changed; refusing an unsafe unflushed Quit".into()),
                 };
-                let quit_app = MenuItemBuilder::with_id("quit-app", "Quit rotli")
+                let quit_app = MenuItemBuilder::with_id("quit-app", host::quit_label(app_identity::product_name()))
                     .accelerator("CmdOrCtrl+Q")
                     .build(app)?;
                 app_sub.remove(last)?;
@@ -2846,7 +2823,8 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
         })
         .build(context)
         .expect("error while building tauri application")
-        .run(|app, event| {
+        .run(move |app, event| {
+            host::on_run_event(app, &event, opened_urls.as_ref());
             if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {
                 app.state::<routines::BreveSupervisor>().stop();
             }

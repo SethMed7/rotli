@@ -386,4 +386,4 @@ pub(crate) fn bring_forward(plan: OpenPlan) -> Result<(), String> {
 
 #[cfg(test)]
 #[path = "single_instance_tests.rs"]
-mod tests;
+pub(crate) mod tests;

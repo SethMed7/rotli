@@ -170,6 +170,25 @@ fn a_host_identity_refuses_a_folder_inside_or_around_a_vault() {
     assert_eq!(refuse_existing_vault_for(HOST, &around), existing_vault_refusal());
 }
 
+/// A file Finder hands a host build (open_requests.rs) meets the same rule as
+/// a folder: one inside a vault the host doesn't own is refused, one in a plain
+/// folder or the host's own vault opens, and standalone refuses none.
+#[test]
+fn a_host_identity_refuses_a_file_inside_a_vault_it_does_not_own() {
+    let temp = tempfile::tempdir().unwrap();
+    let vault = folder(temp.path(), "vault");
+    make_vault(&vault);
+    let opened = folder(&vault, "Projects").join("opened from finder.txt");
+    std::fs::write(&opened, "handed over by Finder").unwrap();
+    assert_eq!(refuse_existing_vault_for(HOST, &opened), existing_vault_refusal());
+    assert_eq!(refuse_existing_vault_for(STANDALONE_IDENTIFIER, &opened), Ok(()));
+    let loose = folder(temp.path(), "Downloads").join("dropped on the dock.txt");
+    std::fs::write(&loose, "dropped on the Dock icon").unwrap();
+    assert_eq!(refuse_existing_vault_for(HOST, &loose), Ok(()));
+    claim_for(HOST, &vault).unwrap();
+    assert_eq!(refuse_existing_vault_for(HOST, &opened), Ok(()));
+}
+
 #[test]
 fn a_host_identity_opens_plain_folders_and_its_own_vaults() {
     let temp = tempfile::tempdir().unwrap();
@@ -412,7 +431,7 @@ fn launch_checks_identity_then_settles_scratch_before_binding_anything() {
     assert!(lock < launch.find("tauri::Builder::default()").unwrap(), "the lock precedes the builder");
     let main = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/main.rs")).unwrap();
     assert!(main.find("run_headless_if_requested(").unwrap() < main.find("rotli_lib::run(").unwrap());
-    let setup = &lib[lib.find(".setup(|app| {").expect("setup exists")..];
+    let setup = &lib[lib.find(".setup(move |app| {").expect("setup exists")..];
     let identity = setup.find("app_identity::matches_runtime(").unwrap();
     let mismatch_exit = setup.find("std::process::exit(78)").unwrap();
     let locked_folder = setup.find("single_instance::confirm_support_folder(").expect("setup confirms the locked folder");
@@ -470,7 +489,7 @@ fn every_root_choice_meets_the_vault_refusal() {
 fn launch_secures_the_registry_and_writers_mark_their_roots() {
     let src = |file: &str| std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join(file)).unwrap();
     let lib = src("lib.rs");
-    let setup = &lib[lib.find(".setup(|app| {").expect("setup exists")..];
+    let setup = &lib[lib.find(".setup(move |app| {").expect("setup exists")..];
     let repair = setup.find("vault_location::repair_vault_locations(").unwrap();
     let secure = setup.find("host_registry::secure_registry(").expect("the launch secures the registry");
     let first_read = setup.find("corpus::is_configured(app.handle())").unwrap();

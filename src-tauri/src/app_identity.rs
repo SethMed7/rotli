@@ -41,6 +41,9 @@ pub struct HostWords {
     /// `# Title` first: the heading names the note and its file. `None` writes
     /// Rotli's own. `set_host_words` checks the shape (`is_note_body`).
     pub welcome_note: Option<String>,
+    /// The name in the menu-bar item's "Open …" and "Quit …" and the app
+    /// menu's Quit. `None` keeps Rotli's own, lower-case ("Quit rotli").
+    pub product_name: Option<String>,
 }
 
 impl Default for HostWords {
@@ -52,6 +55,7 @@ impl Default for HostWords {
             existing_vault: "Rotli already uses this folder as a vault, so this app won't open it. Choose another folder."
                 .into(),
             welcome_note: None,
+            product_name: None,
         }
     }
 }
@@ -88,6 +92,19 @@ pub(crate) fn stays_with_rotli() -> String {
 /// A host's own first note, if it supplied one.
 pub(crate) fn welcome_note() -> Option<&'static str> {
     words().welcome_note.as_deref()
+}
+
+/// The name Rotli's own menus use when a host gives none.
+pub(crate) const STANDALONE_PRODUCT_NAME: &str = "rotli";
+
+/// The name in these words' menu labels.
+pub(crate) fn product_name_in(words: &HostWords) -> &str {
+    words.product_name.as_deref().unwrap_or(STANDALONE_PRODUCT_NAME)
+}
+
+/// This build's name in its menu labels (`host::open_label`, `host::quit_label`).
+pub(crate) fn product_name() -> &'static str {
+    product_name_in(words())
 }
 
 /// Shown where a host build refuses the Keychain.
