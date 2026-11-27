@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Host builds can bring their own menu-bar item.** For apps built on Rotli's
+  shell: a host can turn off Rotli's tray and call `host::show_main` and
+  `host::quit` from its own, name itself in the tray and the app menu's Quit,
+  and receive the URLs macOS opens it with. Files and folders opened from
+  Finder in a host build open as they do in Rotli, but never inside a vault
+  the host doesn't own. Standalone Rotli is unchanged: its menu-bar item
+  still reads "Open rotli" and "Quit rotli".
+
 ### Fixed
 
 - **`rotli open` during setup is no longer lost.** A request that arrived while

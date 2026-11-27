@@ -107,8 +107,9 @@ per support folder (`src-tauri/src/single_instance.rs`).
   `notify`, not recursive). On a nudge it does what a Reopen does for `open`
   in the standalone build: it shows the main window and emits
   `rotli:open-request`, so the webview consumes the `rotli open` mailbox. A
-  nudge carries no request. A host build has no deep-link plugin and Finder
-  hands it no files, so a second launch has no argv or link to pass on. For
+  nudge carries no request. A host build has no deep-link plugin, and macOS
+  hands a running app the files and URLs it opens as an `Opened` event (see
+  "Opened URLs"), so a second launch has no argv or link to pass on. For
   what a forged nudge and mailbox can reach, see the threat model's
   host-identity boundary.
 - **Why `flock` and not Tauri's single-instance plugin.** On macOS the plugin
@@ -179,10 +180,17 @@ in two places, each on its own.
   refusal. The CLI's `ROTLI_CORPUS_ROOT` pin meets the same rule
   (`app_identity::refuse_pinned_root`), and so does every root launch reads
   from the registry (see "The launch bind").
-- **Paths that never reach a host build.** Files and folders opened from Finder
-  arrive only through the deep-link plugin, which a host build doesn't
-  register. The relay's MCP root is the vault the app already has open, and
-  pairing needs the Keychain, which a host build refuses.
+- **Files and folders opened from Finder.** Standalone Rotli gets them from
+  its deep-link plugin; a host build gets them from its run loop (see
+  "Opened URLs"). Both reach `open_from_finder` (`open_requests.rs`), which
+  refuses before it binds anything: a folder meets `reject_privileged_root`
+  (and again in its window's mount, `folder_window.rs`), and a file meets
+  `refuse_existing_vault`. So a host opens no file or folder inside a vault it
+  doesn't own, and says so in the main window. In standalone Rotli both
+  refusals behave as before.
+- **Paths that never reach a host build.** The relay's MCP root is the vault
+  the app already has open, and pairing needs the Keychain, which a host build
+  refuses.
 - **`rotli-helper`.** Under a host ID the helper keeps its token and vault
   choice in `<support folder>/Helper`, not `~/.rotli-helper`, so it never serves
   the vault Rotli's helper chose. Choosing a folder (`--vault` or the page's
@@ -354,6 +362,11 @@ passes:
   it has no Keychain, and where it refuses an existing vault; Rotli's defaults
   are neutral. `welcome_note` is the first note written into an empty notes
   folder, a host's scratch vault included (see "The welcome note" below).
+  `product_name` is the name in the menu-bar item and the app menu's Quit
+  (see "The menu-bar item" below);
+- **`without_tray()`**: no menu-bar item from Rotli (see "The menu-bar item");
+- **`on_opened_urls(…)`**: its handler for the URLs macOS opens the app with
+  (see "Opened URLs").
 
 Only Rotli's own binary (`src-tauri/src/main.rs`) expands Rotli's Tauri
 context. The library never does, so a host crate builds without Rotli's
@@ -389,10 +402,105 @@ rotli_lib::run_with_host(rotli_lib::AppHost::new(context).words(rotli_lib::HostW
 
 **For a host repinning:** `HostWords` is a public struct, so a new field can
 break a host's literal. A host that builds `HostWords { … }` must set every
-field (`welcome_note: None` keeps today's note), or use `..Default::default()`
-only when it leaves at least one field unset. With every field set, the struct
-update has no effect: clippy's `needless_update` rejects it in a crate that
-denies warnings (plain `rustc` accepts it).
+field (`welcome_note: None` keeps today's note, `product_name: None` keeps
+"Quit rotli"), or use `..Default::default()` only when it leaves at least one
+field unset. With every field set, the struct update has no effect: clippy's
+`needless_update` rejects it in a crate that denies warnings (plain `rustc`
+accepts it). `product_name` arrived after `welcome_note` (2026-11-27), so a
+host that lists every field adds it when it repins.
+
+### The menu-bar item
+
+Standalone Rotli has one menu-bar item (tray id `rotli`): its mark, a menu
+with "Open rotli" and "Quit rotli", and a left click that shows or hides the
+main window. A host keeps it by default, and `HostWords::product_name`
+renames both items and the app menu's Quit ("Open Synthetic", "Quit
+Synthetic"). `None` keeps Rotli's strings exactly, lower-case included. The
+labels come from `host::open_label` and `host::quit_label`.
+
+A host that ships one menu-bar item of its own calls `without_tray()`. Rotli
+then builds no tray icon and no tray menu: every tray API Rotli touches is in
+`host::build_tray`, which the shell calls only with the tray on, and nothing
+else in Rotli (Rust or the front end) looks a tray up, sets its title or swaps
+its icon. A fence (`host::tests`) keeps it that way. Rotli's closed windows
+hide rather than close, as before; the host's item is then the way back, or the
+Dock icon when "Show in Dock" is on. Rotli starts as a menu-bar app
+(`Accessory`) until the person's Dock setting applies, as it always has.
+
+The host's tray calls two functions, each a thin wrapper over what Rotli's own
+items do:
+
+- **`rotli_lib::host::show_main(&AppHandle)`** shows and focuses the main
+  window (`SummonIntent::ShowMain`, Rotli's "Open rotli").
+- **`rotli_lib::host::quit(&AppHandle)`** quits as ⌘Q does (`graceful_quit`):
+  every window saves and flushes first, then the app exits. It returns at
+  once. A window that can't save keeps the app open and says why in the main
+  window.
+
+```rust
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::TrayIconBuilder;
+
+let host = rotli_lib::AppHost::new(context)
+    .without_tray()
+    .words(rotli_lib::HostWords { product_name: Some("Synthetic".into()), ..Default::default() })
+    .plugin(
+        tauri::plugin::Builder::<tauri::Wry>::new("synthetic-tray")
+            .setup(|app, _| {
+                let notes = MenuItemBuilder::with_id("synthetic-notes", "Open Notes").build(app)?;
+                let quit = MenuItemBuilder::with_id("synthetic-quit", "Quit Synthetic").build(app)?;
+                let menu = MenuBuilder::new(app).items(&[&notes, &quit]).build()?;
+                TrayIconBuilder::with_id("synthetic")
+                    .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?)
+                    .menu(&menu)
+                    .on_menu_event(|app, event| match event.id().as_ref() {
+                        "synthetic-notes" => rotli_lib::host::show_main(app),
+                        "synthetic-quit" => rotli_lib::host::quit(app),
+                        _ => {}
+                    })
+                    .build(app)?;
+                Ok(())
+            })
+            .build(),
+    );
+rotli_lib::run_with_host(host);
+```
+
+Give the host's items ids other than `open`, `quit` and Rotli's app-menu ids
+(`quit-app`, `close-tab`, `close-window`, `edit-undo`, `edit-redo`): Rotli's
+app-wide menu handler matches those. A host's own Quit should call
+`host::quit`, never `AppHandle::exit`, which skips the flush.
+
+### Opened URLs
+
+macOS hands an app the files and URLs it opens (Open With, a Dock drop, a
+link in the host's own scheme from `CFBundleURLTypes`) as
+`RunEvent::Opened`. Under `run_with_host` Rotli owns the run loop, so a host
+passes a handler:
+
+```rust
+rotli_lib::AppHost::new(context).on_opened_urls(|app, urls| {
+    for url in urls {
+        // synthetic-host://… : the host's own routing
+    }
+});
+```
+
+- **What the host gets:** every URL in the event that isn't a `file:` URL,
+  in order, in one call. A `rotli://` URL is the host's too: it never reaches
+  Rotli's link handling in a host build. An event with no such URL makes no
+  call.
+- **What Rotli keeps:** the `file:` URLs, files and folders. Rotli opens them
+  after the hook returns, as Finder's Open With opens them in standalone Rotli
+  (`open_from_finder`), behind the vault refusal (see "Where Rust checks").
+  The host's bundle must declare the document types itself
+  (`CFBundleDocumentTypes`) for Finder to offer it.
+- **Order:** `host::on_run_event` is the first statement of the run loop's
+  closure, and in it the hook runs before Rotli opens any file. A fence
+  (`the_hook_runs_before_rotlis_own_opened_handling`) keeps both.
+- The hook runs on the main thread, so it should hand slow work off.
+- **Standalone** passes no hook and its deep-link plugin takes every URL, as
+  before: the run-loop path runs only when `owns_shared_state()` is false.
 
 ### Building a host crate
 
@@ -779,6 +887,15 @@ This list says only what was run.
   with the same results. `e2e/host-panes.spec.ts` now keeps the focus handoff,
   a dropped pane request, the unsubscribe on close and the dev-server throw
   under the same kind of host. No native build was launched.
+- **The menu-bar item and opened URLs** (2026-11-27, tests only). The labels
+  are pure functions, standalone's strings pinned exactly; the shell options'
+  builder; how an `Opened` event splits between the host and Rotli; source
+  fences for the hook's order and for no tray API outside `build_tray`; a file
+  inside a vault the host doesn't own refused by `refuse_existing_vault`; and
+  `check:vault-binds` on the new refusals in `open_from_finder` (each removed
+  in turn, the guard failed). No native build was launched, so a host's own
+  tray, a URL in its scheme reaching the hook, and a Finder-opened file in a
+  host build are not proven live.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run
@@ -794,7 +911,7 @@ This list says only what was run.
   a link and `..`, and a registry rewritten after launch),
   `helper_vault_identity_tests.rs` (including a vault made inside the served
   folder before the helper starts),
-  `breve_dev_roots.rs` and `app_host.rs`.
+  `breve_dev_roots.rs`, `app_host.rs` and `host.rs`.
 - **TypeScript:** `src/lib/appIdentity.test.ts`, `src/host/registry.test.ts`,
   `src/components/settings/settingsNav.test.ts`,
   `src/components/settings/connectionsSettings.test.tsx`,

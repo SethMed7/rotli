@@ -169,8 +169,10 @@ owns the threat side.
   exits 73. After launch a host takes roots, and their adopted and active
   flags and a connected vault's read-only flag, only from its open stores;
   the current vault's write right comes from its own `memex.json`, never the
-  registry. The helper and the CLI vet each root on every load and walk
-  below it once per process. `check:vault-binds` makes every call that turns
+  registry. A file or folder macOS opens a host build with (its run loop's
+  `Opened` event) meets the same vault refusal before it is mounted. The
+  helper and the CLI vet each root on every load and walk below it once per
+  process. `check:vault-binds` makes every call that turns
   a path into a root, and every registry read, say why it is safe, ties a
   refused or live reason to the same variable, and pins the count per file.
   It is a tripwire, not a proof.
