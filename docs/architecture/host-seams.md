@@ -683,6 +683,10 @@ For each name given to `AppManifest::commands`, `tauri-build` 2.6.3 (through
   windows, which is why the check above runs in both directions.
 - Folder windows get every command, as they do in standalone Rotli.
 - A host's own commands are plugin commands and keep their own permissions.
+- **Scoping separates webviews, not code.** The panes and blocks a host
+  registers (see "The host registry") are bundled into Rotli's front end and
+  run in Rotli's webviews, so they can call every command. A host page that
+  shouldn't have that belongs in a webview of its own.
 - **Not covered by command permissions** (read from the Tauri 2.11.5 sources,
   not run): Tauri registers `asset:` on every webview with one app-wide scope,
   so a host page that knows a path inside an open vault's scope can load that
