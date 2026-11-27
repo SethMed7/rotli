@@ -2373,6 +2373,8 @@ fn launch(mut context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plug
                 );
                 std::process::exit(78);
             }
+            // inside applicationDidFinishLaunching: the launch's Apple event is current
+            host::decide_at_launch(app.handle());
             #[cfg(target_os = "macos")]
             if native_drag::debug_drops() {
                 if let Some(main) = app.get_webview_window("main") {

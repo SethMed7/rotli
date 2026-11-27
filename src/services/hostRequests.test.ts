@@ -9,6 +9,7 @@ import {
   deliverHeld,
   openSettingsFromHost,
   openSettingsOn,
+  pageHandlers,
   settingsPaneOpens,
 } from "./hostRequests";
 
@@ -78,18 +79,56 @@ test("without notes, Settings is already the window: only the pane changes", () 
   expect(useUiStore.getState().settingsOpen).toBe(false);
 });
 
-test("what was held is delivered in the order it came", () => {
+test("what was held is delivered in the order it came, the notices as one", () => {
   const log: string[] = [];
   deliverHeld(
-    { notices: ["first refusal", "second refusal"], settings: ["general", "synthetic"] },
-    { notice: (m) => log.push(`notice ${m}`), settings: (id) => log.push(`settings ${id}`) },
+    { notices: ["First refusal.", "Second refusal."], settings: ["general", "synthetic"] },
+    {
+      notice: (m) => log.push(`notice ${m}`),
+      settings: (id, held) => log.push(`settings ${id}${held ? " (held)" : ""}`),
+    },
   );
+  // the notice line holds one sentence at a time: a cold batch shows every one
   expect(log).toEqual([
-    "notice first refusal",
-    "notice second refusal",
-    "settings general",
-    "settings synthetic",
+    "notice First refusal. Second refusal.",
+    "settings general (held)",
+    "settings synthetic (held)",
   ]);
+});
+
+test("a held request that opens nothing still brings the window forward; a live one does nothing", () => {
+  const log: string[] = [];
+  const handlers = pageHandlers({
+    opens: (id) => id === "synthetic",
+    open: (id) => log.push(`open ${id}`),
+    show: async () => void log.push("show"),
+  });
+  // judged when the page first listens: a pane not showing yet opens nothing,
+  // but after a quiet start the window must not stay hidden on the request
+  handlers.settings("gated", true);
+  expect(log).toEqual(["show"]);
+  handlers.settings("gated", false);
+  expect(log).toEqual(["show"]);
+  handlers.settings("synthetic", true);
+  expect(log).toEqual(["show", "open synthetic", "show"]);
+});
+
+test("a take that fails says so under the dev server", async () => {
+  const warn = spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const transport: PageTransport = {
+      listenHere: async () => () => {},
+      ready: async () => {
+        throw new Error("synthetic IPC failure");
+      },
+    };
+    attachPageRequests({ notice: () => {}, settings: () => {} }, transport, true);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("synthetic IPC failure");
+  } finally {
+    warn.mockRestore();
+  }
 });
 
 /** A transport whose listeners register when the test says so. */

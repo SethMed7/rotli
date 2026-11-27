@@ -6,7 +6,7 @@
 //! page"). Standalone Rotli builds its tray here and sends no URL through this
 //! module: its deep-link plugin takes them.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Mutex, OnceLock, PoisonError};
 
 use tauri::utils::config::WindowConfig;
@@ -15,8 +15,8 @@ use tauri::{AppHandle, Emitter, Url};
 /// A host's handler for the URLs macOS opens its app with.
 pub type OpenedUrls = Box<dyn Fn(&AppHandle, Vec<Url>) + Send + Sync>;
 
-/// A host's answer, asked once at launch, to whether this launch starts with
-/// no window showing.
+/// A host's answer, asked once as the app finishes launching, to whether this
+/// launch keeps its window hidden.
 pub type StartHidden = Box<dyn Fn() -> bool + Send + Sync>;
 
 /// Show and focus the main window, as Rotli's tray item "Open …" does.
@@ -74,19 +74,106 @@ impl ShellOptions {
     }
 }
 
-static STARTED_HIDDEN: AtomicBool = AtomicBool::new(false);
+/// Whether this launch starts with no window. A host that passes
+/// `start_hidden` has `main` made hidden, then is asked once setup runs,
+/// inside `applicationDidFinishLaunching`, where the launch's Apple event is
+/// still current (`decide_at_launch`); a no shows the window there. Until
+/// then, and after a yes, the page's load-time show is skipped. Nothing here
+/// hides a window, so a show before the decision stands.
+pub(crate) struct QuietStart {
+    state: AtomicU8,
+    predicate: Mutex<Option<StartHidden>>,
+}
+
+const NO_PREDICATE: u8 = 0;
+const UNDECIDED: u8 = 1;
+const SHOWN: u8 = 2;
+const HIDDEN: u8 = 3;
+
+impl QuietStart {
+    pub(crate) const fn new() -> Self {
+        Self { state: AtomicU8::new(NO_PREDICATE), predicate: Mutex::new(None) }
+    }
+
+    /// At launch, before any window: with a predicate, `main` is made hidden
+    /// and the predicate kept for `decide`. Without one, nothing changes.
+    fn arm(&self, predicate: Option<StartHidden>, windows: &mut [WindowConfig]) {
+        let Some(predicate) = predicate else { return };
+        hide_main_at_creation(windows);
+        *self.predicate.lock().unwrap_or_else(PoisonError::into_inner) = Some(predicate);
+        self.state.store(UNDECIDED, Ordering::Release);
+    }
+
+    /// Asks the predicate, once. `Some(true)`: show the window now.
+    fn decide(&self) -> Option<bool> {
+        let predicate = self.predicate.lock().unwrap_or_else(PoisonError::into_inner).take()?;
+        let show = !predicate();
+        self.state.store(if show { SHOWN } else { HIDDEN }, Ordering::Release);
+        Some(show)
+    }
+
+    /// Whether the page's load-time show is skipped: before the decision, and
+    /// after a yes.
+    fn skips_launch_show(&self) -> bool {
+        matches!(self.state.load(Ordering::Acquire), UNDECIDED | HIDDEN)
+    }
+}
+
+static QUIET: QuietStart = QuietStart::new();
 
 /// The launch's shell options, applied before the builder makes any window:
-/// the opened-URL hook is set, and the host's `start_hidden` is asked once.
-/// When it says yes, the main window is made hidden. Gives whether to build
-/// the tray. Standalone passes the defaults, which leave `windows` untouched.
+/// the opened-URL hook is set and the quiet start armed. Gives whether to
+/// build the tray. Standalone passes the defaults, which leave `windows`
+/// untouched.
 pub(crate) fn apply_at_launch(shell: ShellOptions, windows: &mut [WindowConfig]) -> bool {
     set_opened_urls(shell.on_opened_urls);
-    if shell.start_hidden.is_some_and(|hidden| hidden()) {
-        STARTED_HIDDEN.store(true, Ordering::Relaxed);
-        hide_main_at_creation(windows);
-    }
+    QUIET.arm(shell.start_hidden, windows);
     shell.tray
+}
+
+/// Setup, inside `applicationDidFinishLaunching`: the host's `start_hidden`
+/// is asked now, while the launch Apple event is current, and a no shows the
+/// window. Standalone has no predicate and nothing happens.
+pub(crate) fn decide_at_launch(app: &AppHandle) {
+    if QUIET.decide() == Some(true) {
+        show_main(app);
+    }
+}
+
+/// Whether macOS launched this process as a login item: the launch's Apple
+/// event (`oapp`) carries `keyAELaunchedAsLogInItem`. Only meaningful inside
+/// `start_hidden`, which runs while that event is current; anywhere else,
+/// and in a relaunch or a launch from Finder, the Dock or `open`, it is false.
+pub fn launched_as_login_item() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let manager = objc2_foundation::NSAppleEventManager::sharedAppleEventManager();
+        manager.currentAppleEvent().is_some_and(|event| login_item::is_login_launch(&event))
+    }
+    #[cfg(not(target_os = "macos"))]
+    false
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) mod login_item {
+    use objc2::msg_send;
+    use objc2::rc::Retained;
+    use objc2_foundation::NSAppleEventDescriptor;
+
+    // the four-character codes from AppleEvents.h
+    pub(crate) const K_AE_OPEN_APPLICATION: u32 = u32::from_be_bytes(*b"oapp");
+    pub(crate) const KEY_AE_PROP_DATA: u32 = u32::from_be_bytes(*b"prdt");
+    pub(crate) const KEY_AE_LAUNCHED_AS_LOG_IN_ITEM: u32 = u32::from_be_bytes(*b"lgit");
+
+    /// An open-application event whose property data says "login item".
+    /// `eventID` and `paramDescriptorForKeyword:` sit behind another crate's
+    /// feature in objc2-foundation, so they are sent directly.
+    pub(crate) fn is_login_launch(event: &NSAppleEventDescriptor) -> bool {
+        let id: u32 = unsafe { msg_send![event, eventID] };
+        let data: Option<Retained<NSAppleEventDescriptor>> =
+            unsafe { msg_send![event, paramDescriptorForKeyword: KEY_AE_PROP_DATA] };
+        id == K_AE_OPEN_APPLICATION && data.is_some_and(|data| data.enumCodeValue() == KEY_AE_LAUNCHED_AS_LOG_IN_ITEM)
+    }
 }
 
 /// The main window's config entry made hidden, so the window is never ordered
@@ -98,16 +185,16 @@ fn hide_main_at_creation(windows: &mut [WindowConfig]) {
 }
 
 /// Whether the webview's `show_main_window` shows the window: always, except
-/// the call the page makes as it loads when this launch started hidden.
-fn shows_main(at_launch: bool, started_hidden: bool) -> bool {
-    !(at_launch && started_hidden)
+/// the call the page makes as it loads while the quiet start skips it.
+fn shows_main(at_launch: bool, skips_launch_show: bool) -> bool {
+    !(at_launch && skips_launch_show)
 }
 
 /// The webview's way to show the main window. The page's own call as it
-/// loads passes `at_launch`, and a quiet start skips that one call's show.
+/// loads passes `at_launch`.
 #[tauri::command]
 pub(crate) fn show_main_window(app: AppHandle, at_launch: Option<bool>) {
-    if shows_main(at_launch == Some(true), STARTED_HIDDEN.load(Ordering::Relaxed)) {
+    if shows_main(at_launch == Some(true), QUIET.skips_launch_show()) {
         show_main(&app);
     }
 }
@@ -437,12 +524,19 @@ mod tests {
         let run = &lib[lib.find(".run(|app, event| \u{7b}").expect("the run loop")..];
         assert_eq!(run.lines().nth(1).unwrap().trim(), "host::on_run_event(app, &event);");
         assert_eq!(lib.matches("RunEvent::Opened").count(), 0, "Opened is read only in host.rs");
-        assert_eq!(lib.matches("host::ready(").count(), 1);
+        assert_eq!(lib.matches(OPENED_RELEASE).count(), 1);
+        in_setup_order(&lib, &[IDENTITY_CHECK, "app.manage(corpus::CorpusState(", OPENED_RELEASE]);
+    }
+
+    /// Two steps of Rotli's setup that other steps are ordered against.
+    pub(super) const IDENTITY_CHECK: &str = "app_identity::matches_runtime(";
+    pub(super) const OPENED_RELEASE: &str = "host::ready(";
+
+    /// `calls` appear in Rotli's setup closure in this order.
+    pub(super) fn in_setup_order(lib: &str, calls: &[&str]) {
         let setup = &lib[lib.find(".setup(move |app| \u{7b}").expect("setup")..];
-        let identity = setup.find("app_identity::matches_runtime(").unwrap();
-        let vaults = setup.find("app.manage(corpus::CorpusState(").unwrap();
-        let drain = setup.find("host::ready(").unwrap();
-        assert!(identity < vaults && vaults < drain, "the drain follows the identity check and the vaults");
+        let at: Vec<usize> = calls.iter().map(|call| setup.find(call).unwrap_or_else(|| panic!("no {call} in setup"))).collect();
+        assert!(at.windows(2).all(|pair| pair[0] < pair[1]), "setup runs {calls:?} in this order");
     }
 
     /// With the tray off, Rotli touches no tray API: every one lives in

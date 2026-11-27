@@ -22,17 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Host builds can open Settings on a pane and start quietly.** For apps
   built on Rotli's shell: `host::open_settings` brings the window forward on
   a Settings pane, Rotli's or the host's, and does nothing for a pane that
-  doesn't exist or doesn't show; `AppHost::start_hidden` starts a login
-  launch with no window until the host shows it. A file a host won't open
+  doesn't exist or doesn't show; `AppHost::start_hidden`, asked as the app
+  finishes launching (with `host::launched_as_login_item` to read the login
+  flag), keeps a login launch's window hidden until the host shows it. A file a host won't open
   now says "This file is in a folder Rotli uses as a vault…" instead of a
   sentence about folders. Standalone Rotli's window opens as before.
 
 ### Fixed
 
-- **A refused folder now says why on a cold launch.** Opening a folder Rotli
-  can't use (your home folder, say) from Finder while Rotli wasn't running
-  brought the window up with no explanation. The sentence now shows once the
-  window is ready.
 - **`rotli open` during setup is no longer lost.** A request that arrived while
   first run (or any setup or vault screen) was showing was used up behind that
   screen, and choosing a vault then closed the tab it had opened. Rotli now

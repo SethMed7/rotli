@@ -61,13 +61,15 @@ export function openSettingsFromHost(id: string, steps: SettingsRequestSteps = S
 
 export interface PageRequestHandlers {
   notice: (message: string) => void;
-  settings: (id: string) => void;
+  /** `held`: it came before the page listened (a cold launch). */
+  settings: (id: string, held: boolean) => void;
 }
 
-/** What was held, in the order it came: notices first, then Settings. */
+/** What was held, in the order it came: notices first, as one, since the
+ * notice line shows one at a time; then each Settings request. */
 export function deliverHeld(held: HeldForPage, handlers: PageRequestHandlers): void {
-  for (const message of held.notices) handlers.notice(message);
-  for (const id of held.settings) handlers.settings(id);
+  if (held.notices.length > 0) handlers.notice(held.notices.join(" "));
+  for (const id of held.settings) handlers.settings(id, true);
 }
 
 type Listen = (event: string, handler: (event: { payload: string }) => void) => Promise<() => void>;
@@ -85,11 +87,12 @@ const TAURI_TRANSPORT: PageTransport = { listenHere: listenHere<string>, ready: 
 export function attachPageRequests(
   handlers: PageRequestHandlers,
   transport: PageTransport = TAURI_TRANSPORT,
+  dev: boolean = !!import.meta.env.DEV,
 ): () => void {
   let stopped = false;
   const listening = Promise.all([
     transport.listenHere("rotli:open-notice", (event) => handlers.notice(event.payload)),
-    transport.listenHere("rotli:open-settings", (event) => handlers.settings(event.payload)),
+    transport.listenHere("rotli:open-settings", (event) => handlers.settings(event.payload, false)),
   ]);
   void listening
     .then(async () => {
@@ -98,7 +101,10 @@ export function attachPageRequests(
       // Rust released them on this call: deliver them even if the mount went
       deliverHeld(await transport.ready(), handlers);
     })
-    .catch(() => {});
+    .catch((error: unknown) => {
+      // Rust may already have let go of what it held: say so where it can be seen
+      if (dev) console.warn(`Held notices and Settings requests were lost: ${String(error)}`);
+    });
   return () => {
     stopped = true;
     void listening.then((stops) => stops.forEach((stop) => stop())).catch(() => {});
@@ -106,11 +112,19 @@ export function attachPageRequests(
 }
 
 /** The main page's handlers: notices go to the row-error line, Settings
- * requests to `openSettingsFromHost`. */
-export const MAIN_PAGE_HANDLERS: PageRequestHandlers = {
-  notice: (message) => useUiStore.getState().setRowActionError(message),
-  settings: (id) => void openSettingsFromHost(id),
-};
+ * requests to `openSettingsFromHost`. A held request is judged when the page
+ * first listens; one that opens nothing then still brings the window
+ * forward, so a quiet start never swallows an explicit request. */
+export function pageHandlers(steps: SettingsRequestSteps = SETTINGS_STEPS): PageRequestHandlers {
+  return {
+    notice: (message) => useUiStore.getState().setRowActionError(message),
+    settings: (id, held) => {
+      if (!openSettingsFromHost(id, steps) && held) void steps.show().catch(() => {});
+    },
+  };
+}
+
+export const MAIN_PAGE_HANDLERS: PageRequestHandlers = pageHandlers();
 
 /** The main page's wiring. A no-op outside the shell. */
 export function attachMainPageRequests(): () => void {

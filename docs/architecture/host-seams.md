@@ -373,10 +373,10 @@ passes:
 - **`without_tray()`**: no menu-bar item from Rotli (see "The menu-bar item");
 - **`on_opened_urls(…)`**: its handler for the URLs macOS opens the app with
   (see "Opened URLs");
-- **`start_hidden(…)`**: whether this launch starts with no window showing
-  (see "A quiet start").
+- **`start_hidden(…)`**: whether this launch keeps its window hidden, asked
+  as the app finishes launching (see "A quiet start").
 
-Two calls reach the running shell from a host's own code: `host::show_main`
+Three calls reach the running shell from a host's own code: `host::show_main`
 and `host::quit` (see "The menu-bar item"), and `host::open_settings` (see
 "Opening Settings").
 
@@ -558,7 +558,8 @@ rotli_lib::host::open_settings(app, "appearance");        // a built-in pane
   the page knows the host's panes, so Rust sends the id and the page judges
   it (`src/services/hostRequests.ts`, `settingsPaneOpens`).
 - **What "nothing" means.** For an id that opens nothing, Settings doesn't
-  open and the window doesn't come forward. For one that does, the page
+  open and the window doesn't come forward, with one exception: a request
+  held from before the page listened (see "A cold launch"). For one that does, the page
   sets the same store request the app's own links use
   (`setSettingsPaneRequest`, then `setSettingsOpen(true)`) and then asks
   Rust to show the window (`show_main_window`). In a host without notes,
@@ -570,53 +571,86 @@ rotli_lib::host::open_settings(app, "appearance");        // a built-in pane
   plugin's setup, or during `start_hidden`'s quiet launch) is held and
   delivered once it does (see "Held for the page"). Several held requests
   run in order; the last pane that opens is the one shown.
+- **When the pane is judged.** A held request is judged when the page first
+  listens, not later. A host pane whose `visible` depends on state the host
+  loads afterwards doesn't show yet, so the request opens no pane. It still
+  brings the window forward, on whatever it shows, so a quiet start never
+  swallows an explicit request. To land on such a pane, request it again
+  once its `visible` says yes. A request made after the page listens is
+  judged when it arrives, and one that opens nothing does nothing.
+- **Behind a setup screen.** In a host with notes, a request during first
+  run or another setup screen sets the pane request behind that screen: the
+  window comes forward on setup, and Settings shows on the pane once setup
+  ends.
 - It returns at once and reports nothing back: the host can't tell whether
   the pane opened.
 
 ### A quiet start
 
 A host that registers as a login item (`SMAppService`) wants that launch to
-start with no window. `AppHost::start_hidden(|| …)` is asked once, in
-`launch()`, before the Tauri builder makes any window:
+start with no window. It passes `AppHost::start_hidden(|| …)`, and reads the
+login flag inside it with `rotli_lib::host::launched_as_login_item()`:
 
 ```rust
-rotli_lib::AppHost::new(context)
-    .start_hidden(|| std::env::args().any(|arg| arg == "--synthetic-login"));
+rotli_lib::AppHost::new(context).start_hidden(rotli_lib::host::launched_as_login_item);
 ```
 
-- **Why the window could show.** The main window is a config window
-  (`tauri.conf.json`, or the host's own context: `"visible": true,
-  "maximized": true`). Tauri builds config windows in its own setup, before
-  Rotli's setup closure runs, and tao orders a visible one on screen the
-  moment it is made. Then, as the page loads, `persist.ts` calls
-  `show_main_window`, because a menu-bar app isn't activated by its own
-  launch. Either alone puts the window on screen.
-- **What a yes changes.** Two things, and nothing else:
-  1. `host::apply_at_launch` sets `visible: false` on the context's `main`
-     window entry, before `.build(context)`. tao then makes the window and
-     never orders it front (`makeKeyAndOrderFront` runs only when
-     `visible`). The page still loads in it.
-  2. The page's own call as it loads passes `atLaunch`, and `show_main_window`
-     skips that one call after a quiet start (`host::shows_main`). Every
-     other show still shows.
-- **Why nothing can flash.** The window is never visible between creation
-  and the first explicit show: it isn't made visible and then hidden, so
-  there is no frame to flash. tao still zooms it (`maximized`) after making
-  it. A plain AppKit probe (no Rotli, no tao) showed that `zoom:` on a
-  titled, resizable window never ordered front leaves it off screen and
-  zoomed, and that it shows zoomed when ordered front later. Rotli's own
-  window doing the same is not proven live.
+- **When it is asked.** Once, at the start of Rotli's setup, right after the
+  identity check (`host::decide_at_launch`). Setup runs inside
+  `applicationDidFinishLaunching`. tao's delegate calls
+  `AppState::launched`, which dispatches `NewEvents(StartCause::Init)`
+  synchronously (tao 0.35.3 `app_delegate.rs:125`, `app_state.rs:284-307`).
+  tauri-runtime-wry maps that to `RunEvent::Ready` (2.11.4 `lib.rs:4173`).
+  tauri runs `setup` inline there (2.11.5 `app.rs:1423`), building the config
+  windows (`app.rs:2524`) and then calling Rotli's setup closure. That is the
+  one moment the launch's Apple event is current. A plain AppKit probe saw
+  no current event in `applicationWillFinishLaunching`, the `oapp` event in
+  `applicationDidFinishLaunching`, and none a run-loop turn later. So a
+  predicate asked in `launch()`, before `run`, could never see the login
+  flag.
+- **`launched_as_login_item()`** is true when the current Apple event is
+  `kAEOpenApplication` and its `keyAEPropData` is
+  `keyAELaunchedAsLogInItem`. It is false anywhere else: outside the
+  predicate, on other platforms, and in a launch from Finder, the Dock or
+  `open`. A host can read the flag its own way, at the same point.
+- **Why nothing can flash.** With a predicate, `host::apply_at_launch` sets
+  `visible: false` on the context's `main` entry before `.build(context)`,
+  whatever the predicate will say. tao never orders a hidden window front
+  (`makeKeyAndOrderFront` runs only when `visible`), and the page loads in
+  it. The page's load-time call (`persist.ts`, which passes `atLaunch`) is
+  skipped until the decision, and after a yes, so the page can't show the
+  window first. A no shows the window in setup, then the page's call shows
+  it as standalone's does. tao still zooms the window (`maximized`) after
+  making it. A plain AppKit probe showed `zoom:` leaves a window that was
+  never ordered front off screen, and that it shows zoomed later.
+- **Nothing here hides a window**, so a show before the decision stands: a
+  `show_main` from a host plugin's setup, or a request held for the page.
+  After a yes, the load-time call is skipped on every load of `main` in the
+  process, a reload included. That changes nothing, since a reload leaves
+  the window as it was.
+- **A relaunch shows its window.** Rotli's relaunch (a demo-mode switch, an
+  update, a vault change) goes through `open -n` or a direct start. Neither
+  is a login launch: the probe's `open -n … --args --synthetic-login` got an
+  `oapp` with no login flag. So the predicate above answers no, whatever
+  arguments the relaunch carries. A predicate keyed on an argument would
+  answer yes again, which is why the example reads the flag.
 - **Showing it later:** `host::show_main(app)`, `host::open_settings(app,
-  …)`, or the Dock icon when "Show in Dock" is on (macOS sends `Reopen`).
-  So do a file opened from Finder and a refused one, because each says
-  where it went, and a failed quit flush.
-- **Standalone and a host that says no** pass no predicate or answer false:
-  the window list is untouched and the page's call shows the window exactly
-  as before, at the same moment. Unit tests compare the whole window list
-  with the config's.
-- The predicate runs before any window, plugin or setup exists, so it must
-  answer from the process alone (an argument or an environment variable).
-  It isn't asked again; a later launch asks afresh.
+  …)`, or the Dock icon when "Show in Dock" is on (macOS sends `Reopen`;
+  it shows the window only when none of Rotli's windows is up). So do a
+  second launch of the app and `rotli open` (both nudge the running
+  instance, which shows the window), a file opened from Finder and a refused
+  one, because each says where it went, and a failed quit flush.
+- **Onboarding waits too.** A quiet start skips the load-time show on a
+  first run as well, so a new install launched quietly shows its onboarding
+  only once the host shows the window.
+- **Standalone** passes no predicate. The window list is untouched, nothing
+  is asked in setup, and the page's call shows the window exactly as before,
+  at the same moment. Unit tests compare the whole window list with the
+  config's.
+- **Fences** tie the wires together: launch arms the one state the command
+  reads, setup decides after the identity check and before the opened-URL
+  release, and `persist.ts` and `tauri.ts` send `atLaunch`. Reverting any
+  of them fails a test.
 
 ### Held for the page
 
@@ -632,15 +666,21 @@ until the page says it listens:
   they are registered, then calls `host_page_ready`, which returns what was
   held (notices first, then Settings requests, each in the order it came).
   From then on each one is sent as it comes. Listening before taking means
-  nothing falls between the two (`attachPageRequests`).
+  nothing falls between the two (`attachPageRequests`). Several held
+  notices show as one, since the notice line shows one at a time. If the
+  call fails after Rust let go, the dev server warns in the console.
+- **The first load only.** The hold ends at the first `host_page_ready`. A
+  notice or request sent while `main` reloads (after a content-process
+  crash, say) goes to no listener, as before.
 - **Only main releases.** Every window loads the same bundle; a call from
   any other window gets nothing and releases nothing.
 - **React's development double mount** tears down the first mount before it
   listens, so that mount never takes; the second does. A mount torn down
   after it took still delivers, since Rust has already let go.
-- **Standalone** gains this too: a folder Finder opens Rotli with on a cold
-  launch that `reject_privileged_root` refuses now says so, where before
-  the notice went to no listener. A warm notice arrives as before.
+- **Standalone** takes the same path: a folder Finder opens Rotli with on a
+  cold launch that `reject_privileged_root` refuses is held like a host's
+  notice, where before it went to no listener. That it then shows is not
+  proven live (see "Proof"). A warm notice arrives as before.
 - **Where a notice shows:** the sidebar's error line, as before. A host
   without notes has no sidebar, so a notice shows nothing there (as before).
 
@@ -929,7 +969,14 @@ This list says only what was run.
     load-time show is skipped, and only after a quiet start; only the main
     page takes what was held, once; a fence keeps every main-bound notice and
     Settings request behind the hold, and the launch step before
-    `.build(context)`. `open_requests::tests`: a file refused under a host
+    `.build(context)`. A fence ties the quiet start's wires together: launch arms the state
+    `show_main_window` reads, setup decides after the identity check and
+    before the opened-URL release, `persist.ts` makes its load-time show
+    with `atLaunch`, and `tauri.ts` sends it. A predicate always has `main`
+    made hidden and is never asked at launch; setup asks it once and shows
+    the window on a no. `launched_as_login_item` reads an open-application
+    event built in the test, with and without the login flag. Reverting
+    each wire fails a test (`red3-wire-reverts.txt` in the PR's evidence). `open_requests::tests`: a file refused under a host
     gets the file sentence; a file in the host's own marked vault mounts.
     `app_identity_tests`: the folder sentence is unchanged and other
     refusals pass through.
@@ -938,7 +985,9 @@ This list says only what was run.
     dev warning); a request that opens nothing opens no Settings and shows
     no window; the store route; listen-then-take order; held items in order;
     the double mount; a mount torn down mid-answer; a host without notes
-    gets the pane and no open flag.
+    gets the pane and no open flag; a held request that opens nothing
+    still brings the window forward and a live one doesn't; held notices
+    show as one; a failed take warns under the dev server.
   - Each new test failed first against stubs with the old behaviour; the
     red runs are saved with the PR's evidence.
   - Browser lane (`e2e/host-settings-requests.spec.ts`, synthetic host): a
@@ -953,9 +1002,23 @@ This list says only what was run.
     Appearance captured twice on `c8ae0bef` and twice on this branch. Notes
     matched to the pixel; the Settings panes differed before vs after by no
     more than two runs of the same commit differ (the banner's scenery).
-  - **Not proven live:** a quiet login launch with no flash, `show_main`
-    after it, `open_settings` warm and cold, and a cold refused file's
-    notice in a host build; standalone's cold refused-folder notice.
+  - AppKit probe (no Rotli): the launch Apple event is current in
+    `applicationDidFinishLaunching` only, and `open -n … --args
+    --synthetic-login` delivers `oapp` with no login flag.
+  - **Live, by the host lead, at `e042daea`** (a host build, before the
+    `start_hidden` redesign), all six steps passed:
+    1. a quiet start with no window;
+    2. `show_main` after it;
+    3. a warm `open_settings`;
+    4. `open_settings` after a quiet start, both to a pane and with an
+       unknown id;
+    5. a cold `open_settings`;
+    6. the cold refusal notice.
+
+    That run used a forced predicate. It found that a predicate asked in
+    `launch()` can't see the login flag, which led to the redesign above.
+  - **Not proven live:** the redesigned decision with a real login launch
+    and with a relaunch; standalone's cold refused-folder notice.
 
 - **One process per support folder, live (2026-11-26, at `0a1a3da0`).** The
   host lead ran a Developer ID signed host build from two bundle copies,
