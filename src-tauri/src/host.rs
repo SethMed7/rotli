@@ -1,15 +1,23 @@
 //! What a host build reaches of Rotli's shell from its own code: the menu-bar
-//! item, which a host can leave to its own tray, the calls that tray makes, and
-//! the URLs macOS opens the app with (docs/architecture/host-seams.md, "The
-//! menu-bar item" and "Opened URLs"). Standalone Rotli builds its tray here
-//! and sends no URL through this module: its deep-link plugin takes them.
+//! item, which a host can leave to its own tray, the calls that tray makes, the
+//! URLs macOS opens the app with, a quiet start, and what the main page is
+//! told before it listens (docs/architecture/host-seams.md, "The menu-bar
+//! item", "Opened URLs", "Opening Settings", "A quiet start" and "Held for the
+//! page"). Standalone Rotli builds its tray here and sends no URL through this
+//! module: its deep-link plugin takes them.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock, PoisonError};
 
-use tauri::{AppHandle, Url};
+use tauri::utils::config::WindowConfig;
+use tauri::{AppHandle, Emitter, Url};
 
 /// A host's handler for the URLs macOS opens its app with.
 pub type OpenedUrls = Box<dyn Fn(&AppHandle, Vec<Url>) + Send + Sync>;
+
+/// A host's answer, asked once at launch, to whether this launch starts with
+/// no window showing.
+pub type StartHidden = Box<dyn Fn() -> bool + Send + Sync>;
 
 /// Show and focus the main window, as Rotli's tray item "Open …" does.
 pub fn show_main(app: &AppHandle) {
@@ -23,16 +31,29 @@ pub fn quit(app: &AppHandle) {
     crate::graceful_quit(app);
 }
 
+/// Show Settings on the pane `pane_id`, Rotli's or the host's, in the main
+/// window. The page judges the id as a pane's link is judged: an id no pane
+/// has, or a pane that doesn't show right now, does nothing (and warns under
+/// the dev server); otherwise the window comes forward on that pane. A request
+/// made before the page listens is held until it does.
+pub fn open_settings(app: &AppHandle, pane_id: &str) {
+    for pane in SETTINGS.arrive(vec![pane_id.to_string()]) {
+        let _ = app.emit_to("main", "rotli:open-settings", pane);
+    }
+}
+
 /// The shell's parts a host can change at launch (`AppHost::without_tray`,
-/// `AppHost::on_opened_urls`). The default is standalone Rotli's.
+/// `AppHost::on_opened_urls`, `AppHost::start_hidden`). The default is
+/// standalone Rotli's.
 pub(crate) struct ShellOptions {
     pub(crate) tray: bool,
     pub(crate) on_opened_urls: Option<OpenedUrls>,
+    pub(crate) start_hidden: Option<StartHidden>,
 }
 
 impl Default for ShellOptions {
     fn default() -> Self {
-        Self { tray: true, on_opened_urls: None }
+        Self { tray: true, on_opened_urls: None, start_hidden: None }
     }
 }
 
@@ -45,6 +66,49 @@ impl ShellOptions {
     pub(crate) fn on_opened_urls(mut self, hook: OpenedUrls) -> Self {
         self.on_opened_urls = Some(hook);
         self
+    }
+
+    pub(crate) fn start_hidden(mut self, hidden: StartHidden) -> Self {
+        self.start_hidden = Some(hidden);
+        self
+    }
+}
+
+static STARTED_HIDDEN: AtomicBool = AtomicBool::new(false);
+
+/// The launch's shell options, applied before the builder makes any window:
+/// the opened-URL hook is set, and the host's `start_hidden` is asked once.
+/// When it says yes, the main window is made hidden. Gives whether to build
+/// the tray. Standalone passes the defaults, which leave `windows` untouched.
+pub(crate) fn apply_at_launch(shell: ShellOptions, windows: &mut [WindowConfig]) -> bool {
+    set_opened_urls(shell.on_opened_urls);
+    if shell.start_hidden.is_some_and(|hidden| hidden()) {
+        STARTED_HIDDEN.store(true, Ordering::Relaxed);
+        hide_main_at_creation(windows);
+    }
+    shell.tray
+}
+
+/// The main window's config entry made hidden, so the window is never ordered
+/// on screen until something shows it (`show_main`, `open_settings`).
+fn hide_main_at_creation(windows: &mut [WindowConfig]) {
+    if let Some(main) = windows.iter_mut().find(|window| window.label == "main") {
+        main.visible = false;
+    }
+}
+
+/// Whether the webview's `show_main_window` shows the window: always, except
+/// the call the page makes as it loads when this launch started hidden.
+fn shows_main(at_launch: bool, started_hidden: bool) -> bool {
+    !(at_launch && started_hidden)
+}
+
+/// The webview's way to show the main window. The page's own call as it
+/// loads passes `at_launch`, and a quiet start skips that one call's show.
+#[tauri::command]
+pub(crate) fn show_main_window(app: AppHandle, at_launch: Option<bool>) {
+    if shows_main(at_launch == Some(true), STARTED_HIDDEN.load(Ordering::Relaxed)) {
+        show_main(&app);
     }
 }
 
@@ -102,41 +166,83 @@ pub(crate) fn route_opened(urls: &[Url]) -> OpenedRoute {
     OpenedRoute { host, files }
 }
 
+/// Items held until whatever they need is ready, then passed straight on.
+pub(crate) struct Held<T>(Mutex<Option<Vec<T>>>);
+
+impl<T> Held<T> {
+    pub(crate) const fn new() -> Self {
+        Self(Mutex::new(Some(Vec::new())))
+    }
+
+    /// Before `release`, holds `items` and returns none; after, returns them
+    /// to act on now.
+    pub(crate) fn arrive(&self, items: Vec<T>) -> Vec<T> {
+        match self.0.lock().unwrap_or_else(PoisonError::into_inner).as_mut() {
+            Some(held) => {
+                held.extend(items);
+                Vec::new()
+            }
+            None => items,
+        }
+    }
+
+    /// Everything held, in the order it came; from now on nothing is held.
+    pub(crate) fn release(&self) -> Vec<T> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).take().unwrap_or_default()
+    }
+}
+
 /// URLs from `Opened` events, held until setup is done. AppKit can send the
 /// files a launch was asked to open before the app finishes launching, so
 /// before Rotli's setup has checked the identity or opened a vault, and before
 /// a host's hook can show anything. Standalone's deep-link plugin holds its
 /// own (`get_current`).
-pub(crate) struct OpenedQueue(Mutex<Option<Vec<Url>>>);
+pub(crate) type OpenedQueue = Held<Url>;
 
-impl OpenedQueue {
-    pub(crate) const fn new() -> Self {
-        Self(Mutex::new(Some(Vec::new())))
-    }
+static OPENED: OpenedQueue = OpenedQueue::new();
 
-    /// Before `release`, holds `urls` and returns none; after, returns them
-    /// to open now.
-    pub(crate) fn arrive(&self, urls: Vec<Url>) -> Vec<Url> {
-        match self.0.lock().unwrap_or_else(PoisonError::into_inner).as_mut() {
-            Some(held) => {
-                held.extend(urls);
-                Vec::new()
-            }
-            None => urls,
-        }
-    }
+/// What the main page is told before it listens, held until it says it does:
+/// the notices it shows (a refused file or folder) and `open_settings`
+/// requests. Setup runs before the page loads, so a cold launch's notice
+/// would otherwise go to no listener.
+static NOTICES: Held<String> = Held::new();
+static SETTINGS: Held<String> = Held::new();
 
-    /// Everything held, in the order it came; from now on nothing is held.
-    pub(crate) fn release(&self) -> Vec<Url> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).take().unwrap_or_default()
+/// A notice for the main page: a sentence about something handed over from
+/// outside that didn't open. Held until the page listens.
+pub(crate) fn notice(app: &AppHandle, message: String) {
+    for message in NOTICES.arrive(vec![message]) {
+        let _ = app.emit_to("main", "rotli:open-notice", message);
     }
 }
 
-static OPENED: OpenedQueue = OpenedQueue::new();
+/// What the main page missed before it listened.
+#[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct HeldForPage {
+    pub(crate) notices: Vec<String>,
+    pub(crate) settings: Vec<String>,
+}
+
+/// The page in `label` listens now. Only the main page takes what is held:
+/// every window loads the same bundle, and another must not take main's.
+fn page_ready_for(label: &str, notices: &Held<String>, settings: &Held<String>) -> HeldForPage {
+    if label != "main" {
+        return HeldForPage::default();
+    }
+    HeldForPage { notices: notices.release(), settings: settings.release() }
+}
+
+/// The page calls this once its listeners are registered: it gets what was
+/// held, and from now on each notice and request is sent as it comes.
+#[tauri::command]
+pub(crate) fn host_page_ready(webview: tauri::Webview) -> HeldForPage {
+    page_ready_for(webview.label(), &NOTICES, &SETTINGS)
+}
+
 static HOOK: OnceLock<OpenedUrls> = OnceLock::new();
 
 /// The host's hook, set once at launch, before the run loop starts.
-pub(crate) fn set_opened_urls(hook: Option<OpenedUrls>) {
+fn set_opened_urls(hook: Option<OpenedUrls>) {
     if let Some(hook) = hook {
         let _ = HOOK.set(hook);
     }
@@ -182,6 +288,10 @@ pub(crate) fn dispatch(urls: &[Url], hook: Option<&dyn Fn(Vec<Url>)>, mut open_f
         open_file(url);
     }
 }
+
+#[cfg(test)]
+#[path = "host_tests.rs"]
+mod page_tests;
 
 #[cfg(test)]
 mod tests {
@@ -259,7 +369,7 @@ mod tests {
     }
 
     /// The body of `fn name` in `text`, up to the next top-level item.
-    fn body<'a>(text: &'a str, name: &str) -> &'a str {
+    pub(super) fn body<'a>(text: &'a str, name: &str) -> &'a str {
         let start = text.find(&format!("fn {name}(")).unwrap_or_else(|| panic!("no fn {name}"));
         let rest = &text[start..];
         let end = rest.find("\n\u{7d}\n").expect("fn ends");

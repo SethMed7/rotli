@@ -175,7 +175,10 @@ owns the threat side.
   before it is mounted. A folder also meets `reject_privileged_root`; a file
   meets only the vault refusal, as in standalone Rotli, so a host can open a
   file the person picks in Finder anywhere outside a vault it doesn't own,
-  dot-folders included. The helper and the CLI vet each root on every load and walk below it once per
+  dot-folders included. Notices about a refusal, and a host's
+  `open_settings` requests, are held for the main page until it calls
+  `host_page_ready`; a call from any other window takes nothing, so a
+  folder window can't empty main's queue. The helper and the CLI vet each root on every load and walk below it once per
   process. `check:vault-binds` makes every call that turns
   a path into a root, and every registry read, say why it is safe, ties a
   refused or live reason to the same variable, and pins the count per file.

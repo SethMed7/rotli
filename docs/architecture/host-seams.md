@@ -188,8 +188,8 @@ in two places, each on its own.
   only `refuse_existing_vault` (`mount_opened_file`), as in standalone Rotli,
   where the person chose it in Finder. So a host opens no file or folder
   inside a vault it doesn't own, and says so in the main window: the host's
-  `existing_vault` sentence alone for a file, and after "Couldn't open that
-  folder —" for a folder, whose refusal can also be another check's. In standalone Rotli both refusals behave as before. Under a host a
+  `existing_vault_file` sentence alone for a file, and its `existing_vault`
+  sentence after "Couldn't open that folder —" for a folder, whose refusal can also be another check's. In standalone Rotli both refusals behave as before. Under a host a
   folder is walked twice, once for each check (up to 50,000 folders each, on
   background threads): the vault-binds guard wants the refusal in the
   function that makes the call, and `mount_and_show` keeps its own.
@@ -364,14 +364,21 @@ passes:
   that one is Rotli's;
 - **`HostWords`**: its own words. `shared_state`, `no_keychain` and
   `existing_vault` are the sentences shown where it declines shared state, where
-  it has no Keychain, and where it refuses an existing vault; Rotli's defaults
-  are neutral. `welcome_note` is the first note written into an empty notes
+  it has no Keychain, and where it refuses an existing vault;
+  `existing_vault_file` is the sentence for a file opened from Finder inside
+  a vault it doesn't own. Rotli's defaults are neutral. `welcome_note` is the first note written into an empty notes
   folder, a host's scratch vault included (see "The welcome note" below).
   `product_name` is the name in the menu-bar item and the app menu's Quit
   (see "The menu-bar item" below);
 - **`without_tray()`**: no menu-bar item from Rotli (see "The menu-bar item");
 - **`on_opened_urls(…)`**: its handler for the URLs macOS opens the app with
-  (see "Opened URLs").
+  (see "Opened URLs");
+- **`start_hidden(…)`**: whether this launch starts with no window showing
+  (see "A quiet start").
+
+Two calls reach the running shell from a host's own code: `host::show_main`
+and `host::quit` (see "The menu-bar item"), and `host::open_settings` (see
+"Opening Settings").
 
 Only Rotli's own binary (`src-tauri/src/main.rs`) expands Rotli's Tauri
 context. The library never does, so a host crate builds without Rotli's
@@ -411,8 +418,11 @@ field (`welcome_note: None` keeps today's note, `product_name: None` keeps
 "Quit rotli"), or use `..Default::default()` only when it leaves at least one
 field unset. With every field set, the struct update has no effect: clippy's
 `needless_update` rejects it in a crate that denies warnings (plain `rustc`
-accepts it). `product_name` arrived after `welcome_note` (2026-11-27), so a
-host that lists every field adds it when it repins.
+accepts it). `product_name` arrived after `welcome_note` (2026-11-27), and
+`existing_vault_file` after that (2026-11-27), so a host that lists every
+field adds each when it repins. A host that set its own `existing_vault` and
+wants its own words for a file too sets `existing_vault_file`; otherwise a
+file gets Rotli's neutral file sentence.
 
 ### The menu-bar item
 
@@ -512,18 +522,125 @@ rotli_lib::AppHost::new(context).on_opened_urls(|app, urls| {
   made and `show_main` safe, but before Rotli's own tray (when on) and its
   app-menu Quit exist; a host's plugins have already run their setup. After
   setup, each event goes straight through. A file refused on a cold launch
-  emits its notice during setup, likely before the webview listens, so it
-  may show nothing (not proven either way; standalone has the same gap for
-  a refused folder).
+  raises its notice during setup, before the page listens; the notice is
+  held until it does (see "Held for the page").
 - **Order within an event:** the hook runs first, in one call, then Rotli
   opens the files (`host::dispatch`, unit-tested with recording closures).
   Fences keep the queue in front of both and the release after the identity
   check and the vaults.
-- The hook runs on the main thread, so it should hand slow work off.
+- **The hook must never block or run a modal.** It runs on the main thread,
+  inside tao's handler for the event, so hand slow work off and show any
+  window or dialog after it returns (`app.run_on_main_thread` from a spawned
+  thread, for example). A nested run loop (a blocking dialog, say) during the
+  hook lets a second `Opened` arrive while tao still holds its handler lock,
+  and tao locks it again: the app deadlocks or panics. Standalone's deep-link
+  path has the same rule.
 - **Standalone** passes no hook and its deep-link plugin takes every URL, as
   before: the run-loop path runs only when `owns_shared_state()` is false. A
   crate that calls `run_with_host` but is built with Rotli's own bundle ID is
   standalone, so its `on_opened_urls` hook is never called.
+
+### Opening Settings
+
+`rotli_lib::host::open_settings(&AppHandle, pane_id: &str)` shows the main
+window on Settings › that pane, Rotli's or the host's:
+
+```rust
+rotli_lib::host::open_settings(app, "synthetic-account"); // a host pane
+rotli_lib::host::open_settings(app, "appearance");        // a built-in pane
+```
+
+- **It follows a pane link's rules** (`openPane`, `opensPane` in
+  `settingsNav.ts`). An id no pane has does nothing, and warns in the
+  console under the dev server (a link throws there; a request from outside
+  only warns). A pane whose `visible` says no, a notes pane in a host
+  without notes, and a pane this platform doesn't show do nothing too. Only
+  the page knows the host's panes, so Rust sends the id and the page judges
+  it (`src/services/hostRequests.ts`, `settingsPaneOpens`).
+- **What "nothing" means.** For an id that opens nothing, Settings doesn't
+  open and the window doesn't come forward. For one that does, the page
+  sets the same store request the app's own links use
+  (`setSettingsPaneRequest`, then `setSettingsOpen(true)`) and then asks
+  Rust to show the window (`show_main_window`).
+- **The route.** No Rust-to-page Settings event existed, so there is one
+  now, `rotli:open-settings`, and it ends in that existing store route.
+- **A cold launch.** A request made before the page listens (from a host
+  plugin's setup, or during `start_hidden`'s quiet launch) is held and
+  delivered once it does (see "Held for the page"). Several held requests
+  run in order; the last pane that opens is the one shown.
+- It returns at once and reports nothing back: the host can't tell whether
+  the pane opened.
+
+### A quiet start
+
+A host that registers as a login item (`SMAppService`) wants that launch to
+start with no window. `AppHost::start_hidden(|| …)` is asked once, in
+`launch()`, before the Tauri builder makes any window:
+
+```rust
+rotli_lib::AppHost::new(context)
+    .start_hidden(|| std::env::args().any(|arg| arg == "--synthetic-login"));
+```
+
+- **Why the window could show.** The main window is a config window
+  (`tauri.conf.json`, or the host's own context: `"visible": true,
+  "maximized": true`). Tauri builds config windows in its own setup, before
+  Rotli's setup closure runs, and tao orders a visible one on screen the
+  moment it is made. Then, as the page loads, `persist.ts` calls
+  `show_main_window`, because a menu-bar app isn't activated by its own
+  launch. Either alone puts the window on screen.
+- **What a yes changes.** Two things, and nothing else:
+  1. `host::apply_at_launch` sets `visible: false` on the context's `main`
+     window entry, before `.build(context)`. tao then makes the window and
+     never orders it front (`makeKeyAndOrderFront` runs only when
+     `visible`). The page still loads in it.
+  2. The page's own call as it loads passes `atLaunch`, and `show_main_window`
+     skips that one call after a quiet start (`host::shows_main`). Every
+     other show still shows.
+- **Why nothing can flash.** The window is never visible between creation
+  and the first explicit show: it isn't made visible and then hidden, so
+  there is no frame to flash. tao still zooms it (`maximized`) after making
+  it. A plain AppKit probe (no Rotli, no tao) showed that `zoom:` on a
+  titled, resizable window never ordered front leaves it off screen and
+  zoomed, and that it shows zoomed when ordered front later. Rotli's own
+  window doing the same is not proven live.
+- **Showing it later:** `host::show_main(app)`, `host::open_settings(app,
+  …)`, or the Dock icon when "Show in Dock" is on (macOS sends `Reopen`).
+  So do a file opened from Finder and a refused one, because each says
+  where it went, and a failed quit flush.
+- **Standalone and a host that says no** pass no predicate or answer false:
+  the window list is untouched and the page's call shows the window exactly
+  as before, at the same moment. Unit tests compare the whole window list
+  with the config's.
+- The predicate runs before any window, plugin or setup exists, so it must
+  answer from the process alone (an argument or an environment variable).
+  It isn't asked again; a later launch asks afresh.
+
+### Held for the page
+
+Rotli's setup runs before the main page loads, and a page hears only the
+events sent after it listens. So Rust holds what it sends the main page
+until the page says it listens:
+
+- **What is held:** main's refusal notices (`host::notice`: a file refused
+  under a host, a folder refused in either build) and `open_settings`
+  requests. A fence keeps every main-bound `rotli:open-notice` and every
+  `rotli:open-settings` in `host.rs`, behind the hold.
+- **How it is released.** The page registers both listeners, waits until
+  they are registered, then calls `host_page_ready`, which returns what was
+  held (notices first, then Settings requests, each in the order it came).
+  From then on each one is sent as it comes. Listening before taking means
+  nothing falls between the two (`attachPageRequests`).
+- **Only main releases.** Every window loads the same bundle; a call from
+  any other window gets nothing and releases nothing.
+- **React's development double mount** tears down the first mount before it
+  listens, so that mount never takes; the second does. A mount torn down
+  after it took still delivers, since Rust has already let go.
+- **Standalone** gains this too: a folder Finder opens Rotli with on a cold
+  launch that `reject_privileged_root` refuses now says so, where before
+  the notice went to no listener. A warm notice arrives as before.
+- **Where a notice shows:** the sidebar's error line, as before. A host
+  without notes has no sidebar, so a notice shows nothing there (as before).
 
 ### Building a host crate
 
@@ -801,6 +918,41 @@ shows "Hide …" only, since it leaves system-wide chords out.
 
 This list says only what was run.
 
+- **Opening Settings, a quiet start and held notices** (2026-11-27, tests
+  and the browser lane; no native build launched).
+  - Rust (`host_tests.rs`, standalone and under
+    `ROTLI_APP_IDENTIFIER=com.example.host`): standalone's whole window list
+    is unchanged by the launch step, and so is a host's that answers no; a
+    yes asks once and changes only `main`'s `visible`; only the page's
+    load-time show is skipped, and only after a quiet start; only the main
+    page takes what was held, once; a fence keeps every main-bound notice and
+    Settings request behind the hold, and the launch step before
+    `.build(context)`. `open_requests::tests`: a file refused under a host
+    gets the file sentence; a file in the host's own marked vault mounts.
+    `app_identity_tests`: the folder sentence is unchanged and other
+    refusals pass through.
+  - TypeScript (`src/services/hostRequests.test.ts`): pane judgement
+    (built-in, host, hidden, notes-off, web, unknown with and without the
+    dev warning); a request that opens nothing opens no Settings and shows
+    no window; the store route; listen-then-take order; held items in order;
+    the double mount; a mount torn down mid-answer.
+  - Each new test failed first against stubs with the old behaviour; the
+    red runs are saved with the PR's evidence.
+  - Browser lane (`e2e/host-settings-requests.spec.ts`, synthetic host): a
+    request lands on Appearance and on a host pane; an unknown id and a
+    hidden pane leave notes showing and Settings closed (with the dev
+    warning); a hidden pane leaves an open Settings where it is; a held
+    notice shows in the sidebar once the page listens. The spec calls the
+    functions the listeners call: the event transport and Rust's hold are
+    proven by unit tests only.
+  - Standalone, browser lane: notes, Settings › General and Settings ›
+    Appearance captured twice on `c8ae0bef` and twice on this branch. Notes
+    matched to the pixel; the Settings panes differed before vs after by no
+    more than two runs of the same commit differ (the banner's scenery).
+  - **Not proven live:** a quiet login launch with no flash, `show_main`
+    after it, `open_settings` warm and cold, and a cold refused file's
+    notice in a host build; standalone's cold refused-folder notice.
+
 - **One process per support folder, live (2026-11-26, at `0a1a3da0`).** The
   host lead ran a Developer ID signed host build from two bundle copies,
   each binary run directly in a sandbox HOME. All six steps passed:
@@ -938,7 +1090,7 @@ This list says only what was run.
   a link and `..`, and a registry rewritten after launch),
   `helper_vault_identity_tests.rs` (including a vault made inside the served
   folder before the helper starts),
-  `breve_dev_roots.rs`, `app_host.rs` and `host.rs`.
+  `breve_dev_roots.rs`, `app_host.rs`, `host.rs` and `host_tests.rs`.
 - **TypeScript:** `src/lib/appIdentity.test.ts`, `src/host/registry.test.ts`,
   `src/components/settings/settingsNav.test.ts`,
   `src/components/settings/connectionsSettings.test.tsx`,

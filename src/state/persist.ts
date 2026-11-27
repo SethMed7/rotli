@@ -902,7 +902,8 @@ function applyShellSideEffects(s: PersistedSettings): void {
   if (s.stayOpen || !s.onboarded) void setHideOnBlur(false);
   // a menu-bar app isn't activated by its own launch: bring the window forward
   const dock = s.showInDock ? setDockVisible(true) : Promise.resolve();
-  void dock.then(showMainWindow, showMainWindow).catch(() => {});
+  const showAtLaunch = () => showMainWindow(true);
+  void dock.then(showAtLaunch, showAtLaunch).catch(() => {});
   // push the persisted trust rung to the daemon NOW — it also re-reads
   // settings.json each cycle, so this is immediacy, not correctness
   organizerSetTrust(s.organizerTrust).catch(() => {});

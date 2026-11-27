@@ -105,9 +105,23 @@ export async function toggleMainWindow(): Promise<void> {
   await invoke("toggle_main_window");
 }
 
-export async function showMainWindow(): Promise<void> {
+/** `atLaunch`: the page's own call as it loads, which a host's quiet start
+ * skips (host.rs `show_main_window`). Every other caller shows the window. */
+export async function showMainWindow(atLaunch = false): Promise<void> {
   if (!isTauri()) return;
-  await invoke("show_main_window");
+  await invoke("show_main_window", atLaunch ? { atLaunch } : {});
+}
+
+/** What Rust held for the main page until it listened: refusal notices and a
+ * host's Settings requests (host.rs `host_page_ready`). */
+export interface HeldForPage {
+  notices: string[];
+  settings: string[];
+}
+
+export function hostPageReady(): Promise<HeldForPage> {
+  if (!isTauri()) return Promise.resolve({ notices: [], settings: [] });
+  return invoke<HeldForPage>("host_page_ready");
 }
 
 export async function hideCaptureWindow(): Promise<void> {

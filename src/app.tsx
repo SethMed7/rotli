@@ -60,7 +60,6 @@ import {
 import {
   onCorpusChanged,
   onVaultChanged,
-  onOpenNotice,
   onOpenRequest,
   onNativeCloseTab,
   onNativeEditHistory,
@@ -76,6 +75,7 @@ import { createVaultCapture } from "./services/captureRouting";
 import { openNoteChatFromQuickNote, summonChat } from "./services/chatSummon";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
+import { attachMainPageRequests } from "./services/hostRequests";
 import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
 import { notesService, refreshWebFolderNotes } from "./services/notes";
 import { isWebVault } from "./lib/browserVault";
@@ -320,7 +320,7 @@ function MainShell() {
     };
   }, []);
   useEffect(() => void openRequestGate.setSetupShown(inSetup), [inSetup]);
-  useEffect(() => onOpenNotice((message) => useUiStore.getState().setRowActionError(message)), []);
+  useEffect(() => attachMainPageRequests(), []);
 
   // Agents reach Word documents through this window (ai/agentRequests.ts).
   useEffect(() => (LAUNCH_FEATURES.agents ? attachAgentBridge() : undefined), []);
