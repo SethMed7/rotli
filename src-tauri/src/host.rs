@@ -144,6 +144,8 @@ pub(crate) fn decide_at_launch(app: &AppHandle) {
 /// event (`oapp`) carries `keyAELaunchedAsLogInItem`. Only meaningful inside
 /// `start_hidden`, which runs while that event is current; anywhere else,
 /// and in a relaunch or a launch from Finder, the Dock or `open`, it is false.
+/// It reads AppKit's current event, so it answers only on the main thread;
+/// off the main thread it returns false.
 pub fn launched_as_login_item() -> bool {
     #[cfg(target_os = "macos")]
     {

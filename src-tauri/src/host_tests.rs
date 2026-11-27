@@ -17,7 +17,6 @@ fn rotli_windows() -> Vec<WindowConfig> {
     serde_json::from_value(conf["app"]["windows"].clone()).unwrap()
 }
 
-
 /// A predicate that counts how often it is asked.
 fn counted(answer: bool) -> (StartHidden, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
     let asked = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -192,7 +191,6 @@ fn notices_and_settings_requests_reach_main_only_through_the_hold() {
     assert!(apply < launch.find(".build(context)").unwrap(), "{launch}");
 }
 
-
 /// The quiet start's wires: launch arms the one `QUIET` the command reads,
 /// setup decides inside `applicationDidFinishLaunching` (after the identity
 /// check, before anything opens), and the page makes its load-time call with
@@ -209,7 +207,10 @@ fn the_quiet_start_is_wired_from_launch_to_the_page() {
 
     let lib = src("lib.rs");
     assert_eq!(lib.matches("host::decide_at_launch(").count(), 1);
-    in_setup_order(&lib, &[IDENTITY_CHECK, "host::decide_at_launch(app.handle())", OPENED_RELEASE]);
+    in_setup_order(
+        &lib,
+        &[IDENTITY_CHECK, "host::decide_at_launch(app.handle())", "app_identity::ensure_scratch_vault(app.handle())", OPENED_RELEASE],
+    );
 
     let web = |path: &str| std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(path)).unwrap();
     let persist = web("src/state/persist.ts");

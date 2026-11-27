@@ -624,7 +624,12 @@ rotli_lib::AppHost::new(context).start_hidden(rotli_lib::host::launched_as_login
   making it. A plain AppKit probe showed `zoom:` leaves a window that was
   never ordered front off screen, and that it shows zoomed later.
 - **Nothing here hides a window**, so a show before the decision stands: a
-  `show_main` from a host plugin's setup, or a request held for the page.
+  request held for the page, or a `show_main` from a host's
+  `on_opened_urls` hook. A `show_main` from a host plugin's own `setup` does
+  nothing: plugin setup runs inside `build()`, before the `main` window
+  exists, so after a yes the window stays hidden. A host that wants the
+  window up from its plugin setup returns no from its predicate instead, or
+  calls `open_settings`, which is held for the page.
   After a yes, the load-time call is skipped on every load of `main` in the
   process, a reload included. That changes nothing, since a reload leaves
   the window as it was.
