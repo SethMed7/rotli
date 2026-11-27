@@ -99,6 +99,7 @@ use std::time::{Duration, Instant};
 use quit_flush::{QuitFlush, Scope};
 use summon::{LastBlurHide, SummonIntent};
 
+#[cfg(target_os = "macos")]
 use tauri::menu::MenuItemBuilder;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
