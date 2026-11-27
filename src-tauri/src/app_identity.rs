@@ -42,7 +42,8 @@ pub struct HostWords {
     /// Rotli's own. `set_host_words` checks the shape (`is_note_body`).
     pub welcome_note: Option<String>,
     /// The name in the menu-bar item's "Open …" and "Quit …" and the app
-    /// menu's Quit. `None` keeps Rotli's own, lower-case ("Quit rotli").
+    /// menu's Quit. `None`, or a blank name, keeps Rotli's own, lower-case
+    /// ("Quit rotli").
     pub product_name: Option<String>,
 }
 
@@ -99,7 +100,7 @@ pub(crate) const STANDALONE_PRODUCT_NAME: &str = "rotli";
 
 /// The name in these words' menu labels.
 pub(crate) fn product_name_in(words: &HostWords) -> &str {
-    words.product_name.as_deref().unwrap_or(STANDALONE_PRODUCT_NAME)
+    words.product_name.as_deref().filter(|name| !name.trim().is_empty()).unwrap_or(STANDALONE_PRODUCT_NAME)
 }
 
 /// This build's name in its menu labels (`host::open_label`, `host::quit_label`).

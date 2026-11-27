@@ -53,8 +53,10 @@ impl AppHost {
         self
     }
 
-    /// Called on the run loop with each `Opened` event's URLs that aren't
-    /// files, before Rotli opens the files and folders in it. A later call
+    /// Called with the URLs macOS opens the app with that aren't files, before
+    /// Rotli opens the files and folders. URLs that arrive before Rotli's
+    /// setup is done are held and come in one call from setup; later ones
+    /// come one event at a time from the run loop. Set once: a later call
     /// replaces an earlier one.
     #[must_use]
     pub fn on_opened_urls(mut self, hook: impl Fn(&tauri::AppHandle, Vec<tauri::Url>) + Send + Sync + 'static) -> Self {

@@ -2056,7 +2056,8 @@ pub fn run_with_host(host: AppHost) {
 }
 
 fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>, shell: host::ShellOptions) {
-    let host::ShellOptions { tray, on_opened_urls: opened_urls } = shell;
+    let host::ShellOptions { tray, on_opened_urls } = shell;
+    host::set_opened_urls(on_opened_urls);
     // A host build is one process per support folder: a second one runs no
     // plugin, window or setup step (single_instance.rs; exits 75 or 73).
     single_instance::hold_at_launch(&context.config().identifier);
@@ -2066,7 +2067,7 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
         .plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_clipboard_manager::init());
     // The update feed and rotli:// belong to the standalone build alone: a
     // host build never registers either plugin, so it cannot ask rotli.co for
-    // an update or receive a link.
+    // an update. The URLs macOS opens a host with reach host.rs instead.
     let builder = if app_identity::owns_shared_state() {
         builder.plugin(tauri_plugin_updater::Builder::new().build()).plugin(tauri_plugin_deep_link::init())
     } else {
@@ -2598,9 +2599,9 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             // through rotli:open-request. Ids only, validated in
             // parse_deep_link; a link can never name an arbitrary disk path,
             // and a malformed link is ignored, never an error surface. A host
-            // build registers no deep-link plugin, so it listens for none.
-            // A host build has none: a second launch or `rotli open` nudges
-            // this instance through its lock folder instead.
+            // build has no deep-link plugin: the URLs macOS opens it with go
+            // through host.rs, held until here, and a second launch or `rotli
+            // open` nudges this instance through its lock folder.
             single_instance::listen(app.handle());
             if app_identity::owns_shared_state() {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -2618,6 +2619,8 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
                         open_requests::handle_deep_link(&handle, &url);
                     }
                 }
+            } else {
+                host::ready(app.handle());
             }
 
             // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
@@ -2824,8 +2827,8 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
         })
         .build(context)
         .expect("error while building tauri application")
-        .run(move |app, event| {
-            host::on_run_event(app, &event, opened_urls.as_ref());
+        .run(|app, event| {
+            host::on_run_event(app, &event);
             if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {
                 app.state::<routines::BreveSupervisor>().stop();
             }

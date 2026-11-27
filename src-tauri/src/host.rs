@@ -4,6 +4,8 @@
 //! menu-bar item" and "Opened URLs"). Standalone Rotli builds its tray here
 //! and sends no URL through this module: its deep-link plugin takes them.
 
+use std::sync::{Mutex, OnceLock, PoisonError};
+
 use tauri::{AppHandle, Url};
 
 /// A host's handler for the URLs macOS opens its app with.
@@ -100,29 +102,84 @@ pub(crate) fn route_opened(urls: &[Url]) -> OpenedRoute {
     OpenedRoute { host, files }
 }
 
+/// URLs from `Opened` events, held until setup is done. AppKit can send the
+/// files a launch was asked to open before the app finishes launching, so
+/// before Rotli's setup has checked the identity or opened a vault, and before
+/// a host's hook can show anything. Standalone's deep-link plugin holds its
+/// own (`get_current`).
+pub(crate) struct OpenedQueue(Mutex<Option<Vec<Url>>>);
+
+impl OpenedQueue {
+    pub(crate) const fn new() -> Self {
+        Self(Mutex::new(Some(Vec::new())))
+    }
+
+    /// Before `release`, holds `urls` and returns none; after, returns them
+    /// to open now.
+    pub(crate) fn arrive(&self, urls: Vec<Url>) -> Vec<Url> {
+        match self.0.lock().unwrap_or_else(PoisonError::into_inner).as_mut() {
+            Some(held) => {
+                held.extend(urls);
+                Vec::new()
+            }
+            None => urls,
+        }
+    }
+
+    /// Everything held, in the order it came; from now on nothing is held.
+    pub(crate) fn release(&self) -> Vec<Url> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).take().unwrap_or_default()
+    }
+}
+
+static OPENED: OpenedQueue = OpenedQueue::new();
+static HOOK: OnceLock<OpenedUrls> = OnceLock::new();
+
+/// The host's hook, set once at launch, before the run loop starts.
+pub(crate) fn set_opened_urls(hook: Option<OpenedUrls>) {
+    if let Some(hook) = hook {
+        let _ = HOOK.set(hook);
+    }
+}
+
 /// Every run-loop event passes here first. Only a host build acts, and only on
 /// `Opened`: standalone Rotli's deep-link plugin takes those URLs itself.
-pub(crate) fn on_run_event(app: &AppHandle, event: &tauri::RunEvent, hook: Option<&OpenedUrls>) {
+pub(crate) fn on_run_event(app: &AppHandle, event: &tauri::RunEvent) {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     if let tauri::RunEvent::Opened { urls } = event {
         if !crate::app_identity::owns_shared_state() {
-            opened(app, urls, hook);
+            let now = OPENED.arrive(urls.clone());
+            opened(app, &now);
         }
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    let _ = (app, event, hook);
+    let _ = (app, event);
 }
 
-/// The host's URLs go to its hook first. Then Rotli opens the files and
-/// folders, as Finder's Open With and a Dock drop open them in standalone
-/// Rotli, behind the vault refusal (open_requests.rs).
-fn opened(app: &AppHandle, urls: &[Url], hook: Option<&OpenedUrls>) {
+/// Setup is done in a host build (the identity checked, the vaults open, the
+/// main window made): open what arrived before it.
+pub(crate) fn ready(app: &AppHandle) {
+    let held = OPENED.release();
+    opened(app, &held);
+}
+
+fn opened(app: &AppHandle, urls: &[Url]) {
+    let hook = HOOK.get().map(|hook| move |urls: Vec<Url>| hook(app, urls));
+    dispatch(urls, hook.as_ref().map(|hook| hook as &dyn Fn(Vec<Url>)), |url| {
+        crate::open_requests::handle_deep_link(app, url);
+    });
+}
+
+/// The host's URLs go to its hook first, in one call. Then Rotli opens the
+/// files and folders, as Finder's Open With and a Dock drop open them in
+/// standalone Rotli, behind the vault refusal (open_requests.rs).
+pub(crate) fn dispatch(urls: &[Url], hook: Option<&dyn Fn(Vec<Url>)>, mut open_file: impl FnMut(&Url)) {
     let route = route_opened(urls);
     if let Some(hook) = hook.filter(|_| !route.host.is_empty()) {
-        hook(app, route.host);
+        hook(route.host);
     }
     for url in &route.files {
-        crate::open_requests::handle_deep_link(app, url);
+        open_file(url);
     }
 }
 
@@ -152,6 +209,11 @@ mod tests {
         let product = product_name_in(&words);
         assert_eq!(open_label(product), "Open Synthetic Notes");
         assert_eq!(quit_label(product), "Quit Synthetic Notes");
+        // a blank name is no name: never "Quit "
+        for blank in ["", "   "] {
+            let words = HostWords { product_name: Some(blank.into()), ..Default::default() };
+            assert_eq!(quit_label(product_name_in(&words)), "Quit rotli", "{blank:?}");
+        }
     }
 
     #[test]
@@ -204,27 +266,73 @@ mod tests {
         &rest[..end]
     }
 
-    /// The host's hook sees an `Opened` event before Rotli opens any file in
-    /// it, and the run loop hands the event here before anything else of
-    /// Rotli's reads it.
     #[test]
-    fn the_hook_runs_before_rotlis_own_opened_handling() {
-        let host = src("host.rs");
-        let opened = body(&host, "opened");
-        let hook = opened.find("hook(app, route.host)").expect("the hook is called");
-        let rotli = opened.find("open_requests::").expect("Rotli opens the files");
-        assert!(hook < rotli, "{opened}");
+    fn opened_urls_wait_until_setup_is_done_then_pass_straight_through() {
+        let queue = OpenedQueue::new();
+        assert_eq!(queue.arrive(vec![url("synthetic-host://one")]), Vec::<Url>::new(), "held before setup");
+        assert_eq!(queue.arrive(vec![url("file:///tmp/a.md"), url("synthetic-host://two")]), Vec::<Url>::new());
+        assert_eq!(
+            queue.release(),
+            vec![url("synthetic-host://one"), url("file:///tmp/a.md"), url("synthetic-host://two")],
+            "setup gets every held URL, in the order they came"
+        );
+        assert_eq!(queue.arrive(vec![url("synthetic-host://three")]), vec![url("synthetic-host://three")]);
+        assert_eq!(queue.release(), Vec::<Url>::new(), "nothing is held twice");
+    }
 
-        let lib = src("lib.rs");
-        let run = &lib[lib.find(".run(move |app, event| \u{7b}").expect("the run loop")..];
-        let first = run.lines().nth(1).unwrap().trim();
-        assert_eq!(first, "host::on_run_event(app, &event, opened_urls.as_ref());");
-        assert_eq!(lib.matches("RunEvent::Opened").count(), 0, "Opened is read only in host.rs");
+    /// The hook gets the host's URLs in one call, before Rotli opens any file
+    /// from the same event, and no call when there are none.
+    #[test]
+    fn the_hook_runs_once_with_only_the_hosts_urls_before_rotli_opens_a_file() {
+        use std::cell::RefCell;
+        let log = RefCell::new(Vec::<String>::new());
+        let hook = |urls: Vec<Url>| log.borrow_mut().push(format!("hook {}", urls.iter().map(Url::as_str).collect::<Vec<_>>().join(" ")));
+        let open = |url: &Url| log.borrow_mut().push(format!("open {url}"));
+        let event = [url("file:///tmp/a.md"), url("synthetic-host://one"), url("file:///tmp/b/"), url("rotli://open?id=x")];
+        dispatch(&event, Some(&hook), open);
+        assert_eq!(
+            log.take(),
+            [
+                "hook synthetic-host://one rotli://open?id=x",
+                "open file:///tmp/a.md",
+                "open file:///tmp/b/",
+            ]
+        );
+        dispatch(&[url("file:///tmp/a.md")], Some(&hook), open);
+        assert_eq!(log.take(), ["open file:///tmp/a.md"], "no host URL, no hook call");
+        dispatch(&[url("synthetic-host://one")], None, open);
+        assert_eq!(log.take(), Vec::<String>::new(), "no hook, nothing for Rotli");
+    }
+
+    /// Nothing an `Opened` event carries is acted on before setup: the run
+    /// loop goes through the queue, and setup drains it only after the
+    /// identity check and once the vaults are open.
+    #[test]
+    fn opened_urls_reach_the_hook_and_rotli_only_after_setup() {
+        let host = src("host.rs");
         let production = &host[..host.find("#[cfg(test)]").unwrap()];
         assert_eq!(production.matches("RunEvent::Opened").count(), 1);
-        // standalone's deep-link plugin takes every URL; this path is a host's only
-        let on_run = body(&host, "on_run_event");
+        let on_run = body(production, "on_run_event");
         assert!(on_run.contains("!crate::app_identity::owns_shared_state()"), "{on_run}");
+        let arrive = on_run.find("OPENED.arrive(").expect("the run loop holds early URLs");
+        assert!(arrive < on_run.find("opened(app, ").expect("and opens the rest"), "{on_run}");
+        let ready = body(production, "ready");
+        assert!(ready.find("OPENED.release()").unwrap() < ready.find("opened(app, ").unwrap(), "{ready}");
+        assert_eq!(production.matches("opened(app, ").count(), 2, "on_run_event and ready only");
+        // the host's registered hook, then Rotli's own file opening
+        let wired = body(production, "opened");
+        assert!(wired.contains("HOOK.get()") && wired.contains("open_requests::handle_deep_link("), "{wired}");
+
+        let lib = src("lib.rs");
+        let run = &lib[lib.find(".run(|app, event| \u{7b}").expect("the run loop")..];
+        assert_eq!(run.lines().nth(1).unwrap().trim(), "host::on_run_event(app, &event);");
+        assert_eq!(lib.matches("RunEvent::Opened").count(), 0, "Opened is read only in host.rs");
+        assert_eq!(lib.matches("host::ready(").count(), 1);
+        let setup = &lib[lib.find(".setup(move |app| \u{7b}").expect("setup")..];
+        let identity = setup.find("app_identity::matches_runtime(").unwrap();
+        let vaults = setup.find("app.manage(corpus::CorpusState(").unwrap();
+        let drain = setup.find("host::ready(").unwrap();
+        assert!(identity < vaults && vaults < drain, "the drain follows the identity check and the vaults");
     }
 
     /// With the tray off, Rotli touches no tray API: every one lives in
