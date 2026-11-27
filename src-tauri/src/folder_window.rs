@@ -23,10 +23,15 @@ pub(crate) fn open(app: &AppHandle, path: &Path) {
     let path = path.to_path_buf();
     std::thread::spawn(move || {
         if let Err(message) = mount_and_show(&app, &path) {
-            let _ = app.emit_to("main", "rotli:open-notice", format!("Couldn’t open that folder — {message}"));
-            crate::SummonIntent::ShowMain.perform(&app);
+            refused(&app, &message);
         }
     });
+}
+
+/// A folder that couldn't open says why in the main window.
+pub(crate) fn refused(app: &AppHandle, message: &str) {
+    let _ = app.emit_to("main", "rotli:open-notice", format!("Couldn’t open that folder — {message}"));
+    crate::SummonIntent::ShowMain.perform(app);
 }
 
 fn mount_and_show(app: &AppHandle, path: &Path) -> Result<(), String> {

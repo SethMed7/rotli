@@ -53,27 +53,41 @@ pub(crate) fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
 /// A file macOS handed Rotli opens in a tab without joining a vault (the
 /// raw mount, corpus_raw.rs; docs/design/open-in-rotli.md stage 1). The root
 /// id is the grant: only this OS event mounts a path. A folder opens in its
-/// own window (stage 2, folder_window.rs).
+/// own window (stage 2, folder_window.rs). Standalone Rotli gets these from
+/// its deep-link plugin, a host build from its run loop (host.rs); a host
+/// build opens neither inside a vault it doesn't own (host-seams.md).
 fn open_from_finder(app: &AppHandle, path: &std::path::Path) {
     if path.is_dir() {
-        crate::folder_window::open(app, path); // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
+        // off the run loop: a host build's vault refusal walks the folder
+        let (app, dir) = (app.clone(), path.to_path_buf());
+        std::thread::spawn(move || {
+            if let Err(message) = crate::reject_privileged_root(&app, &dir) {
+                return crate::folder_window::refused(&app, &message);
+            }
+            crate::folder_window::open(&app, &dir); // vault bind (refused): reject_privileged_root above; mount_and_show refuses again before it binds
+        });
         return;
     }
     let Ok(cache) = app.path().app_cache_dir() else { return };
     let Ok(file) = std::fs::canonicalize(path) else { return };
+    if let Err(message) = crate::app_identity::refuse_existing_vault(&file) {
+        let _ = app.emit_to("main", "rotli:open-notice", format!("Couldn’t open that file — {message}"));
+        SummonIntent::ShowMain.perform(app);
+        return;
+    }
     let root_id = corpus::raw::raw_root_id(&file);
     let state = app.state::<corpus::CorpusState>();
     let (id, kind) = {
         let Ok(mut registry) = state.0.lock() else { return };
         if !registry.contains(&root_id) {
-            let Ok(store) = corpus::CorpusStore::open_raw_file(&file, &cache.join("opened-files")) else { // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
+            let Ok(store) = corpus::CorpusStore::open_raw_file(&file, &cache.join("opened-files")) else { // vault bind (refused): refuse_existing_vault above
                 return;
             };
             if registry.insert(root_id.clone(), store).is_err() {
                 return;
             }
             // an image or video previews over asset://: this one file, never its folder
-            let _ = app.asset_protocol_scope().allow_file(&file); // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
+            let _ = app.asset_protocol_scope().allow_file(&file); // vault bind (refused): refuse_existing_vault above
         }
         let Some(item) = registry.raw_item(&root_id) else { return };
         item
