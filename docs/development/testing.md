@@ -327,7 +327,9 @@ tests are additional verify phases.
   which may only shrink. Command names must be multi-segment snake_case. It
   also keeps `src-tauri/app-commands.json`, the list a host build scopes
   Rotli's commands with, equal to the handler and to the capability files'
-  webview labels.
+  webview labels, with no glob pattern but `finder_*`, and refuses what it
+  can't read (list-shaped, TOML or inline capabilities, a second handler).
+  Each of its gates has a case in `scripts/check-ipc-contract.test.ts`.
 - `check:web-parity` keeps the native registry and explicit web availability
   inventory exhaustive in both directions; it rejects missing, stale, duplicate,
   invalid, or unexplained decisions and missing implementation/test references.

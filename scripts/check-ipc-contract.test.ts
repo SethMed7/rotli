@@ -3,9 +3,18 @@
 // host-seams.md). A list that drifts from the handler either breaks Rotli
 // under the host or leaves a command out of its review.
 import { describe, expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 const repo = join(import.meta.dir, "..");
 const checker = join(import.meta.dir, "check-ipc-contract.mjs");
@@ -19,7 +28,10 @@ function tree(): string {
   const root = mkdtempSync(join(tmpdir(), "rotli-ipc-"));
   mkdirSync(join(root, "src-tauri"));
   symlinkSync(join(repo, "src"), join(root, "src"));
-  for (const path of ["src-tauri/src", "src-tauri/capabilities", LIST]) {
+  const configs = readdirSync(join(repo, "src-tauri"))
+    .filter((name) => /^tauri(\..+)?\.conf\.json$/.test(name))
+    .map((name) => `src-tauri/${name}`);
+  for (const path of ["src-tauri/src", "src-tauri/capabilities", LIST, ...configs]) {
     cpSync(join(repo, path), join(root, path), { recursive: true });
   }
   return root;
@@ -40,6 +52,19 @@ function editList(root: string, change: (list: AppCommands) => void) {
     return JSON.stringify(list);
   });
 }
+
+function addCapability(root: string, file: string, content: unknown) {
+  const target = join(root, "src-tauri/capabilities", file);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, JSON.stringify(content));
+}
+
+const guest = (webviews: string[], more: object = {}) => ({
+  identifier: "extra",
+  webviews,
+  permissions: ["core:event:default"],
+  ...more,
+});
 
 function check(root: string) {
   const proc = Bun.spawnSync([process.execPath, checker], {
@@ -144,5 +169,158 @@ describe("check:ipc — the published command list", () => {
     const r = check(root);
     expect(r.code).toBe(1);
     expect(r.out).toContain("renames a command");
+  });
+
+  test("a comment that looks like a rename, or closes the handler, changes nothing", () => {
+    const root = tree();
+    edit(root, LIB, (s) =>
+      s
+        .replace(
+          "generate_handler![",
+          "generate_handler![\n            // ends here ])\n            /* a, b ]) */",
+        )
+        .concat(
+          '\n/// #[tauri::command(rename = "x")]\n/* #[command(rename = "y")] */\nfn documented() {}\n',
+        ),
+    );
+    const r = check(root);
+    expect(r.out).toContain("check:ipc ok");
+    expect(r.code).toBe(0);
+  });
+
+  // Tauri keeps the last handler set, so a second one would replace the list
+  test("a second invoke_handler fails", () => {
+    const root = tree();
+    edit(
+      root,
+      LIB,
+      (s) => `${s}\nfn later(b: B) -> B { b.invoke_handler(tauri::generate_handler![summon]) }\n`,
+    );
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("exactly one .invoke_handler(");
+  });
+
+  // the gate that predates the list: a rewrite of this check once dropped it
+  // with every other test still green (review of PR 338)
+  test("a single-word command name fails, listed or not", () => {
+    const root = tree();
+    edit(root, LIB, (s) => s.replace("generate_handler![", "generate_handler![\n            singleword,"));
+    editList(root, (list) => (list.commands = [...list.commands, "singleword"].sort()));
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("multi-segment snake_case:\n  - singleword");
+  });
+});
+
+describe("check:ipc — the front end and the handler", () => {
+  test("a command the front end calls but nothing registers fails", () => {
+    const root = tree();
+    edit(root, LIB, (s) => s.replace(/\n\s*corpus::corpus_read,/, ""));
+    editList(root, (list) => (list.commands = list.commands.filter((c) => c !== "corpus_read")));
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("frontend commands missing Rust handlers");
+  });
+
+  test("a registered command nothing calls fails", () => {
+    const root = tree();
+    edit(root, LIB, (s) =>
+      s.replace("generate_handler![", "generate_handler![\n            nobody_calls_this,"),
+    );
+    editList(root, (list) => (list.commands = [...list.commands, "nobody_calls_this"].sort()));
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("registered Rust commands nothing in src/ calls");
+  });
+});
+
+describe("check:ipc — which webviews the list may name", () => {
+  // `*` in the list would hand every command to every local webview
+  test("a wildcard label fails, whatever the capability is for", () => {
+    const cases: [string, object][] = [
+      ["*", {}],
+      ["*", { remote: { urls: ["https://example.com"] } }],
+      ["private-browser-*", {}],
+      ["finder_?", {}],
+      ["finder*", {}],
+      ["[mq]ain", {}],
+    ];
+    for (const [label, more] of cases) {
+      const root = tree();
+      addCapability(root, "extra.json", guest([label], more));
+      editList(root, (list) => (list.webviews = [...list.webviews, label].sort()));
+      const r = check(root);
+      expect(r.out).toContain("extra.json");
+      expect(r.code).toBe(1);
+    }
+  });
+
+  test("a wildcard typed straight into the list fails", () => {
+    const root = tree();
+    editList(root, (list) => (list.webviews = ["*", ...list.webviews]));
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("only exact labels and finder_*");
+  });
+
+  test("a capability for remote pages fails, even with an exact label", () => {
+    const root = tree();
+    addCapability(root, "extra.json", guest(["guest"], { remote: { urls: ["https://a.test"] } }));
+    editList(root, (list) => (list.webviews = [...list.webviews, "guest"].sort()));
+    const r = check(root);
+    expect(r.out).toContain("extra.json grants remote pages");
+    expect(r.code).toBe(1);
+  });
+
+  test("an unsorted webview list fails", () => {
+    const root = tree();
+    editList(root, (list) => list.webviews.reverse());
+    expect(check(root).out).toContain("webviews must be sorted, each once");
+  });
+
+  // Tauri reads `capabilities/**/*`, in three JSON shapes and in TOML
+  test("a capability file in a shape the check cannot read fails", () => {
+    const wide = { identifier: "wide", windows: ["main"], permissions: [] };
+    const cases: [string, unknown][] = [
+      ["bundle.json", { capabilities: [wide] }],
+      ["array.json", [wide]],
+      ["wide.toml", wide],
+      ["wide.json5", wide],
+    ];
+    for (const [file, content] of cases) {
+      const root = tree();
+      addCapability(root, file, content);
+      const r = check(root);
+      expect(r.out).toContain(`${file} is not one JSON capability`);
+      expect(r.code).toBe(1);
+    }
+  });
+
+  test("a capability in a nested folder is read; a file Tauri skips is ignored", () => {
+    const nested = tree();
+    addCapability(nested, "deep/er.json", { identifier: "deep", windows: ["main"] });
+    expect(check(nested).out).toContain("deep/er.json targets windows");
+
+    const stray = tree();
+    addCapability(stray, ".DS_Store", "binary");
+    expect(check(stray).code).toBe(0);
+  });
+
+  test("a capability written inline in a Tauri config fails", () => {
+    for (const config of ["tauri.conf.json", "tauri.dev.conf.json"]) {
+      const root = tree();
+      edit(root, `src-tauri/${config}`, (source) => {
+        const parsed = JSON.parse(source) as { app?: { security?: object } };
+        parsed.app = {
+          ...parsed.app,
+          security: { ...parsed.app?.security, capabilities: [guest(["main"])] },
+        } as { security?: object };
+        return JSON.stringify(parsed);
+      });
+      const r = check(root);
+      expect(r.out).toContain(`${config} writes a capability inline`);
+      expect(r.code).toBe(1);
+    }
   });
 });
