@@ -16,7 +16,8 @@ use tauri::{AppHandle, Emitter, Url};
 pub type OpenedUrls = Box<dyn Fn(&AppHandle, Vec<Url>) + Send + Sync>;
 
 /// A host's answer, asked once as the app finishes launching, to whether this
-/// launch keeps its window hidden.
+/// launch keeps its window hidden. It can read `launched_as_login_item` and
+/// `pending_opened_urls`.
 pub type StartHidden = Box<dyn Fn() -> bool + Send + Sync>;
 
 /// Show and focus the main window, as Rotli's tray item "Open …" does.
@@ -275,6 +276,14 @@ impl<T> Held<T> {
         }
     }
 
+    /// A copy of what is held, which stays held; empty after `release`.
+    pub(crate) fn peek(&self) -> Vec<T>
+    where
+        T: Clone,
+    {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).clone().unwrap_or_default()
+    }
+
     /// Everything held, in the order it came; from now on nothing is held.
     pub(crate) fn release(&self) -> Vec<T> {
         self.0.lock().unwrap_or_else(PoisonError::into_inner).take().unwrap_or_default()
@@ -289,6 +298,20 @@ impl<T> Held<T> {
 pub(crate) type OpenedQueue = Held<Url>;
 
 static OPENED: OpenedQueue = OpenedQueue::new();
+
+/// The URLs macOS has opened the app with that still wait for setup, `file:`
+/// ones left out (`rotli://` deep links included, so test the scheme): what the `on_opened_urls` hook is handed when setup releases
+/// them. Nothing is taken. It is for the `start_hidden` predicate; standalone
+/// Rotli and a call after the release get none. A URL that arrives after the
+/// predicate was asked is not here and reaches the hook alone
+/// (docs/architecture/host-seams.md, "A quiet start").
+pub fn pending_opened_urls() -> Vec<Url> {
+    pending_in(&OPENED)
+}
+
+fn pending_in(queue: &OpenedQueue) -> Vec<Url> {
+    route_opened(&queue.peek()).host
+}
 
 /// What the main page is told before it listens, held until it says it does:
 /// the notices it shows (a refused file or folder) and `open_settings`
@@ -465,44 +488,6 @@ mod tests {
         &rest[..end]
     }
 
-    #[test]
-    fn opened_urls_wait_until_setup_is_done_then_pass_straight_through() {
-        let queue = OpenedQueue::new();
-        assert_eq!(queue.arrive(vec![url("synthetic-host://one")]), Vec::<Url>::new(), "held before setup");
-        assert_eq!(queue.arrive(vec![url("file:///tmp/a.md"), url("synthetic-host://two")]), Vec::<Url>::new());
-        assert_eq!(
-            queue.release(),
-            vec![url("synthetic-host://one"), url("file:///tmp/a.md"), url("synthetic-host://two")],
-            "setup gets every held URL, in the order they came"
-        );
-        assert_eq!(queue.arrive(vec![url("synthetic-host://three")]), vec![url("synthetic-host://three")]);
-        assert_eq!(queue.release(), Vec::<Url>::new(), "nothing is held twice");
-    }
-
-    /// The hook gets the host's URLs in one call, before Rotli opens any file
-    /// from the same event, and no call when there are none.
-    #[test]
-    fn the_hook_runs_once_with_only_the_hosts_urls_before_rotli_opens_a_file() {
-        use std::cell::RefCell;
-        let log = RefCell::new(Vec::<String>::new());
-        let hook = |urls: Vec<Url>| log.borrow_mut().push(format!("hook {}", urls.iter().map(Url::as_str).collect::<Vec<_>>().join(" ")));
-        let open = |url: &Url| log.borrow_mut().push(format!("open {url}"));
-        let event = [url("file:///tmp/a.md"), url("synthetic-host://one"), url("file:///tmp/b/"), url("rotli://open?id=x")];
-        dispatch(&event, Some(&hook), open);
-        assert_eq!(
-            log.take(),
-            [
-                "hook synthetic-host://one rotli://open?id=x",
-                "open file:///tmp/a.md",
-                "open file:///tmp/b/",
-            ]
-        );
-        dispatch(&[url("file:///tmp/a.md")], Some(&hook), open);
-        assert_eq!(log.take(), ["open file:///tmp/a.md"], "no host URL, no hook call");
-        dispatch(&[url("synthetic-host://one")], None, open);
-        assert_eq!(log.take(), Vec::<String>::new(), "no hook, nothing for Rotli");
-    }
-
     /// Nothing an `Opened` event carries is acted on before setup: the run
     /// loop goes through the queue, and setup drains it only after the
     /// identity check and once the vaults are open.
@@ -512,8 +497,10 @@ mod tests {
         let production = &host[..host.find("#[cfg(test)]").unwrap()];
         assert_eq!(production.matches("RunEvent::Opened").count(), 1);
         let on_run = body(production, "on_run_event");
-        assert!(on_run.contains("!crate::app_identity::owns_shared_state()"), "{on_run}");
+        let gate = on_run.find("!crate::app_identity::owns_shared_state()").expect("never in standalone");
         let arrive = on_run.find("OPENED.arrive(").expect("the run loop holds early URLs");
+        assert!(gate < arrive, "{on_run}");
+        assert_eq!(production.matches("OPENED.arrive(").count(), 1, "one way into the queue");
         assert!(arrive < on_run.find("opened(app, ").expect("and opens the rest"), "{on_run}");
         let ready = body(production, "ready");
         assert!(ready.find("OPENED.release()").unwrap() < ready.find("opened(app, ").unwrap(), "{ready}");

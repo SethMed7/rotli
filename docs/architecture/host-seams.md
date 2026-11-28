@@ -374,7 +374,8 @@ passes:
 - **`on_opened_urls(…)`**: its handler for the URLs macOS opens the app with
   (see "Opened URLs");
 - **`start_hidden(…)`**: whether this launch keeps its window hidden, asked
-  as the app finishes launching (see "A quiet start").
+  as the app finishes launching (see "A quiet start"). The predicate can read
+  `host::launched_as_login_item` and `host::pending_opened_urls`.
 
 Three calls reach the running shell from a host's own code: `host::show_main`
 and `host::quit` (see "The menu-bar item"), and `host::open_settings` (see
@@ -524,6 +525,9 @@ rotli_lib::AppHost::new(context).on_opened_urls(|app, urls| {
   setup, each event goes straight through. A file refused on a cold launch
   raises its notice during setup, before the page listens; the notice is
   held until it does (see "Held for the page").
+- **Read early, delivered later:** `host::pending_opened_urls()` shows a
+  `start_hidden` predicate the held URLs and takes none of them (see "A quiet
+  start").
 - **Order within an event:** the hook runs first, in one call, then Rotli
   opens the files (`host::dispatch`, unit-tested with recording closures).
   Fences keep the queue in front of both and the release after the identity
@@ -588,12 +592,29 @@ rotli_lib::host::open_settings(app, "appearance");        // a built-in pane
 ### A quiet start
 
 A host that registers as a login item (`SMAppService`) wants that launch to
-start with no window. It passes `AppHost::start_hidden(|| …)`, and reads the
-login flag inside it with `rotli_lib::host::launched_as_login_item()`:
+start with no window. A host with a URL scheme may want the same for a launch
+through one of its URLs, so that only its own window shows. It passes
+`AppHost::start_hidden(|| …)` and reads both inside it, with
+`rotli_lib::host::launched_as_login_item()` and
+`rotli_lib::host::pending_opened_urls()`:
 
 ```rust
-rotli_lib::AppHost::new(context).start_hidden(rotli_lib::host::launched_as_login_item);
+rotli_lib::AppHost::new(context)
+    .start_hidden(|| {
+        rotli_lib::host::launched_as_login_item()
+            || rotli_lib::host::pending_opened_urls().iter().any(|url| url.scheme() == "synthetic-host")
+    })
+    .on_opened_urls(|app, urls| {
+        // synthetic-host://run/… : show the host's own window for it, after
+        // this returns (see "Opened URLs")
+    });
 ```
+
+A host whose other URLs should still open `main` narrows the test, to
+`url.host_str() == Some("run")` as well, say.
+`pending_opened_urls()` holds every waiting URL except `file:` ones, and
+that includes `rotli://` deep links, so `!is_empty()` alone would hide `main`
+for a Rotli link too. Test the scheme, as above.
 
 - **When it is asked.** Once, at the start of Rotli's setup, right after the
   identity check (`host::decide_at_launch`). Setup runs inside
@@ -608,6 +629,32 @@ rotli_lib::AppHost::new(context).start_hidden(rotli_lib::host::launched_as_login
   `applicationDidFinishLaunching`, and none a run-loop turn later. So a
   predicate asked in `launch()`, before `run`, could never see the login
   flag.
+- **`pending_opened_urls()`** returns the URLs already held for setup, `file:`
+  ones left out (`host::OpenedQueue`), and takes nothing: the hook is handed
+  the same URLs when setup releases them. It is meant for the predicate. It is
+  empty in standalone Rotli, which never fills the queue, after the release,
+  and off macOS. It answers with or without an `on_opened_urls` hook, but a
+  host that stays hidden for a URL needs the hook to show anything for it.
+- **A launch URL has been there in time in every run seen, but nothing
+  guarantees it.** tao and tauri add no delay and no order
+  of their own: tao installs the run loop's callback before `[NSApp run]`
+  (0.35.3 `event_loop.rs:233-234`) and passes `application:openURLs:` straight
+  to it (`app_state.rs:309-311`); tauri-runtime-wry forwards `Opened`
+  (2.11.4 `lib.rs:4387`) and tauri hands it to the app's closure without
+  waiting for setup (2.11.5 `app.rs:1438`, `app.rs:2630`), where Rotli holds
+  it. The order itself is AppKit's. A bare tao 0.35.3 app on macOS 27.0.1,
+  launched with a URL by `open -a`, got `Opened` before
+  `applicationDidFinishLaunching` in 8 launches of 8. That is one probe, not
+  a promise: if a launch URL ever arrives after the decision, the predicate
+  sees none and answers as for a plain launch, `main` shows, and the hook
+  still gets the URL.
+- **A URL can still arrive after the decision.** One opened while the app is
+  already launching or running is not part of the launch: in the same probe, a
+  second URL opened right behind the first arrived just after
+  `applicationDidFinishLaunching`. The predicate doesn't see it. It goes to the
+  `on_opened_urls` hook, which setup has released by then. So show the host's
+  window from the hook, for every URL that wants it, whatever the predicate
+  answered. After a no, `main` is already up, and a late URL doesn't hide it.
 - **`launched_as_login_item()`** is true when the current Apple event is
   `kAEOpenApplication` and its `keyAEPropData` is
   `keyAELaunchedAsLogInItem`. It is false anywhere else: outside the
@@ -637,8 +684,9 @@ rotli_lib::AppHost::new(context).start_hidden(rotli_lib::host::launched_as_login
   update, a vault change) goes through `open -n` or a direct start. Neither
   is a login launch: the probe's `open -n … --args --synthetic-login` got an
   `oapp` with no login flag. So the predicate above answers no, whatever
-  arguments the relaunch carries. A predicate keyed on an argument would
-  answer yes again, which is why the example reads the flag.
+  arguments the relaunch carries, and it carries no URL. So the example above
+  answers no. A predicate keyed on an argument would answer yes again, which
+  is why it reads the flag.
 - **Showing it later:** `host::show_main(app)`, `host::open_settings(app,
   …)`, or the Dock icon when "Show in Dock" is on (macOS sends `Reopen`;
   it shows the window only when none of Rotli's windows is up). So do a
@@ -1249,8 +1297,9 @@ This list says only what was run.
   - TypeScript: `src/host/registry.test.ts` (`inlineName`, `hostThemeFamily`,
     `mascotShown`, `productMark`, and the refusal of an unknown family or
     mascot), `src/state/appearanceDefaultsHost.test.ts` (a host's family on
-    every fresh start, read at each use, and in parsed settings with no family), `src/state/chatNavigatorStyle.test.ts`
-    (no quokka trail without the mascot), `src/host/mascot.test.tsx`
+    every fresh start, read at each use, and in parsed settings with no
+    family), `src/state/chatNavigatorStyle.test.ts` (no quokka trail without
+    the mascot), `src/host/mascot.test.tsx`
     (no quokka drawn, the host's mark in the quokka mark's place). Each failed
     on `origin/dev` before the change.
   - `scripts/check-product-name.test.ts`: what counts as naming the app, in
@@ -1278,9 +1327,27 @@ This list says only what was run.
     prompt, the thank-you card and the Settings hint), three runs on
     `origin/dev` and three on the change, taken back to back. The DOM matched
     in all 66 after shots (ULIDs and relative times aside). The pixels that
-    differed were the Settings banners' scenery (at most 1,605 against the
+    differed were the Settings banners' scenery (at most 627 against the
     closest base; two base runs differ by up to 3,895) and the note's "19m"
     age line.
+
+- **Pending URLs in `start_hidden`** (2026-11-27, tests and an ordering probe;
+  no Rotli build launched).
+  - Rust (`host_tests.rs`): held URLs are visible to the predicate's call,
+    `file:` URLs left out; asking takes none, the release still hands over
+    everything and the hook part of it equals what was seen. Nothing is
+    pending after the release or in a process that never received `Opened`;
+    the `host.rs` fence keeps the queue's one way in behind the standalone
+    gate. The first test fails against a stub that sees nothing and against
+    an implementation that consumes the queue; the empty case holds for the
+    stub too.
+  - Probe (bare tao 0.35.3, `com.example.openorderprobe`, no declared URL
+    scheme, `open -a`, macOS 27.0.1): `Opened` before
+    `applicationDidFinishLaunching` in 8 cold launches of 8 with a URL; no
+    `Opened` on a plain launch; a URL sent to the running app arrived as
+    `Opened`; of two sent back to back to a cold app, the first arrived before
+    and the second just after (one run).
+  - Not run: a host build launched by a click on its own scheme.
 
 - **Opening Settings, a quiet start and held notices** (2026-11-27, tests
   and the browser lane; no native build launched).
