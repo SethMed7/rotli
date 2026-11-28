@@ -1,11 +1,15 @@
-//! The quiet start, `open_settings` and what is held for the main page
-//! (host.rs; docs/architecture/host-seams.md, "A quiet start" and "Held for
-//! the page").
+//! The quiet start, `open_settings`, what is held for the main page and the
+//! queue of opened URLs (host.rs; docs/architecture/host-seams.md, "A quiet
+//! start", "Held for the page" and "Opened URLs").
 
 use super::tests::{body, in_setup_order, IDENTITY_CHECK, OPENED_RELEASE};
 use super::*;
 use crate::single_instance::tests::source as src;
 use std::path::Path;
+
+fn url(s: &str) -> Url {
+    Url::parse(s).unwrap()
+}
 
 /// Rotli's own window list, as standalone's context carries it.
 fn rotli_windows() -> Vec<WindowConfig> {
@@ -257,4 +261,90 @@ fn only_an_open_event_marked_as_a_login_item_is_a_login_launch() {
     let reopen = event(u32::from_be_bytes(*b"rapp"));
     mark(&reopen, KEY_AE_LAUNCHED_AS_LOG_IN_ITEM);
     assert!(!is_login_launch(&reopen), "not an open-application event");
+}
+
+#[test]
+fn opened_urls_wait_until_setup_is_done_then_pass_straight_through() {
+    let queue = OpenedQueue::new();
+    assert_eq!(queue.arrive(vec![url("synthetic-host://one")]), Vec::<Url>::new(), "held before setup");
+    assert_eq!(queue.arrive(vec![url("file:///tmp/a.md"), url("synthetic-host://two")]), Vec::<Url>::new());
+    assert_eq!(
+        queue.release(),
+        vec![url("synthetic-host://one"), url("file:///tmp/a.md"), url("synthetic-host://two")],
+        "setup gets every held URL, in the order they came"
+    );
+    assert_eq!(queue.arrive(vec![url("synthetic-host://three")]), vec![url("synthetic-host://three")]);
+    assert_eq!(queue.release(), Vec::<Url>::new(), "nothing is held twice");
+}
+
+/// The hook gets the host's URLs in one call, before Rotli opens any file
+/// from the same event, and no call when there are none.
+#[test]
+fn the_hook_runs_once_with_only_the_hosts_urls_before_rotli_opens_a_file() {
+    use std::cell::RefCell;
+    let log = RefCell::new(Vec::<String>::new());
+    let hook = |urls: Vec<Url>| log.borrow_mut().push(format!("hook {}", urls.iter().map(Url::as_str).collect::<Vec<_>>().join(" ")));
+    let open = |url: &Url| log.borrow_mut().push(format!("open {url}"));
+    let event = [url("file:///tmp/a.md"), url("synthetic-host://one"), url("file:///tmp/b/"), url("rotli://open?id=x")];
+    dispatch(&event, Some(&hook), open);
+    assert_eq!(
+        log.take(),
+        [
+            "hook synthetic-host://one rotli://open?id=x",
+            "open file:///tmp/a.md",
+            "open file:///tmp/b/",
+        ]
+    );
+    dispatch(&[url("file:///tmp/a.md")], Some(&hook), open);
+    assert_eq!(log.take(), ["open file:///tmp/a.md"], "no host URL, no hook call");
+    dispatch(&[url("synthetic-host://one")], None, open);
+    assert_eq!(log.take(), Vec::<String>::new(), "no hook, nothing for Rotli");
+}
+
+/// A `start_hidden` predicate reads the URLs already waiting, files and
+/// folders left out, and the hook still gets every one of them when setup
+/// releases the queue.
+#[test]
+fn pending_urls_are_seen_before_setup_and_stay_held_for_the_hook() {
+    let queue = OpenedQueue::new();
+    assert_eq!(pending_in(&queue), Vec::<Url>::new(), "a plain launch has none");
+    queue.arrive(vec![url("file:///tmp/launch.md")]);
+    assert_eq!(pending_in(&queue), Vec::<Url>::new(), "a file is Rotli's to open, never the host's");
+    queue.arrive(vec![url("synthetic-host://run/one")]);
+    queue.arrive(vec![url("file:///tmp/launch-folder/"), url("synthetic-host://run/two")]);
+    let seen = vec![url("synthetic-host://run/one"), url("synthetic-host://run/two")];
+    assert_eq!(pending_in(&queue), seen, "every event's URLs, in the order they came");
+    assert_eq!(pending_in(&queue), seen, "asking takes nothing");
+    let released = queue.release();
+    assert_eq!(
+        released,
+        vec![
+            url("file:///tmp/launch.md"),
+            url("synthetic-host://run/one"),
+            url("file:///tmp/launch-folder/"),
+            url("synthetic-host://run/two"),
+        ],
+        "setup still gets everything, files included"
+    );
+    assert_eq!(route_opened(&released).host, seen, "the hook gets what the predicate saw");
+}
+
+/// After the release nothing is pending: a later URL goes straight on. And
+/// standalone never fills the queue (the run loop's gate, fenced in
+/// `host::tests`), so a call there is empty too.
+#[test]
+fn no_urls_are_pending_after_the_release_or_in_standalone() {
+    let queue = OpenedQueue::new();
+    queue.arrive(vec![url("synthetic-host://run/one")]);
+    queue.release();
+    assert_eq!(pending_in(&queue), Vec::<Url>::new(), "released");
+    let late = url("synthetic-host://run/late");
+    assert_eq!(queue.arrive(vec![late.clone()]), vec![late], "a late URL goes straight to the hook");
+    assert_eq!(pending_in(&queue), Vec::<Url>::new(), "and is never pending");
+
+    // the process's own queue, which only a host build's `Opened` events fill
+    assert_eq!(pending_opened_urls(), Vec::<Url>::new());
+    let host = src("host.rs");
+    let production = &host[..host.find("#[cfg(test)]").unwrap()];
+    assert!(body(production, "pending_opened_urls").contains("pending_in(&OPENED)"));
 }

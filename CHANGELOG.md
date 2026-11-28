@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `build.rs` and capability that grant them to Rotli's webviews alone. A host
   that adds webviews of its own needs this, or its pages can call Rotli's
   commands. Standalone Rotli is unchanged.
+- **Host builds can start quietly when launched by their own link.** For apps
+  built on Rotli's shell: the `start_hidden` predicate can call
+  `host::pending_opened_urls` to see the URLs the app was launched with, so
+  such a launch can show only the host's window. The URLs still reach
+  `on_opened_urls`. Standalone Rotli is unchanged.
 - **Host builds can bring their own menu-bar item.** For apps built on Rotli's
   shell: a host can turn off Rotli's tray and call `host::show_main` and
   `host::quit` from its own, name itself in the tray and the app menu's Quit,
