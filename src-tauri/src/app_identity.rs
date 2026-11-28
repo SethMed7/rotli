@@ -295,6 +295,53 @@ pub(crate) fn claim_for(identifier: &str, folder: &Path) -> Result<(), String> {
     claimed_by(folder, identifier).then_some(()).ok_or_else(unmarkable)
 }
 
+/// Why a host build's command line leaves a folder that has files alone.
+pub(crate) const NOT_EMPTY: &str = "This folder already has files and this app hasn't opened it, so its command line won't turn it into notes. Choose an empty folder, or open this one in the app first.";
+
+/// Before a command line (`rotli`, its MCP server) opens `folder` for writing,
+/// which makes it a vault: mark it, so the next call finds its own vault. A
+/// folder already marked stays as it is. Any other folder meets what the app
+/// asks of a new choice (the vault refusal, the private folders, a real support
+/// folder) and must also be empty, since no person confirms an environment
+/// variable; only a Finder's `.DS_Store` doesn't count. The standalone build
+/// marks nothing.
+pub(crate) fn claim_new_vault_for(identifier: &str, home: &Path, folder: &Path) -> Result<(), String> {
+    if owns_shared_state_for(identifier) {
+        return Ok(());
+    }
+    let open = |path: &Path| std::fs::canonicalize(path).map_err(|e| format!("open {}: {e}", path.display()));
+    let folder = open(folder)?;
+    if claimed_by(&folder, identifier) {
+        return Ok(());
+    }
+    refuse_existing_vault_for(identifier, &folder)?;
+    let home = open(home)?;
+    let support = support_dir_for(&home, identifier);
+    if std::fs::symlink_metadata(&support).is_ok_and(|meta| meta.file_type().is_symlink()) {
+        return Err(format!("{} is a link, so this app marks no folder", support.display()));
+    }
+    // the scratch vault sits in the support folder on purpose
+    if trusted_scratch_for(&support, identifier).as_ref() != Some(&folder) {
+        // the second is Tauri's `app_data_dir` on Linux; on a Mac it is `support`
+        let app_dirs = [support, home.join(".local/share").join(identifier)];
+        crate::private_roots::refuse_overlap_through_links(&folder, &home, app_dirs)?;
+    }
+    let mut entries = std::fs::read_dir(&folder).map_err(|e| format!("open {}: {e}", folder.display()))?;
+    if entries.any(|entry| !entry.is_ok_and(|entry| entry.file_name() == ".DS_Store")) {
+        return Err(NOT_EMPTY.into());
+    }
+    claim_for(identifier, &folder) // vault bind (refused): refuse_existing_vault_for above, then the private folders
+}
+
+/// `claim_new_vault_for` this build and this `HOME`.
+pub(crate) fn claim_new_vault(folder: &Path) -> Result<(), String> {
+    if owns_shared_state() {
+        return Ok(());
+    }
+    let home = std::env::var("HOME").map_err(|_| "HOME is unavailable")?;
+    claim_new_vault_for(APP_IDENTIFIER, Path::new(&home), folder) // vault bind (delegated): claim_new_vault_for for this build
+}
+
 /// Whether `folder` holds nothing but host marks: a fresh scratch vault,
 /// whose first open is still a first run.
 pub(crate) fn holds_only_marks(folder: &Path) -> bool {

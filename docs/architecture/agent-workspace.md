@@ -23,7 +23,10 @@ maintaining separate file-manipulation implementations.
 
 - `src-tauri/src/workspace.rs` coordinates headless use cases. It discovers only
   roots registered in Rotli's production `corpus.json`; tests may override the
-  default with `ROTLI_CORPUS_ROOT`.
+  default with `ROTLI_CORPUS_ROOT`. A host build's CLI also turns only an empty
+  or already marked folder into notes
+  ([`host-seams.md`](host-seams.md), "The command line makes no unmarked
+  vault").
 - `CorpusStore` remains the filesystem and security adapter. Headless callers do
   not accept arbitrary root paths and do not bypass vault write lanes.
 - The packaged Tauri executable dispatches recognized headless commands before
