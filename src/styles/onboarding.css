@@ -1436,3 +1436,81 @@
   cursor: default;
   opacity: 0.7;
 }
+
+/* ─── the plain first run (host/registry.ts, HostFirstRun.plain) ───
+   One centred column about 760px wide on the theme's flat ground: no scenery,
+   no companion and no intro. Only a host turns it on, so every rule here is
+   scoped under [data-look="plain"] and standalone Rotli's first run is
+   untouched. */
+.onb[data-look="plain"] {
+  padding-bottom: 28px;
+  background: var(--ground);
+}
+.onb[data-look="plain"] .setup-shell {
+  width: min(760px, 100%);
+  height: min(720px, calc(100dvh - 84px));
+}
+.onb[data-look="plain"] .setup-stage {
+  display: flex;
+  flex-direction: column;
+}
+.onb[data-look="plain"] .setup-content {
+  align-self: stretch;
+}
+.onb[data-look="plain"] .setup-lede,
+.onb[data-look="plain"] .setup-content h1 {
+  max-width: none;
+}
+/* a host's blocks keep their own layout; Rotli gives them the column */
+.setup-host-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* the folder row: the notes folder and its button on one line */
+.setup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 4px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.setup-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.setup-row-copy strong {
+  color: var(--text);
+  font-size: 13.5px;
+}
+.setup-row .setup-button {
+  flex-shrink: 0;
+}
+/* the thank-you as words alone on the card's flat ground */
+.thanks-banner.thanks-banner--plain {
+  aspect-ratio: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  background: var(--surface);
+}
+.thanks-banner--plain .thanks-banner-headline {
+  font-size: 26px;
+}
+.thanks-banner--plain .thanks-banner-subline {
+  font-size: 14px;
+}
+@media (max-width: 460px) {
+  .setup-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

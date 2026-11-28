@@ -87,6 +87,61 @@ export interface HostWords {
   aboutBody?: string | null;
 }
 
+/** First run's built-in steps, in Rotli's own order. */
+export const SETUP_STEPS = ["you", "vault", "librarian", "shortcuts"] as const;
+export type SetupStepId = (typeof SETUP_STEPS)[number];
+
+/** A host's words for one step: the progress label, the heading, the lede
+ * and the primary button. Each falls back to Rotli's. */
+export interface HostStepWords {
+  label?: string;
+  title?: string;
+  lede?: string;
+  primary?: string;
+}
+
+/** Whether a step's own content lets setup move on yet, and how to hear that
+ * it may have changed. Absent: always. */
+interface HostReadiness {
+  ready?: () => boolean;
+  subscribeReady?: (onChange: () => void) => () => void;
+}
+
+/** A first-run step a host adds: a screen of its own between Rotli's. */
+export interface HostSetupStep extends HostReadiness {
+  /** Unique, and none of Rotli's step ids. */
+  id: string;
+  label: string;
+  title: string;
+  lede?: string;
+  /** The primary button; "Continue", or "Finish setup" on the last step. */
+  primary?: string;
+  Body: ComponentType;
+}
+
+/** A block a host adds before or after the body of one of Rotli's steps. */
+export interface HostStepBlock extends HostReadiness {
+  step: SetupStepId;
+  place: "before" | "after";
+  Block: ComponentType;
+}
+
+/** How first run goes under a host. Absent: Rotli's own four steps, as ever. */
+export interface HostFirstRun {
+  /** One centred column on the theme's flat ground: no scenery, no companion,
+   * no intro; the thank-you card is words alone; a folder is a row with its
+   * own button, and the step's primary moves on once one is chosen. */
+  plain?: boolean;
+  /** Step ids in order, Rotli's and the host's. It starts with "you" and holds
+   * "vault"; absent, Rotli's four and then the host's steps. */
+  order?: readonly string[];
+  steps?: readonly HostSetupStep[];
+  blocks?: readonly HostStepBlock[];
+  words?: Partial<Record<SetupStepId, HostStepWords>>;
+  /** Whether the You step offers the theme, mode and accent. Default true. */
+  themeChoice?: boolean;
+}
+
 export interface AppHost {
   /** Whether notes are part of this app. False: the window is Settings, with
    * no notes panes and no way back to notes. Default true. */
@@ -112,6 +167,7 @@ export interface AppHost {
   /** The host's own mark, where Rotli shows its quokka mark (the titlebar's
    * home mark, the search field). With no mascot and no mark, nothing. */
   productMark?: HostGlyph;
+  firstRun?: HostFirstRun;
 }
 
 export const DEFAULT_UPDATES_WORDS = "Updates arrive with this app";
@@ -149,6 +205,7 @@ export function createHostRegistry(): HostRegistry {
         throw new Error(`Host pane blocks go before or after ${BLOCK_PANES.join(", ")}`);
       if (next.themeFamily !== undefined && !(THEME_FAMILIES as readonly string[]).includes(next.themeFamily))
         throw new Error(`A host's theme family is one of ${THEME_FAMILIES.join(", ")}`);
+      validateFirstRun(next.firstRun);
       if (next.mascot !== undefined && next.mascot !== "quokka" && next.mascot !== "none")
         throw new Error('A host\'s mascot is "quokka" or "none"');
       host = Object.freeze({
@@ -162,6 +219,26 @@ export function createHostRegistry(): HostRegistry {
       return host;
     },
   };
+}
+
+/** Throws when a host's first run can't be followed. */
+function validateFirstRun(firstRun: HostFirstRun | undefined): void {
+  if (!firstRun) return;
+  const builtIn = SETUP_STEPS as readonly string[];
+  const hostIds = (firstRun.steps ?? []).map((step) => step.id);
+  if (new Set(hostIds).size !== hostIds.length || hostIds.some((id) => builtIn.includes(id)))
+    throw new Error("A host's first-run steps need unique ids, none of them a built-in step's");
+  const order = setupOrder({ firstRun });
+  if (new Set(order).size !== order.length) throw new Error("A first-run step is named twice");
+  const unknown = order.filter((id) => !builtIn.includes(id) && !hostIds.includes(id));
+  if (unknown.length) throw new Error(`Unknown first-run steps: ${unknown.join(", ")}`);
+  if (order[0] !== "you" || !order.includes("vault"))
+    throw new Error('A first run starts with "you" and holds "vault"');
+  const unplaced = hostIds.filter((id) => !order.includes(id));
+  if (unplaced.length) throw new Error(`First-run steps left out of the order: ${unplaced.join(", ")}`);
+  for (const { step, place } of firstRun.blocks ?? [])
+    if (!order.includes(step) || (place !== "before" && place !== "after"))
+      throw new Error(`A first-run block goes before or after a step in the order: ${step}`);
 }
 
 const registry = createHostRegistry();
@@ -279,4 +356,39 @@ export function hostVersion(host: AppHost | null = appHost()): string | null {
 /** The foot of Settings' nav: the app's name, and its version once known. */
 export function navFootLabel(name: string, version: string | null): string {
   return version ? `${name} ${version}` : name;
+}
+
+/** First run's step ids in order: Rotli's four, or the host's order. */
+export function setupOrder(host: AppHost | null = appHost()): readonly string[] {
+  const firstRun = host?.firstRun;
+  return firstRun?.order ?? [...SETUP_STEPS, ...(firstRun?.steps ?? []).map((step) => step.id)];
+}
+
+/** Whether first run is the plain one. */
+export function plainFirstRun(host: AppHost | null = appHost()): boolean {
+  return host?.firstRun?.plain === true;
+}
+
+/** A host's own step, by id, or null for one of Rotli's. */
+export function hostSetupStep(id: string, host: AppHost | null = appHost()): HostSetupStep | null {
+  return host?.firstRun?.steps?.find((step) => step.id === id) ?? null;
+}
+
+/** The blocks a host puts in one place of one of Rotli's steps, in order. */
+export function setupStepBlocks(
+  step: SetupStepId,
+  place: "before" | "after",
+  host: AppHost | null = appHost(),
+): readonly HostStepBlock[] {
+  return (host?.firstRun?.blocks ?? []).filter((block) => block.step === step && block.place === place);
+}
+
+/** A host's words for one of Rotli's steps; empty when it gave none. */
+export function setupStepWords(step: SetupStepId, host: AppHost | null = appHost()): HostStepWords {
+  return host?.firstRun?.words?.[step] ?? {};
+}
+
+/** Whether the You step offers the theme, mode and accent. */
+export function setupThemeChoice(host: AppHost | null = appHost()): boolean {
+  return host?.firstRun?.themeChoice !== false;
 }

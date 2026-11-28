@@ -80,3 +80,64 @@ test("first run names the host and shows no quokka on any screen", async ({ page
   await expect(page.getByRole("dialog", { name: "Thank you for trying Example Host" })).toBeVisible();
   await expectNoQuokka(page);
 });
+
+test("a host's plain first run: its order and words, its blocks, and no scenery", async ({ page }) => {
+  await asHost(page, "/?onboarding&plain");
+  await expect(page.locator(".onb[data-look='plain']")).toBeVisible();
+  await expect(page.getByText("1 of 2")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Make Example Host yours." })).toBeVisible();
+  // the host's block, and no theme choice, companion, scenery or intro
+  await expect(page.getByRole("group", { name: "Example Host tools" })).toBeVisible();
+  await expect(page.getByRole("radiogroup", { name: "Appearance mode" })).toHaveCount(0);
+  await expect(page.locator(".setup-companion, .onb-scenery, [data-testid='onboarding-intro']")).toHaveCount(
+    0,
+  );
+  await expectNoQuokka(page);
+
+  await page.getByRole("button", { name: /^Connect Example Sync/ }).click();
+  await expect(page.getByText("2 of 2")).toBeVisible();
+  await expect(page.locator(".setup-progress")).toContainText("Connect");
+  await expect(
+    page.getByRole("heading", { name: "Connect Example Sync, then pick a folder." }),
+  ).toBeVisible();
+  // the step waits for the host's row and for a folder
+  const finish = page.getByRole("button", { name: /^Finish setup/ });
+  await expect(finish).toBeDisabled();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(finish).toBeDisabled();
+  await page.getByRole("button", { name: "Choose folder…" }).click();
+  await expect(page.getByRole("button", { name: "Choose another…" })).toBeVisible();
+  await expect(finish).toBeEnabled();
+  await expectNoQuokka(page);
+  await finish.click();
+
+  // the thank-you is words alone
+  const thanks = page.getByRole("dialog", { name: "Thank you for trying Example Host" });
+  await expect(thanks.locator(".thanks-banner--plain")).toBeVisible();
+  await expect(thanks.locator("svg.thanks-banner-sky, .thanks-banner-horizon")).toHaveCount(0);
+});
+
+test("Back walks a host's order, and a host's own step sits where its order puts it", async ({ page }) => {
+  await asHost(page, "/?onboarding&plain&hoststep");
+  await expect(page.getByText("1 of 3")).toBeVisible();
+  await page.getByRole("button", { name: /^Continue/ }).click();
+  await expect(page.getByRole("heading", { name: "One more thing." })).toBeVisible();
+  await expect(page.getByText("2 of 3")).toBeVisible();
+  await page.getByRole("button", { name: /^Continue/ }).click();
+  await expect(page.getByText("3 of 3")).toBeVisible();
+  await page.getByRole("button", { name: /^Back/ }).click();
+  await expect(page.getByRole("heading", { name: "One more thing." })).toBeVisible();
+  await page.getByRole("button", { name: /^Back/ }).click();
+  await expect(page.getByRole("heading", { name: "Make Example Host yours." })).toBeVisible();
+});
+
+test("Skip setup on a plain first run asks for a folder alone, with no scene", async ({ page }) => {
+  await asHost(page, "/?onboarding&plain");
+  await page.getByRole("button", { name: "Skip setup" }).click();
+  const prompt = page.getByRole("dialog", { name: "Example Host needs a folder for your notes" });
+  await expect(prompt).toBeVisible();
+  await expect(
+    page.locator(".vault-needed[data-look='plain'] .pane-scene, .vault-needed .pane-empty-scene"),
+  ).toHaveCount(0);
+  await expectNoQuokka(page);
+});

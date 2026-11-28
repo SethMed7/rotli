@@ -4,10 +4,18 @@
 // shortcuts worth knowing. The window, music, quokka, and chat models wait in
 // the app, where they're used: Settings, the sidebar player, and Chat.
 
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { DEFAULT_QUOKKA_ACCESSORY_HUE, DEFAULT_QUOKKA_CUSTOM_HUE } from "../../brand/quokka";
-import { mascotShown, productName } from "../../host/registry";
+import {
+  hostSetupStep,
+  mascotShown,
+  plainFirstRun,
+  productName,
+  setupOrder,
+  setupStepWords,
+  setupThemeChoice,
+} from "../../host/registry";
 import { resolveChord, useBindingsStore } from "../../keys/bindings";
 import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
 import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../../keys/registry";
@@ -15,17 +23,14 @@ import { DEFAULT_AMBIENT } from "../../lib/ambient";
 import { setDockVisible, setGlobalShortcut } from "../../lib/tauri";
 import { useAmbient } from "../../state/ambient";
 import { defaultAppearance } from "../../state/appearanceDefaults";
-import {
-  ONBOARDING_STEP_NUMBER,
-  ONBOARDING_TOTAL_STEPS,
-  firstRunWindow,
-  isFirstRun,
-} from "../../state/onboarding";
+import { firstRunWindow, isFirstRun } from "../../state/onboarding";
 import { flushSettingsNow } from "../../state/persist";
 import { startSetupDetection } from "../../state/setupDetection";
+import { stepAfter } from "../../state/setupSequence";
 import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
 import { Character } from "../character";
 import { AccentRow } from "../settingsSurface";
+import { StepBlocks, stepBlocks, useStepReady } from "./hostSetup";
 import { LibrarianScreen } from "./librarianStep";
 import { OnboardingIntro, OnboardingScenery, introWanted } from "./onboardingScenery";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary, useSetupHandle } from "./setupControls";
@@ -190,19 +195,35 @@ function ChordRow({ id, label, hint }: (typeof HOTKEYS)[number]) {
   );
 }
 
-function YouScreen({ advance }: { advance: () => void }) {
+function YouScreen({
+  advance,
+  title,
+  lede,
+  before,
+  after,
+}: {
+  advance: () => void;
+  title?: string | undefined;
+  lede?: string | undefined;
+  before: ReactNode;
+  after: ReactNode;
+}) {
   const theme = useUiStore((state) => state.theme);
   const family = useUiStore((state) => state.themeFamily);
   const userName = useUiStore((state) => state.userName);
   const setUserName = useUiStore((state) => state.setUserName);
   return (
     <>
-      <h1 id="setup-title">{`Make ${productName()} yours.`}</h1>
+      <h1 id="setup-title">{title ?? `Make ${productName()} yours.`}</h1>
       <p className="setup-lede">
-        {mascotShown()
-          ? "Your name and a theme now; your notes folder next. Your quokka, music, and the rest wait in Settings."
-          : "Your name and a theme now; your notes folder next. Music and the rest wait in Settings."}
+        {lede ??
+          (plainFirstRun()
+            ? "Your name and a theme now; your notes folder next. Music and the rest wait in Settings, where you can change any of this later."
+            : mascotShown()
+              ? "Your name and a theme now; your notes folder next. Your quokka, music, and the rest wait in Settings."
+              : "Your name and a theme now; your notes folder next. Music and the rest wait in Settings.")}
       </p>
+      {before}
       <label className="setup-name-field">
         <span>
           {`What should ${productName()} call you? `}
@@ -225,36 +246,43 @@ function YouScreen({ advance }: { advance: () => void }) {
         />
         <small>Used for greetings only.</small>
       </label>
-      <SetupChoiceGroup
-        label="Theme"
-        value={family}
-        onChange={(next: ThemeFamily) => useUiStore.getState().setThemeFamily(next)}
-        options={THEME_FAMILY_PRESENTATIONS.map(({ family: optionFamily, label, lightLabel, darkLabel }) => ({
-          value: optionFamily,
-          title: label,
-          // the site's lit orbs, Light and Dark (the owner, 2026-09-30)
-          detail: (
-            <span className="setup-theme-pair" aria-hidden="true">
-              <span className="setup-orb" data-orb={`${optionFamily}-light`} title={lightLabel} />
-              <span className="setup-orb" data-orb={`${optionFamily}-dark`} title={darkLabel} />
-            </span>
-          ),
-        }))}
-      />
-      <div className="setup-mode-row">
-        <span>Mode</span>
-        <ThemeModeChoice value={theme} onChange={(next) => useUiStore.getState().setTheme(next)} />
-        <small>{theme === "system" ? "Follows macOS" : `System is off · ${theme}`}</small>
-      </div>
-      <div className="setup-accent">
-        <span>Accent</span>
-        <AccentRow />
-      </div>
+      {setupThemeChoice() && (
+        <>
+          <SetupChoiceGroup
+            label="Theme"
+            value={family}
+            onChange={(next: ThemeFamily) => useUiStore.getState().setThemeFamily(next)}
+            options={THEME_FAMILY_PRESENTATIONS.map(
+              ({ family: optionFamily, label, lightLabel, darkLabel }) => ({
+                value: optionFamily,
+                title: label,
+                // the site's lit orbs, Light and Dark (the owner, 2026-09-30)
+                detail: (
+                  <span className="setup-theme-pair" aria-hidden="true">
+                    <span className="setup-orb" data-orb={`${optionFamily}-light`} title={lightLabel} />
+                    <span className="setup-orb" data-orb={`${optionFamily}-dark`} title={darkLabel} />
+                  </span>
+                ),
+              }),
+            )}
+          />
+          <div className="setup-mode-row">
+            <span>Mode</span>
+            <ThemeModeChoice value={theme} onChange={(next) => useUiStore.getState().setTheme(next)} />
+            <small>{theme === "system" ? "Follows macOS" : `System is off · ${theme}`}</small>
+          </div>
+          <div className="setup-accent">
+            <span>Accent</span>
+            <AccentRow />
+          </div>
+        </>
+      )}
+      {after}
     </>
   );
 }
 
-function ShortcutsScreen() {
+function ShortcutsScreen({ before, after }: { before: ReactNode; after: ReactNode }) {
   return (
     <>
       <h1 id="setup-title">Three shortcuts, yours to change.</h1>
@@ -262,11 +290,13 @@ function ShortcutsScreen() {
         They work from any app. Keep these, or click one and press the keys you’d rather use. You can change
         them anytime in Settings → Keybindings.
       </p>
+      {before}
       <div className="setup-shortcuts">
         {HOTKEYS.map((hotkey) => (
           <ChordRow key={hotkey.id} {...hotkey} />
         ))}
       </div>
+      {after}
     </>
   );
 }
@@ -293,12 +323,16 @@ function skipToDefaults(): void {
 
 export function Onboarding({
   step,
+  order = setupOrder(),
   onDone,
   onBack,
   onSkip,
   resumed = false,
 }: {
-  step: SetupScreen;
+  /** One of Rotli's screens here, or a host's own step (host/registry.ts). */
+  step: SetupScreen | (string & {});
+  /** Setup's steps in order (state/setupSequence.ts); Rotli's or the host's. */
+  order?: readonly string[];
   onDone: () => void;
   onBack?: () => void;
   /** Skip setup from here; only the vault is required (setupFlow.tsx). */
@@ -306,11 +340,22 @@ export function Onboarding({
   /** Back from a later screen: keep what was chosen, no intro, no reset. */
   resumed?: boolean;
 }) {
-  // a fresh first run opens on the island (onboardingScenery.tsx)
-  const [intro, setIntro] = useState(() => introWanted(step === "you" && !resumed));
+  const plain = plainFirstRun();
+  const hostStep = hostSetupStep(step);
+  const screen = hostStep ? null : (step as SetupScreen);
+  const words = screen ? setupStepWords(screen) : {};
+  const blocks = useMemo(() => (screen ? stepBlocks(screen) : { before: [], after: [] }), [screen]);
+  const ready = useStepReady(
+    useMemo(() => [...blocks.before, ...blocks.after, ...(hostStep ? [hostStep] : [])], [blocks, hostStep]),
+  );
+  // a fresh first run opens on the island (onboardingScenery.tsx); a plain one doesn't
+  const [intro, setIntro] = useState(() => !plain && introWanted(step === "you" && !resumed));
   // a short window: the step scrolls, and says so
   const [stageRef, showScrollCue, stageScrolls] = useStageScrollCue();
-  const advance = onDone;
+  const advance = () => {
+    if (ready) onDone();
+  };
+  const next = stepAfter(step, order);
 
   useSetupHandle(advance, onBack);
   // A new install is in the Dock from the first frame (persist.ts) and stays
@@ -332,19 +377,21 @@ export function Onboarding({
     startSetupDetection();
   }, [step, resumed]);
 
-  const companion = COMPANION[step];
+  const companion = screen ? COMPANION[screen] : null;
+  const before = <StepBlocks blocks={blocks.before} />;
+  const after = <StepBlocks blocks={blocks.after} />;
   return (
-    <div className="onb" data-intro={intro ? "" : undefined}>
+    <div className="onb" data-intro={intro ? "" : undefined} data-look={plain ? "plain" : undefined}>
       <div className="onb-drag" data-tauri-drag-region />
       {/* Rotli's own theme is the island; another pick previews its scenery live */}
-      <OnboardingScenery />
+      {!plain && <OnboardingScenery />}
       <section className="setup-shell" aria-labelledby="setup-title">
         <div className="setup-progress">
           <span>
-            {ONBOARDING_STEP_NUMBER[step]} of {ONBOARDING_TOTAL_STEPS}
+            {order.indexOf(step) + 1} of {order.length}
           </span>
           <span aria-hidden="true">·</span>
-          <span>{TITLES[step]}</span>
+          <span>{words.label ?? hostStep?.label ?? (screen ? TITLES[screen] : step)}</span>
         </div>
 
         <div
@@ -355,15 +402,32 @@ export function Onboarding({
           key={step}
           ref={stageRef}
         >
-          <aside className={`setup-companion setup-companion--${step}`} aria-hidden="true">
-            <Character name={companion.pose} size={152} />
-            <p>{companion.line}</p>
-          </aside>
+          {!plain && companion && (
+            <aside className={`setup-companion setup-companion--${step}`} aria-hidden="true">
+              <Character name={companion.pose} size={152} />
+              <p>{companion.line}</p>
+            </aside>
+          )}
 
           <div className="setup-content">
-            {step === "you" && <YouScreen advance={advance} />}
-            {step === "librarian" && <LibrarianScreen />}
-            {step === "shortcuts" && <ShortcutsScreen />}
+            {step === "you" && (
+              <YouScreen
+                advance={advance}
+                title={words.title}
+                lede={words.lede}
+                before={before}
+                after={after}
+              />
+            )}
+            {step === "librarian" && <LibrarianScreen before={before} after={after} />}
+            {step === "shortcuts" && <ShortcutsScreen before={before} after={after} />}
+            {hostStep && (
+              <>
+                <h1 id="setup-title">{hostStep.title}</h1>
+                {hostStep.lede && <p className="setup-lede">{hostStep.lede}</p>}
+                <hostStep.Body />
+              </>
+            )}
           </div>
         </div>
 
@@ -390,12 +454,14 @@ export function Onboarding({
           )}
           <div className="setup-actions">
             {onBack && <SetupBack onClick={onBack} />}
-            <SetupPrimary onClick={advance}>
-              {step === "you"
-                ? "Choose where notes live"
-                : step === "shortcuts"
+            <SetupPrimary disabled={!ready} onClick={advance}>
+              {words.primary ??
+                hostStep?.primary ??
+                (next === null
                   ? "Finish setup"
-                  : "Continue"}
+                  : step === "you" && next === "vault"
+                    ? "Choose where notes live"
+                    : "Continue")}
             </SetupPrimary>
           </div>
         </footer>

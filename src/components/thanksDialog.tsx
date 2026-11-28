@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 
-import { productName } from "../host/registry";
+import { plainFirstRun, productName } from "../host/registry";
 import { ROTLI_REPO_URL } from "../lib/feedback";
 import { shareOnXUrl, shareStatus } from "../lib/thanksBanner";
 import { openLink, shareRotli } from "../services/thanksShare";
@@ -20,7 +20,7 @@ import { useOnboardingThanks } from "../state/onboardingThanks";
 import { showSettingsHintNow } from "../state/settingsHint";
 import { startTour } from "../state/tour";
 import { GitHubMarkGlyph, ShareGlyph, XMarkGlyph } from "./onboarding/shareMarks";
-import { ThanksBannerScene } from "./onboarding/thanksBannerScene";
+import { PlainThanksBanner, ThanksBannerScene } from "./onboarding/thanksBannerScene";
 import { WebDialogFrame } from "./webDialogFrame";
 
 export function ThanksDialog() {
@@ -108,7 +108,7 @@ function ThanksCard() {
         Rotli is made in the open. If it earns a place on your Mac, a star on GitHub helps other people find
         it, and sharing it with a friend helps even more.
       </p>
-      <ThanksBannerScene />
+      {plainFirstRun() ? <PlainThanksBanner /> : <ThanksBannerScene />}
     </WebDialogFrame>
   );
 }
