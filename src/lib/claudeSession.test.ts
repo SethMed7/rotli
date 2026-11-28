@@ -44,8 +44,8 @@ function fakeRust(args: Record<string, string | Error>) {
       const callId = String(payload.callId);
       if (command === "tool_args") {
         const value = args[callId];
-        if (served.has(callId) || value instanceof Error)
-          throw value ?? new Error("that tool call has ended");
+        if (value instanceof Error) throw value;
+        if (served.has(callId)) throw new Error("that tool call has ended");
         served.add(callId);
         return value;
       }
