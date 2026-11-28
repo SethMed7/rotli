@@ -26,6 +26,7 @@
     "chat_messages_stream",
     "chat_models",
     "claude_session_run",
+    "claude_session_tool_args",
     "claude_session_tool_result",
     "cli_cancel",
     "cli_complete",

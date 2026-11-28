@@ -15,7 +15,9 @@
 //!      back inside a rescanned prompt; a hit is withheld from the model.
 //!
 //! The webview executes the tool itself (src/ai/nativeLoop.ts, with the loop's
-//! own egress guards) and answers through `claude_session_tool_result`.
+//! own egress guards) and answers through `claude_session_tool_result`. A
+//! `tool_call` event names the call; its arguments, which can be long, come
+//! back through `claude_session_tool_args`.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -25,9 +27,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use tauri::ipc::Channel;
-
 use crate::claude_protocol::{Protocol, Step, ToolSpec, Wire};
+use crate::event_channel::EventChannel;
 use crate::provider::{self, ProviderState, Running};
 
 const MAX_TOOLS: usize = 32;
@@ -36,10 +37,19 @@ const TOOL_WAIT: Duration = Duration::from_secs(300);
 /// The whole turn's hard ceiling, whatever the per-step timeout × turns says.
 const SESSION_CEILING: Duration = Duration::from_secs(30 * 60);
 
+/// One tool call waiting on the webview: its arguments until the webview reads
+/// them, and where its answer goes.
+struct Pending {
+    args: Option<String>,
+    answer: Sender<String>,
+}
+
+type PendingCalls = Arc<Mutex<HashMap<String, Pending>>>;
+
 /// Tool calls waiting on the webview, keyed `<request_id>:<call_id>`.
 #[derive(Default)]
 pub struct SessionState {
-    pending: Arc<Mutex<HashMap<String, Sender<String>>>>,
+    pending: PendingCalls,
 }
 
 /// One chat turn on Claude's native protocol. Resolves with the final answer.
@@ -58,7 +68,7 @@ pub async fn claude_session_run(
     reasoning_effort: Option<String>,
     // the person's own messages they chose to send anyway (remote_block.rs)
     consent: Option<Vec<String>>,
-    on_event: Channel<String>,
+    on_event: EventChannel,
 ) -> Result<String, String> {
     provider::connected_provider_execution_allowed("claude")?;
     // the lane is remote by definition — the same egress law as cli_complete
@@ -94,10 +104,25 @@ pub fn claude_session_tool_result(
     call_id: String,
     result: String,
 ) -> Result<(), String> {
-    if let Some(tx) = sessions.pending.lock().unwrap().remove(&format!("{request_id}:{call_id}")) {
-        let _ = tx.send(result);
+    if let Some(call) = sessions.pending.lock().unwrap().remove(&format!("{request_id}:{call_id}")) {
+        let _ = call.answer.send(result);
     }
     Ok(())
+}
+
+/// The arguments of one `tool_call` event, as JSON text, read once.
+#[tauri::command]
+pub fn claude_session_tool_args(
+    sessions: tauri::State<'_, SessionState>,
+    request_id: String,
+    call_id: String,
+) -> Result<String, String> {
+    take_args(&sessions.pending, &format!("{request_id}:{call_id}"))
+}
+
+fn take_args(pending: &PendingCalls, key: &str) -> Result<String, String> {
+    let mut calls = pending.lock().unwrap();
+    calls.get_mut(key).and_then(|call| call.args.take()).ok_or_else(|| "that tool call has ended".into())
 }
 
 fn check_tools(tools: &[ToolSpec]) -> Result<(), String> {
@@ -138,8 +163,8 @@ pub(crate) fn session_args(model: &str, effort: Option<&str>, max_turns: u32) ->
 
 struct LiveWire<'a> {
     stdin: Option<ChildStdin>,
-    events: Channel<String>,
-    pending: &'a Arc<Mutex<HashMap<String, Sender<String>>>>,
+    events: EventChannel,
+    pending: &'a PendingCalls,
     children: &'a Arc<Mutex<HashMap<String, Running>>>,
     request_id: &'a str,
     token: u64,
@@ -166,11 +191,11 @@ impl Wire for LiveWire<'_> {
     fn call_tool(&mut self, call_id: &str, name: &str, args: &Value) -> Option<String> {
         let key = format!("{}:{call_id}", self.request_id);
         let (tx, rx) = mpsc::channel();
-        self.pending.lock().unwrap().insert(key.clone(), tx);
-        let event = json!({"type": "tool_call", "callId": call_id, "name": name, "args": args});
+        self.pending.lock().unwrap().insert(key.clone(), Pending { args: Some(args.to_string()), answer: tx });
+        let event = json!({"type": "tool_call", "callId": call_id, "name": name});
         let started = Instant::now();
         let mut answer = None;
-        if self.events.send(event.to_string()).is_ok() {
+        if self.events.send(&event.to_string()).is_ok() {
             while started.elapsed() < TOOL_WAIT {
                 match rx.recv_timeout(Duration::from_millis(250)) {
                     Ok(text) => {
@@ -189,12 +214,12 @@ impl Wire for LiveWire<'_> {
 
 fn run_session(
     children: &Arc<Mutex<HashMap<String, Running>>>,
-    pending: &Arc<Mutex<HashMap<String, Sender<String>>>>,
+    pending: &PendingCalls,
     request_id: &str,
     args: &[String],
     mut proto: Protocol,
     deadline: Duration,
-    events: Channel<String>,
+    events: EventChannel,
 ) -> Result<String, String> {
     let bin = provider::resolve_bin(provider::spec("claude")?).ok_or("claude isn't installed (checked its usual homes)")?;
     // a scratch cwd: no project CLAUDE.md or hooks from wherever Rotli launched
@@ -249,6 +274,31 @@ fn run_session(
 mod tests {
     use super::*;
 
+    /// The webview's side of a session: read each call's arguments by command,
+    /// run `tool` on them, and answer.
+    fn webview(pending: &PendingCalls, request_id: &str, tool: fn(&Value) -> String) -> EventChannel {
+        webview_seeing(pending, request_id, |_| {}, tool)
+    }
+
+    fn webview_seeing(
+        pending: &PendingCalls,
+        request_id: &str,
+        see: impl Fn(&str) + Send + Sync + 'static,
+        tool: fn(&Value) -> String,
+    ) -> EventChannel {
+        let (pending, request_id) = (Arc::clone(pending), request_id.to_string());
+        EventChannel::from_fn(move |raw| {
+            see(&raw);
+            let ev: Value = serde_json::from_str(&serde_json::from_str::<String>(&raw).unwrap()).unwrap();
+            let key = format!("{request_id}:{}", ev["callId"].as_str().unwrap());
+            let args: Value = serde_json::from_str(&take_args(&pending, &key).unwrap()).unwrap();
+            assert!(take_args(&pending, &key).is_err(), "arguments are read once");
+            if let Some(call) = pending.lock().unwrap().remove(&key) {
+                let _ = call.answer.send(tool(&args));
+            }
+        })
+    }
+
     fn spec(name: &str) -> ToolSpec {
         ToolSpec { name: name.into(), description: "d".into(), input_schema: json!({"type": "object"}) }
     }
@@ -276,19 +326,8 @@ mod tests {
     #[ignore = "spawns the installed claude CLI"]
     fn live_round_trip_with_the_real_cli() {
         let children = Arc::new(Mutex::new(HashMap::new()));
-        let pending: Arc<Mutex<HashMap<String, Sender<String>>>> = Arc::default();
-        let answers = Arc::clone(&pending);
-        let events = Channel::new(move |body| {
-            let tauri::ipc::InvokeResponseBody::Json(raw) = body else { return Ok(()) };
-            // Channel<String> sends a JSON string holding the event's JSON
-            let inner: String = serde_json::from_str(&raw).unwrap();
-            let ev: Value = serde_json::from_str(&inner).unwrap();
-            let key = format!("live:{}", ev["callId"].as_str().unwrap());
-            if let Some(tx) = answers.lock().unwrap().remove(&key) {
-                let _ = tx.send(format!("ECHO:{}", ev["args"]["query"].as_str().unwrap_or("")));
-            }
-            Ok(())
-        });
+        let pending = PendingCalls::default();
+        let events = webview(&pending, "live", |args| format!("ECHO:{}", args["query"].as_str().unwrap_or("")));
         let tool = ToolSpec {
             name: "search_notes".into(),
             description: "Search the user's notes.".into(),
@@ -303,6 +342,43 @@ mod tests {
         let answer = run_session(&children, &pending, "live", &args, proto, Duration::from_secs(120), events).unwrap();
         assert!(answer.contains("ECHO:kiwi"), "got: {answer}");
         assert!(children.lock().unwrap().is_empty() && pending.lock().unwrap().is_empty());
+    }
+
+    /// Tauri hands a channel message to the webview directly only while its
+    /// serialized body stays under 8,192 bytes.
+    const DIRECT: usize = 8192;
+
+    #[test]
+    fn a_large_tool_call_reaches_the_webview_in_small_messages() {
+        let children = Arc::new(Mutex::new(HashMap::new()));
+        let pending = PendingCalls::default();
+        let sizes = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&sizes);
+        let events = webview_seeing(&pending, "r", move |raw| seen.lock().unwrap().push(raw.len()), |args| {
+            format!("{}:{}", args["title"].as_str().unwrap(), args["body"].as_str().unwrap().len())
+        });
+        let mut wire = LiveWire { stdin: None, events, pending: &pending, children: &children, request_id: "r", token: 0 };
+        // quotes and newlines are escaped twice on the way: 5 KiB of them serializes past 11 KiB
+        let quoted = "\"line\"\n".repeat(768);
+        for (i, body) in ["x".repeat(9000), quoted].into_iter().enumerate() {
+            let expected = format!("Long note:{}", body.len());
+            let args = json!({"title": "Long note", "body": body});
+            assert_eq!(wire.call_tool(&format!("c{i}"), "create_note", &args), Some(expected));
+        }
+        let sizes = sizes.lock().unwrap();
+        assert!(!sizes.is_empty() && sizes.iter().all(|&n| n < DIRECT), "message sizes: {sizes:?}");
+        assert!(pending.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn arguments_no_one_read_are_dropped_when_the_call_ends() {
+        let children = Arc::new(Mutex::new(HashMap::new()));
+        let pending = PendingCalls::default();
+        let events = EventChannel::from_fn(|_| {});
+        let mut wire = LiveWire { stdin: None, events, pending: &pending, children: &children, request_id: "r", token: 0 };
+        assert_eq!(wire.call_tool("c1", "read_note", &json!({"id": "n1"})), None);
+        assert!(pending.lock().unwrap().is_empty());
+        assert!(take_args(&pending, "r:c1").is_err());
     }
 
     #[test]

@@ -1,6 +1,7 @@
 // Native adapter for Claude's agent protocol (src-tauri/src/claude_session.rs).
-// One Channel carries the model's tool calls up from Rust; each answer goes back
-// through `claude_session_tool_result`. Rust owns every gate — which tools may
+// One Channel names each of the model's tool calls as it comes up from Rust; the
+// call's arguments are read through `claude_session_tool_args`, and each answer
+// goes back through `claude_session_tool_result`. Rust owns every gate — which tools may
 // run, the secret scan on arguments, and the rescan of every result.
 
 import { Channel, invoke } from "@tauri-apps/api/core";
@@ -45,17 +46,18 @@ export function claudeSession(requestId: string): NativeSession {
   return (req, onToolCall) => {
     const channel = new Channel<string>();
     channel.onmessage = (raw) => {
-      const call = parseToolCall(raw);
-      if (!call) return;
+      const event = parseToolCallEvent(raw);
+      if (!event) return;
       // a tool that threw answers with its error line, typed like every other
       // result: Rotli's own words, never a note's (fourth review)
-      void onToolCall(call)
+      void invoke<string>("claude_session_tool_args", { requestId, callId: event.callId })
+        .then((args) => onToolCall({ ...event, args: parseToolArgs(args) }))
         .catch(
           (e: unknown): PromptText =>
             prompt`error: ${externalText(e instanceof Error ? e.message : String(e))}`,
         )
         .then((result: PromptText) =>
-          invoke("claude_session_tool_result", { requestId, callId: call.callId, result }),
+          invoke("claude_session_tool_result", { requestId, callId: event.callId, result }),
         )
         .catch(() => undefined); // the turn already ended; nothing is waiting
     };
@@ -73,13 +75,22 @@ export function claudeSession(requestId: string): NativeSession {
   };
 }
 
-export function parseToolCall(raw: string): NativeToolCall | null {
+/** A `tool_call` event names the call; its arguments are read separately. */
+export function parseToolCallEvent(raw: string): Omit<NativeToolCall, "args"> | null {
   try {
-    const ev = JSON.parse(raw) as { type?: unknown; callId?: unknown; name?: unknown; args?: unknown };
+    const ev = JSON.parse(raw) as { type?: unknown; callId?: unknown; name?: unknown };
     if (ev.type !== "tool_call" || typeof ev.callId !== "string" || typeof ev.name !== "string") return null;
-    const args = ev.args && typeof ev.args === "object" ? (ev.args as Record<string, unknown>) : {};
-    return { callId: ev.callId, name: ev.name, args };
+    return { callId: ev.callId, name: ev.name };
   } catch {
     return null;
+  }
+}
+
+export function parseToolArgs(raw: string): Record<string, unknown> {
+  try {
+    const args: unknown = JSON.parse(raw);
+    return args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : {};
+  } catch {
+    return {};
   }
 }

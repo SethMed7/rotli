@@ -256,6 +256,20 @@ describe("check:ipc — the rest of its refusals", () => {
     expect(r.out).toContain('"webviews" must be an array');
   });
 
+  test("a Tauri channel named outside EventChannel fails, a comment doesn't", () => {
+    const root = tree();
+    edit(root, "src-tauri/src/chat.rs", (s) =>
+      s.replace("on_token: crate::event_channel::EventChannel,", "on_token: tauri::ipc::Channel<String>,"),
+    );
+    const r = check(root);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("never Tauri's channel");
+    expect(r.out).toContain("src-tauri/src/chat.rs");
+    const clean = tree();
+    edit(clean, "src-tauri/src/chat.rs", (s) => `// a tauri::ipc::Channel<String> in prose\n${s}`);
+    expect(check(clean).code).toBe(0);
+  });
+
   // the uncalled baseline may only shrink: a name that left it must be deleted
   test("an uncalled-baseline name that is now called fails", () => {
     const root = tree();

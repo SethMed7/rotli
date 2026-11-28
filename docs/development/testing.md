@@ -329,6 +329,9 @@ tests are additional verify phases.
   Rotli's commands with, equal to the handler and to the capability files'
   webview labels, with no glob pattern but `finder_*`, and refuses what it
   can't read (list-shaped, TOML or inline capabilities, a second handler).
+  Only `src-tauri/src/event_channel.rs` may name Tauri's channel types: a
+  command that streams to the webview takes its `EventChannel`, which keeps
+  every message under 6 KiB as sent and splits or refuses anything larger.
   Each of its gates has a case in `scripts/check-ipc-contract.test.ts`.
 - `check:web-parity` keeps the native registry and explicit web availability
   inventory exhaustive in both directions; it rejects missing, stale, duplicate,
