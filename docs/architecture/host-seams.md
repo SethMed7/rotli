@@ -1144,6 +1144,52 @@ or Markdown notes; those are listed under "What a host still sees".
   its own), the Dock and app icons (the host's bundle), and the web build's
   favicon and brand mark, which no host ships.
 
+## First run under a host
+
+`AppHost.firstRun` (`HostFirstRun` in `src/host/registry.ts`) shapes setup.
+Rotli gives the slots and the order; what goes in them is the host's. With no
+`firstRun`, setup is Rotli's own four steps, exactly as before.
+
+- **`plain: true`**: one centred column about 760px wide on the theme's flat
+  ground. No scenery, no companion column or its lines, no island intro, no
+  scene behind Skip's folder prompt, and a thank-you card of words alone. The
+  folder step becomes a row ("Notes folder" and its own button): picking a
+  folder stays on the step, and the step's primary moves on once a folder is
+  chosen. A vault the build already has (a host's scratch vault, say) counts
+  as chosen. Every rule is scoped under `[data-look="plain"]`, so the
+  standalone screens keep their CSS untouched. Re-cut from the private
+  merge thread's plain first run, behind this option.
+- **`order`**: the step ids in order, Rotli's (`you`, `vault`, `librarian`,
+  `shortcuts`) and the host's. It starts with `you`, which sets up the first
+  window, and holds `vault`, the one thing setup can't do without. Absent:
+  Rotli's four, then the host's steps.
+- **`steps`**: a host's own screens (`HostSetupStep`): an id that isn't
+  Rotli's, a progress label, a heading, an optional lede and primary, and a
+  `Body`. Each must sit in the order.
+- **`blocks`**: components a host adds to one of Rotli's steps (`step`,
+  `place: "before" | "after"`): after the step's heading and lede, or after
+  its own controls. In the plain folder step, "before" is above the folder
+  row. A block for a step the order leaves out throws at registration.
+- **Readiness.** A step or block may give `ready()` and `subscribeReady()`,
+  like a pane's `visible`; the step's primary and its keyboard chord stay
+  disabled until every one says yes.
+- **`words`**: per step of Rotli's, the progress label, the heading and lede
+  (You and the folder step), and the primary button. Each falls back to
+  Rotli's.
+- **`themeChoice: false`**: the You step drops the theme, mode and accent;
+  they wait in Settings › Appearance.
+- **Saved phases.** A host's step is saved as `host:<id>`. A saved phase the
+  order doesn't hold (a host step since removed, a step the host left out, or
+  a host's phase read by standalone Rotli) starts setup again at the first
+  step (`setupStepNow` in `src/state/setupSequence.ts`).
+- **Skip.** "Skip setup" on You and "Skip the rest" after it do what they do
+  in Rotli: straight into the app when a vault is chosen, else the one prompt
+  for a folder. The plain folder row offers "Skip the rest" too.
+- **Not built:** the content of the approved mocks' cards and connect row.
+  Those are the host's blocks; this repository's synthetic host
+  (`e2e/host-first-run.fixture.ts`) stands in for them with invented tools
+  and an invented service.
+
 ## What a host still sees
 
 Everything left saying "Rotli" is listed in
@@ -1187,7 +1233,7 @@ shows "Hide …" only, since it leaves system-wide chords out.
 
 ## Not built yet
 
-- **Hosts can't add yet:** sidebar fronts or first-run steps.
+- **Hosts can't add yet:** sidebar fronts.
 - **No seam for a host's own windows or pages.** A host plugin can still
   create webviews of its own, and then "Scoping Rotli's commands" applies.
 - **Hosts can't replace the Welcome catalog** (see "The welcome note").
@@ -1294,6 +1340,27 @@ shows "Hide …" only, since it leaves system-wide chords out.
 ## Proof
 
 This list says only what was run.
+
+- **First run under a host** (2026-11-28, tests and the browser lane; no
+  native build launched).
+  - TypeScript: `src/host/registry.test.ts` (a host's order, steps, blocks,
+    words and theme choice, Rotli's own without one, and each refusal at
+    registration) and `src/state/setupSequence.test.ts` (Rotli's four steps
+    counted and walked as before; `host:<id>` phases; a phase the order
+    doesn't hold starting again at the first step). Both failed on the
+    previous commit (`src/state/setupSequence.ts` didn't exist).
+  - Browser lane, synthetic host (`e2e/host-identity.spec.ts` with
+    `?plain`): two steps with the host's words, its tool cards in You and no
+    theme choice, companion, scenery or intro; the folder step's Finish held
+    until both the host's connect row and a folder say yes; the words-only
+    thank-you; Back through a host's own step; Skip's folder prompt with no
+    scene. The plain tests failed on the previous commit.
+  - The plain steps in all eight families, light and dark, captured for
+    review; every one reads.
+  - Standalone, browser lane: the same 22 screens, three runs on the
+    previous commit and three on this one, back to back. The DOM matched in
+    all 66; the pixels that differed were the Settings banners' scenery,
+    as two runs of the previous commit differ there too.
 
 - **The words everywhere, the look, and the name guard** (2026-11-28, tests
   and the browser lane; no native build launched).

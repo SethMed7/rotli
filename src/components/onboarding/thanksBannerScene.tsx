@@ -12,11 +12,30 @@ import { Character } from "../character";
 import { SETTINGS_BACKDROPS } from "../settings/settingsBackdropArt";
 import { HORIZON_FRAME } from "../settings/settingsBanner";
 
+/** The thank-you's two lines, by the person's first name. */
+function BannerLines() {
+  const text = bannerText(useUiStore((s) => s.userName));
+  return (
+    <>
+      <span className="thanks-banner-headline">{text.headline}</span>
+      <span className="thanks-banner-subline">{text.subline}</span>
+    </>
+  );
+}
+
+/** A plain first run's thank-you (host/registry.ts, HostFirstRun): the words
+ * alone on the card's flat ground, with no scene and no character. */
+export function PlainThanksBanner() {
+  return (
+    <div className="thanks-banner thanks-banner--plain">
+      <BannerLines />
+    </div>
+  );
+}
+
 export function ThanksBannerScene() {
   const family = useUiStore((s) => s.themeFamily);
-  const userName = useUiStore((s) => s.userName);
   const scenery = SETTINGS_BACKDROPS[family] ?? SETTINGS_BACKDROPS.warm;
-  const text = bannerText(userName);
   return (
     <figure className="thanks-banner" data-scenery={family}>
       <svg className="thanks-banner-sky" viewBox="0 0 320 200" aria-hidden="true" focusable="false">
@@ -29,8 +48,7 @@ export function ThanksBannerScene() {
       {/* setup's quokka stays plain: dressing it is a Settings choice */}
       <Character name="celebrating" size={220} className="thanks-banner-quokka" accessorized={false} />
       <figcaption className="thanks-banner-words">
-        <span className="thanks-banner-headline">{text.headline}</span>
-        <span className="thanks-banner-subline">{text.subline}</span>
+        <BannerLines />
         <span className="thanks-banner-site">rotli.co</span>
       </figcaption>
     </figure>

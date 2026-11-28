@@ -6,8 +6,10 @@
 
 import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 
+import { plainFirstRun, setupOrder } from "../../host/registry";
 import { finishFirstRun } from "../../services/firstRun";
 import { flushSettingsNow } from "../../state/persist";
+import { phaseOfStep, setupStepNow, stepAfter, stepBefore } from "../../state/setupSequence";
 import { type OnboardingPhase, useUiStore } from "../../state/ui";
 import { type VaultStatus, useVaultStore } from "../../state/vault";
 import { VaultImportDialog } from "../vaultImportDialog";
@@ -57,25 +59,47 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
     </div>
   );
 
-  if (onboardingActive && phase === "preferences") {
+  // Rotli's four steps, or a host's order (host/registry.ts); a saved phase
+  // this order doesn't hold starts again at the first step
+  const order = setupOrder();
+  const step = onboardingActive ? setupStepNow(phase, order) : null;
+  const plain = plainFirstRun();
+  /** Onward from a step: the next one, or the end of setup. */
+  const forward = (from: string) => {
+    const next = stepAfter(from, order);
+    if (next === null) finish();
+    else go(phaseOfStep(next));
+  };
+  /** Back from a step to the one before, keeping what was chosen there. */
+  const backFrom = (from: string) => {
+    const before = stepBefore(from, order);
+    return before === null ? undefined : () => go(phaseOfStep(before), true);
+  };
+  /** Skip from here: a vault is the one thing setup needs (setupFlow above). */
+  const skipRest = () => {
+    if (skipLeadsTo(vaultStatus) === "app") finish();
+    else go("skipped");
+  };
+
+  if (step === "you") {
     return screen(
       <Onboarding
         step="you"
+        order={order}
         resumed={resumed}
-        onDone={() => go("vault")}
+        onDone={() => forward("you")}
         onSkip={() => {
           // Skip (the owner, 2026-10-05: "only required thing is a vault";
           // 2026-10-06: Skip goes straight to the app). With a vault already
           // chosen the app just opens; without one, it opens to a prompt.
-          if (skipLeadsTo(vaultStatus) === "app") finish();
-          else go("skipped");
+          skipRest();
         }}
       />,
     );
   }
 
   if (skippedWithVault) return null;
-  if (onboardingActive && phase === "skipped") {
+  if (step === "skipped") {
     return screen(
       <VaultNeeded
         onDone={() => {
@@ -95,22 +119,42 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
   }
 
   const vaultUnconfigured = native && vaultStatus === "unconfigured" && !onboardingActive;
-  if (vaultPending || (onboardingActive && phase === "vault") || vaultUnconfigured) {
+  if (vaultPending || step === "vault" || vaultUnconfigured) {
+    const next = stepAfter("vault", order);
+    const after = () => {
+      setVaultPending(false);
+      if (next === null) {
+        finish();
+        return flushSettingsNow();
+      }
+      useUiStore.getState().setOnboardingPhase(phaseOfStep(next));
+      return flushSettingsNow();
+    };
+    // a plain first run's folder row picks and stays; its primary moves on
+    const rows = plain && onboardingActive;
+    const vaultBack = backFrom("vault");
     return screen(
       <VaultActivation
         onboarding={onboardingActive}
         allowCurrent={vaultStatus === "configured"}
         {...(onboardingActive
           ? {
-              onBack: () => go("preferences", true),
-              onDone: () => {
-                setVaultPending(false);
-                useUiStore.getState().setOnboardingPhase("librarian");
-                return flushSettingsNow();
-              },
+              ...(vaultBack ? { onBack: vaultBack } : {}),
+              onDone: after,
+              ...(rows
+                ? {
+                    onPicked: () => {
+                      setVaultPending(false);
+                      return flushSettingsNow();
+                    },
+                    onSkip: skipRest,
+                  }
+                : {}),
               onBeforeSwitch: () => {
                 setVaultPending(true);
-                useUiStore.getState().setOnboardingPhase("librarian");
+                // the switch may reload the corpus: resume where setup goes next,
+                // or, for the row, on this step
+                useUiStore.getState().setOnboardingPhase(rows || next === null ? "vault" : phaseOfStep(next));
                 return flushSettingsNow();
               },
               onSwitchFailed: () => {
@@ -124,19 +168,16 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
     );
   }
 
-  if (onboardingActive && phase === "librarian") {
+  if (step !== null) {
+    const back = backFrom(step);
     return screen(
       <Onboarding
-        step="librarian"
-        onBack={() => go("vault", true)}
-        onDone={() => go("shortcuts")}
+        step={step}
+        order={order}
+        {...(back ? { onBack: back } : {})}
+        onDone={() => forward(step)}
         onSkip={finish}
       />,
-    );
-  }
-  if (onboardingActive && phase === "shortcuts") {
-    return screen(
-      <Onboarding step="shortcuts" onBack={() => go("librarian", true)} onDone={finish} onSkip={finish} />,
     );
   }
   return null;

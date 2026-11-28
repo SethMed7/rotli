@@ -8,7 +8,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { productName } from "../../host/registry";
+import { plainFirstRun, productName } from "../../host/registry";
 import { formatChord } from "../../keys/chords";
 import { currentChord } from "../../keys/registry";
 import { containDialogFocus } from "../../lib/dialogFocus";
@@ -43,10 +43,10 @@ export function VaultNeeded({
   useEffect(() => button.current?.focus(), []);
 
   return (
-    <div className="vault-needed">
+    <div className="vault-needed" data-look={plainFirstRun() ? "plain" : undefined}>
       <div className="onb-drag" data-tauri-drag-region />
       <div className="vault-needed-stack">
-        <PaneScene />
+        {!plainFirstRun() && <PaneScene />}
         <div
           className="rename-card vault-needed-card"
           role="dialog"

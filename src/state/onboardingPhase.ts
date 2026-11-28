@@ -11,12 +11,22 @@ export const FIRST_RUN_WINDOW = { stayOpen: true, showInDock: true } as const;
 /** "skipped": the person skipped setup with no vault yet, so the app asks for
  * one folder in a prompt and nothing else (the owner, 2026-10-06). Saved, so a
  * relaunch asks the same way instead of showing setup's vault step. */
-export type OnboardingPhase = "preferences" | "vault" | "librarian" | "shortcuts" | "skipped";
+export type OnboardingPhase =
+  | "preferences"
+  | "vault"
+  | "librarian"
+  | "shortcuts"
+  | "skipped"
+  /** a host's own first-run step (host/registry.ts, HostFirstRun) */
+  | `host:${string}`;
+
+const HOST_PHASE = /^host:[\w-]+$/;
 
 /** A saved phase, read tolerantly. "models" (setup before 2026-10-01, whose
  * last screen chose models and the Librarian) resumes at the Librarian. */
 export function onboardingPhaseOf(value: unknown): OnboardingPhase {
   if (value === "models") return "librarian";
+  if (typeof value === "string" && HOST_PHASE.test(value)) return value as `host:${string}`;
   return value === "vault" || value === "librarian" || value === "shortcuts" || value === "skipped"
     ? value
     : "preferences";

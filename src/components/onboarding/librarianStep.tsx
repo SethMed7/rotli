@@ -6,7 +6,7 @@
 // ever offered on a copy (decision H): choosing it copies the folder, and the
 // copy opens with the Librarian on.
 
-import { useEffect } from "react";
+import { type ReactNode, useEffect } from "react";
 
 import {
   LANE_STATUS_LABELS,
@@ -39,7 +39,7 @@ export function librarianCopyChoice(label: string) {
   };
 }
 
-export function LibrarianScreen() {
+export function LibrarianScreen({ before, after }: { before?: ReactNode; after?: ReactNode } = {}) {
   const config = useMemexConfig().data;
   const inPlace = openedInPlaceVault(config);
   const librarianOn = useUiStore((state) => state.brainEnabled) && !inPlace;
@@ -66,6 +66,7 @@ export function LibrarianScreen() {
         The Librarian keeps your Library tidy on its own schedule: it files new notes and suggests moves for
         you to approve. It never rewrites what you wrote, and secure and locked notes never leave this Mac.
       </p>
+      {before}
       <SetupChoiceGroup
         label="Librarian"
         value={librarianOn ? "on" : "off"}
@@ -93,6 +94,7 @@ export function LibrarianScreen() {
       <p className="setup-local-note">
         Models for chat come the first time you open Chat. Everything else is in Settings → AI Models.
       </p>
+      {after}
     </>
   );
 }

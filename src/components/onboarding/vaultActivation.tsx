@@ -6,9 +6,9 @@
 // (recommended), or the folder in place with only a hidden .rotli sidecar
 // (services/vaultImport.ts). A Rotli vault opens as it is.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { productName } from "../../host/registry";
+import { plainFirstRun, productName, setupOrder, setupStepWords } from "../../host/registry";
 import {
   corpusInspectFolder,
   corpusStatus,
@@ -18,11 +18,12 @@ import {
 } from "../../lib/tauri";
 import { chooseFolder, initMemexAsCorpus, pickVaultFolder } from "../../memex/service";
 import { activateCreatedVault, refreshActiveVault } from "../../state/activeVault";
-import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
 import { openRequestGate } from "../../state/openRequestGate";
 import { flushSettingsNow } from "../../state/persist";
+import { stepAfter } from "../../state/setupSequence";
 import { useUiStore } from "../../state/ui";
 import { Character } from "../character";
+import { StepBlocks, stepBlocks, useStepReady } from "./hostSetup";
 import { OnboardingScenery } from "./onboardingScenery";
 import {
   LIBRARIAN_ON_DESCRIPTION,
@@ -66,7 +67,8 @@ export function useVaultChoice({
   onSwitchFailed,
 }: {
   librarian: () => boolean;
-  onDone?: (() => void | Promise<void>) | undefined;
+  /** Told the folder that became the vault. */
+  onDone?: ((path: string) => void | Promise<void>) | undefined;
   onBeforeSwitch?: (() => void | Promise<void>) | undefined;
   onSwitchFailed?: (() => void | Promise<void>) | undefined;
 }) {
@@ -117,7 +119,7 @@ export function useVaultChoice({
         // a copy; the Librarian is its own step, and only it would need one
         vaultMoved = await openInPlace();
       }
-      await onDone?.();
+      await onDone?.(path);
     } catch (cause) {
       await restoreVaultStep();
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -134,24 +136,44 @@ export function VaultActivation({
   onboarding = false,
   allowCurrent = false,
   onDone,
+  onPicked,
   onBack,
+  onSkip,
   onBeforeSwitch,
   onSwitchFailed,
 }: {
   onboarding?: boolean;
   allowCurrent?: boolean;
   onDone?: () => void | Promise<void>;
+  /** A plain first run's folder row (host/registry.ts, HostFirstRun): a pick
+   * stays on this step and calls this; the primary then calls onDone. */
+  onPicked?: () => void | Promise<void>;
   onBack?: () => void;
+  /** A plain first run's "Skip the rest" (setupFlow.tsx). */
+  onSkip?: () => void;
   onBeforeSwitch?: () => void | Promise<void>;
   onSwitchFailed?: () => void | Promise<void>;
 }) {
+  const plain = plainFirstRun();
+  const rows = onboarding && plain && onPicked !== undefined;
+  const order = setupOrder();
+  const words = onboarding ? setupStepWords("vault") : {};
+  const blocks = useMemo(() => (onboarding ? stepBlocks("vault") : { before: [], after: [] }), [onboarding]);
+  const ready = useStepReady(useMemo(() => [...blocks.before, ...blocks.after], [blocks]));
   // outside setup no Librarian screen follows, so a new vault asks here
   const [librarian, setLibrarian] = useState<"on" | "off">("on");
   const [current, setCurrent] = useState<CorpusRefView | null>(null);
+  // the folder a plain first run's row picked, by name
+  const [picked, setPicked] = useState<string | null>(null);
   // in setup, whether the Librarian works here is the next screen's question
   const { choose, busy, setBusy, error, chooseLabel } = useVaultChoice({
     librarian: () => (onboarding ? useUiStore.getState().brainEnabled : librarian === "on"),
-    onDone,
+    onDone: rows
+      ? async (path) => {
+          setPicked(path.split("/").filter(Boolean).pop() ?? path);
+          await onPicked?.();
+        }
+      : onDone,
     onBeforeSwitch,
     onSwitchFailed,
   });
@@ -180,31 +202,60 @@ export function VaultActivation({
     }
   };
 
-  const primary = () => void choose();
+  const folder = picked ?? (current ? current.absPath.split("/").pop() || "this vault" : null);
+  // the row's step moves on once a folder is chosen and the host's blocks allow it
+  const canFinish = folder !== null && ready && !busy;
+  const primary = rows ? () => void (canFinish && keepCurrent()) : () => void choose();
   useSetupHandle(primary, onBack);
+  const next = onboarding ? stepAfter("vault", order) : null;
 
   return (
-    <div className="onb vault-activation">
+    <div className="onb vault-activation" data-look={plain && onboarding ? "plain" : undefined}>
       <div className="onb-drag" data-tauri-drag-region />
-      <OnboardingScenery />
+      {!(plain && onboarding) && <OnboardingScenery />}
       <section className="setup-shell" aria-labelledby="vault-title">
         <div className="setup-progress">
-          <span>{onboarding ? `${ONBOARDING_STEP_NUMBER.vault} of ${ONBOARDING_TOTAL_STEPS}` : "Vault"}</span>
+          <span>{onboarding ? `${order.indexOf("vault") + 1} of ${order.length}` : "Vault"}</span>
           <span aria-hidden="true">·</span>
-          <span>Vault</span>
+          <span>{words.label ?? "Vault"}</span>
         </div>
 
         <div className="setup-stage">
-          <aside className="setup-companion" aria-hidden="true">
-            <Character name={busy ? "searching" : "notes"} size={152} />
-            <p>Your notes stay ordinary files you own.</p>
-          </aside>
+          {!(plain && onboarding) && (
+            <aside className="setup-companion" aria-hidden="true">
+              <Character name={busy ? "searching" : "notes"} size={152} />
+              <p>Your notes stay ordinary files you own.</p>
+            </aside>
+          )}
 
           <div className="setup-content">
-            <h1 id="vault-title">Where should your notes live?</h1>
+            <h1 id="vault-title">{words.title ?? "Where should your notes live?"}</h1>
             <p className="setup-lede">
-              {`Pick a folder for your notes. Make a new one with New Folder and ${productName()} starts a fresh vault there, or pick the Markdown folder you already use, like an Obsidian vault: it stays as it is, and ${productName()} adds only a hidden .rotli folder.`}
+              {words.lede ??
+                `Pick a folder for your notes. Make a new one with New Folder and ${productName()} starts a fresh vault there, or pick the Markdown folder you already use, like an Obsidian vault: it stays as it is, and ${productName()} adds only a hidden .rotli folder.`}
             </p>
+            <StepBlocks blocks={blocks.before} />
+            {rows && (
+              <div className="setup-row">
+                <span className="setup-row-copy">
+                  <strong>Notes folder</strong>
+                  <span>
+                    {folder
+                      ? `Your notes live in “${folder}”. Choose another to change it.`
+                      : "An empty folder starts a new vault. A folder that already holds Markdown files opens as it is."}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="setup-button secondary"
+                  disabled={busy}
+                  onClick={() => void choose()}
+                >
+                  {busy ? "Working…" : folder ? "Choose another…" : "Choose folder…"}
+                </button>
+              </div>
+            )}
+            <StepBlocks blocks={blocks.after} />
             {!onboarding && (
               <SetupChoiceGroup
                 label="Librarian choice"
@@ -225,6 +276,9 @@ export function VaultActivation({
                 ]}
               />
             )}
+            {rows && !folder && (
+              <p className="setup-local-note">The next step waits until a folder is chosen.</p>
+            )}
             {error && (
               <p className="setup-error" role="alert">
                 {error}
@@ -234,10 +288,16 @@ export function VaultActivation({
         </div>
 
         <footer className="setup-footer">
-          <span className="setup-local-note">Local files remain the durable truth.</span>
+          {rows && onSkip ? (
+            <button type="button" className="setup-skip" onClick={onSkip}>
+              Skip the rest
+            </button>
+          ) : (
+            <span className="setup-local-note">Local files remain the durable truth.</span>
+          )}
           <div className="setup-actions">
             {onBack && <SetupBack disabled={busy} onClick={onBack} />}
-            {current && (
+            {current && !rows && (
               <button
                 type="button"
                 className="setup-button secondary"
@@ -247,9 +307,15 @@ export function VaultActivation({
                 Keep {current.absPath.split("/").pop() || "this vault"}
               </button>
             )}
-            <SetupPrimary disabled={busy} onClick={primary}>
-              {chooseLabel}
-            </SetupPrimary>
+            {rows ? (
+              <SetupPrimary disabled={!canFinish} onClick={primary}>
+                {words.primary ?? (next === null ? "Finish setup" : "Continue")}
+              </SetupPrimary>
+            ) : (
+              <SetupPrimary disabled={busy || !ready} onClick={primary}>
+                {chooseLabel}
+              </SetupPrimary>
+            )}
           </div>
         </footer>
       </section>

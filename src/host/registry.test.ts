@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 
 import {
   type AppHost,
+  type HostFirstRun,
   aboutBody,
   DEFAULT_ABOUT_LABEL,
   DEFAULT_CONNECTIONS_LEAD,
@@ -14,6 +15,7 @@ import {
   connectionsLead,
   createHostRegistry,
   dockRow,
+  hostSetupStep,
   hostThemeFamily,
   hostVersion,
   inlineName,
@@ -22,10 +24,15 @@ import {
   notesOn,
   notesSectionTag,
   paneBlocks,
+  plainFirstRun,
   plainPaneHeads,
   productMark,
   productName,
   registerHost,
+  setupOrder,
+  setupStepBlocks,
+  setupStepWords,
+  setupThemeChoice,
   updatesWords,
 } from "./registry";
 
@@ -186,4 +193,56 @@ test("an unknown theme family or mascot is refused at registration", () => {
   expect(() => createHostRegistry().register({ mascot: "otter" as never })).toThrow("mascot");
   expect(() => createHostRegistry().register({ productMark: "<svg/>" as never })).toThrow("product mark");
   expect(() => createHostRegistry().register({ themeFamily: "grove", mascot: "none" })).not.toThrow();
+});
+
+test("a host's first run: its order, its steps, blocks and words, and Rotli's own without one", () => {
+  const Body = () => null;
+  const host: AppHost = {
+    firstRun: {
+      plain: true,
+      order: ["you", "synthetic-tools", "vault"],
+      steps: [{ id: "synthetic-tools", label: "Tools", title: "Pick your tools.", Body }],
+      blocks: [{ step: "vault", place: "before", Block: Body }],
+      words: { vault: { label: "Connect", primary: "Finish setup" } },
+      themeChoice: false,
+    },
+  };
+  expect(() => createHostRegistry().register(host)).not.toThrow();
+  expect(setupOrder(host)).toEqual(["you", "synthetic-tools", "vault"]);
+  expect(plainFirstRun(host)).toBe(true);
+  expect(hostSetupStep("synthetic-tools", host)?.title).toBe("Pick your tools.");
+  expect(hostSetupStep("vault", host)).toBeNull();
+  expect(setupStepBlocks("vault", "before", host)).toHaveLength(1);
+  expect(setupStepBlocks("vault", "after", host)).toEqual([]);
+  expect(setupStepWords("vault", host)).toEqual({ label: "Connect", primary: "Finish setup" });
+  expect(setupStepWords("you", host)).toEqual({});
+  expect(setupThemeChoice(host)).toBe(false);
+  // with no order, Rotli's four come first and the host's steps after
+  expect(setupOrder({ firstRun: { steps: host.firstRun!.steps! } })).toEqual([
+    "you",
+    "vault",
+    "librarian",
+    "shortcuts",
+    "synthetic-tools",
+  ]);
+  // standalone
+  expect(setupOrder(null)).toEqual(["you", "vault", "librarian", "shortcuts"]);
+  expect(plainFirstRun(null)).toBe(false);
+  expect(setupThemeChoice(null)).toBe(true);
+});
+
+test("a first run that can't be followed is refused at registration", () => {
+  const Body = () => null;
+  const step = (id: string) => ({ id, label: id, title: id, Body });
+  const refused = (firstRun: HostFirstRun) => () => createHostRegistry().register({ firstRun });
+  expect(refused({ order: ["vault", "you"] })).toThrow('starts with "you"');
+  expect(refused({ order: ["you", "librarian"] })).toThrow('holds "vault"');
+  expect(refused({ order: ["you", "vault", "nowhere"] })).toThrow("Unknown first-run steps: nowhere");
+  expect(refused({ order: ["you", "vault", "vault"] })).toThrow("named twice");
+  expect(refused({ steps: [step("vault")] })).toThrow("none of them a built-in step's");
+  expect(refused({ steps: [step("a"), step("a")] })).toThrow("unique ids");
+  expect(refused({ order: ["you", "vault"], steps: [step("a")] })).toThrow("left out of the order: a");
+  expect(
+    refused({ order: ["you", "vault"], blocks: [{ step: "librarian", place: "before", Block: Body }] }),
+  ).toThrow("a step in the order: librarian");
 });

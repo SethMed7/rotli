@@ -6,6 +6,7 @@
 import { createElement as h } from "react";
 
 import { registerHost } from "../src/host/registry";
+import { syntheticFirstRun } from "./host-first-run.fixture";
 
 // A real host's registration module imports its panes, and they import
 // Rotli's components and stores before it registers; none of them may read the
@@ -29,12 +30,15 @@ const ExampleMark = ({ size = 16 }: { size?: number }) =>
     h("circle", { cx: 8, cy: 8, r: 6, fill: "none", stroke: "currentColor", strokeWidth: 2 }),
   );
 
+const params = new URLSearchParams(location.search);
 registerHost({
   words: { productName: "Example Host", aboutLabel: "About Example Host" },
   themeFamily: "ocean",
   mascot: "none",
   productMark: ExampleMark,
   aboutGlyph: ExampleMark,
+  // `?plain` adds the host's own first run (host-first-run.fixture.ts)
+  ...(params.has("plain") ? { firstRun: syntheticFirstRun(params) } : {}),
 });
 
 const APP_ENTRY = "/src/main.tsx";
