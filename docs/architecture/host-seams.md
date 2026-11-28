@@ -1110,7 +1110,10 @@ literals under `src-tauri/src/` (not test modules, printed lines or `rotli: `
 log lines), and `index.html`'s title. Each one either goes through the words
 above or is listed in `scripts/product-name-allowlist.json` with a category.
 A new string fails, and so does a listed string that is gone or has no
-category. It doesn't read JSON assets (the Welcome catalog), CSS `content`
+category. An entry covers one copy of its text in its file; a text that
+appears more often says `{ "category": …, "count": n }`, so one listed "Rotli"
+can't cover a second. Rust is read by line, so a string literal split across
+lines isn't seen. It doesn't read JSON assets (the Welcome catalog), CSS `content`
 or Markdown notes; those are listed under "What a host still sees".
 
 ## The look
