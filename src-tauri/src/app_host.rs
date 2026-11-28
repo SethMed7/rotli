@@ -64,13 +64,14 @@ impl AppHost {
         self
     }
 
-    /// Asked once at launch, before the main window is made: true makes it
-    /// hidden and keeps the page from showing it as it loads, so a login
-    /// launch starts with no window. `rotli_lib::host::show_main` or
-    /// `rotli_lib::host::open_settings` shows it later. It runs before any
-    /// window or plugin exists, so it must answer from the process alone (an
-    /// argument, an environment variable). Set once: a later call replaces an
-    /// earlier one.
+    /// Whether this launch starts with no window. `main` is made hidden, and
+    /// the predicate is asked once, at the start of Rotli's setup: true keeps
+    /// it hidden and keeps the page from showing it as it loads; false shows
+    /// it. `rotli_lib::host::show_main` or `rotli_lib::host::open_settings`
+    /// shows it later. Inside the predicate,
+    /// `rotli_lib::host::launched_as_login_item` says whether this is a login
+    /// launch and `rotli_lib::host::pending_opened_urls` which URLs launched
+    /// it. Set once: a later call replaces an earlier one.
     #[must_use]
     pub fn start_hidden(mut self, hidden: impl Fn() -> bool + Send + Sync + 'static) -> Self {
         self.shell = self.shell.start_hidden(Box::new(hidden));
