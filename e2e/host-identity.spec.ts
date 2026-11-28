@@ -69,6 +69,9 @@ test("Settings › Appearance has no quokka studio and no quokka trails", async 
 
 test("first run names the host and shows no quokka on any screen", async ({ page }) => {
   await asHost(page, "/?onboarding");
+  // the island intro plays its scene and word with no quokka shell
+  await expect(page.getByTestId("onboarding-intro")).toBeVisible();
+  await expect(page.locator(".onb-intro-quokka")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Make Example Host yours." })).toBeVisible();
   await expect(page.getByText("What should Example Host call you?")).toBeVisible();
   await expectNoQuokka(page);

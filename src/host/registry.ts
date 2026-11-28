@@ -149,6 +149,8 @@ export function createHostRegistry(): HostRegistry {
         throw new Error(`Host pane blocks go before or after ${BLOCK_PANES.join(", ")}`);
       if (next.themeFamily !== undefined && !(THEME_FAMILIES as readonly string[]).includes(next.themeFamily))
         throw new Error(`A host's theme family is one of ${THEME_FAMILIES.join(", ")}`);
+      if (next.productMark !== undefined && typeof next.productMark !== "function")
+        throw new Error("A host's product mark is a component that takes a size");
       if (next.mascot !== undefined && next.mascot !== "quokka" && next.mascot !== "none")
         throw new Error('A host\'s mascot is "quokka" or "none"');
       host = Object.freeze({
