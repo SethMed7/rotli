@@ -50,6 +50,8 @@ export const SINKS = [
   "corpus::spawn_watcher",
   "app_identity::claim",
   "app_identity::claim_for",
+  "app_identity::claim_new_vault",
+  "app_identity::claim_new_vault_for",
   "corpus::persist_corpus_path",
   "corpus::set_corpus_path_live",
   "corpus::upsert_brain",
