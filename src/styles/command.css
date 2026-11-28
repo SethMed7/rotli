@@ -518,6 +518,11 @@
   line-height: 0;
   color: var(--text);
 }
+.host-product-mark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 .quokka-line,
 .quokka-layer,
 .quokka-detail-layer {

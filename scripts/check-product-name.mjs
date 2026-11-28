@@ -217,24 +217,38 @@ export function scan(root) {
   return byFile;
 }
 
-/** Failures: a literal the allowlist doesn't name, a listed one that is gone,
- * and a reason that isn't one of the categories. */
+/** An entry's category and how many times its text may appear in the file:
+ * "category" for once, or { category, count } for more. */
+const entryOf = (value) => (typeof value === "string" ? { category: value, count: 1 } : value);
+
+/** Failures: a literal the allowlist doesn't name, one that appears more often
+ * than listed (so one listed "Rotli" can't cover a second), a listed one that
+ * is gone or appears less often, and a reason that isn't one of the categories. */
 export function productNameFailures(found, allowlist) {
   const failures = [];
   const categories = allowlist.categories ?? {};
   const allowed = allowlist.allowed ?? {};
   for (const [file, list] of Object.entries(found)) {
     const listed = allowed[file] ?? {};
-    for (const { text, line } of list)
-      if (!(text in listed))
+    const seen = new Map();
+    for (const { text, line } of list) {
+      seen.set(text, (seen.get(text) ?? 0) + 1);
+      if (!(text in listed) || seen.get(text) > entryOf(listed[text]).count)
         failures.push(
           `${file}:${line}: "${text}" names the app outside the host words; route it through productName() or inlineName() (in Rust, app_identity::app_name() or product_name()), or list it in ${ALLOWLIST} with a category`,
         );
+    }
   }
   for (const [file, texts] of Object.entries(allowed)) {
-    const present = new Set((found[file] ?? []).map((item) => item.text));
-    for (const [text, category] of Object.entries(texts)) {
-      if (!present.has(text)) failures.push(`${ALLOWLIST}: "${text}" is no longer in ${file}; remove it`);
+    const present = (text) => (found[file] ?? []).filter((item) => item.text === text).length;
+    for (const [text, value] of Object.entries(texts)) {
+      const { category, count } = entryOf(value);
+      if (present(text) < count)
+        failures.push(
+          present(text) === 0
+            ? `${ALLOWLIST}: "${text}" is no longer in ${file}; remove it`
+            : `${ALLOWLIST}: "${text}" appears ${present(text)} time(s) in ${file}, not ${count}; lower its count`,
+        );
       if (!(category in categories))
         failures.push(`${ALLOWLIST}: "${text}" in ${file} has no category "${category}"`);
     }

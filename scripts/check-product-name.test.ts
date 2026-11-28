@@ -119,6 +119,34 @@ describe("check:product-name", () => {
     ]);
   });
 
+  test("one listed text covers only as many copies as its count", () => {
+    const twice = {
+      "src/a.tsx": [
+        { text: "Rotli", line: 3 },
+        { text: "Rotli", line: 9 },
+      ],
+    };
+    const categories = { "rotli-name": "Rotli's own names" };
+    const once = productNameFailures(twice, {
+      categories,
+      allowed: { "src/a.tsx": { Rotli: "rotli-name" } },
+    });
+    expect(once).toHaveLength(1);
+    expect(once[0]).toContain('src/a.tsx:9: "Rotli"');
+    expect(
+      productNameFailures(twice, {
+        categories,
+        allowed: { "src/a.tsx": { Rotli: { category: "rotli-name", count: 2 } } },
+      }),
+    ).toEqual([]);
+    expect(
+      productNameFailures(
+        { "src/a.tsx": [{ text: "Rotli", line: 3 }] },
+        { categories, allowed: { "src/a.tsx": { Rotli: { category: "rotli-name", count: 2 } } } },
+      )[0],
+    ).toContain("appears 1 time(s) in src/a.tsx, not 2");
+  });
+
   test("the tree passes with its allowlist", async () => {
     const allowlist = await Bun.file("scripts/product-name-allowlist.json").json();
     expect(productNameFailures(scan(process.cwd()), allowlist)).toEqual([]);

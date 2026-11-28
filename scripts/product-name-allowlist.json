@@ -40,7 +40,10 @@
       "Rotli didn't answer in time. Is a dialog open in Rotli?": "cli-mcp",
       "Rotli is still starting; try again in a moment": "cli-mcp",
       "Rotli's window didn't receive the request": "cli-mcp",
-      "only Rotli's main window answers agents": "cli-mcp",
+      "only Rotli's main window answers agents": {
+        "category": "cli-mcp",
+        "count": 2
+      },
       "Rotli refused the request": "cli-mcp"
     },
     "src-tauri/src/ai_files.rs": {
@@ -99,7 +102,10 @@
     },
     "src-tauri/src/helper_vault.rs": {
       "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.": "web-only",
-      "vault changed: Rotli Helper now serves a different folder than this page opened": "web-only",
+      "vault changed: Rotli Helper now serves a different folder than this page opened": {
+        "category": "web-only",
+        "count": 3
+      },
       "completion vault road is unclear — reload Rotli Web before chatting": "web-only",
       "Rotli Helper isn't serving a vault yet — choose one first.": "web-only",
       "{} holds Rotli Helper's own settings — choose the folder your notes are in, not one above it": "web-only",
@@ -166,7 +172,10 @@
       "(Rotli)": "vault-format"
     },
     "src-tauri/src/workspace_attachments.rs": {
-      "rotli:": "cli-mcp"
+      "rotli:": {
+        "category": "cli-mcp",
+        "count": 2
+      }
     },
     "src-tauri/src/workspace_documents.rs": {
       "Rotli must be running on this Mac.": "cli-mcp",
@@ -201,10 +210,19 @@
       "Removes the file tools, the shell and T3's own tools from a session started in this vault folder. It is the Librarian protocol's list. The agent keeps Rotli's MCP tools.": "cli-mcp"
     },
     "src-tauri/src/workspace.rs": {
-      "unknown Rotli root: {id}": "cli-mcp",
+      "unknown Rotli root: {id}": {
+        "category": "cli-mcp",
+        "count": 2
+      },
       "Rotli root is unavailable: {}": "cli-mcp",
-      "Main belongs to the default Rotli root": "cli-mcp",
-      "named views belong to the default Rotli root": "cli-mcp",
+      "Main belongs to the default Rotli root": {
+        "category": "cli-mcp",
+        "count": 2
+      },
+      "named views belong to the default Rotli root": {
+        "category": "cli-mcp",
+        "count": 2
+      },
       "\\\"{}\\\" is a connected folder, not a vault: Rotli opens items only from the active vault or a connected vault it can switch to": "cli-mcp",
       "no default Rotli root to open in": "cli-mcp",
       "Rotli corpus config is missing or invalid: {}": "cli-mcp",
@@ -345,7 +363,10 @@
       "Rotli asks its release page for the newest version shortly after it opens and a few times a day, then marks the Settings button when there is one. Nothing downloads until you choose Install at the foot of this menu.": "standalone-only",
       "Rotli": "rotli-name",
       "Your notes stay in the folder you connected on this computer. Rotli Web reads and saves them there.": "web-only",
-      "Rotli (dev)": "dev-only",
+      "Rotli (dev)": {
+        "category": "dev-only",
+        "count": 2
+      },
       ". Its files are real and writable; production Rotli keeps its own vault binding. Development-only appearance and window state stay in the app cache.": "dev-only",
       "The Librarian is available in Rotli for Mac.": "web-only",
       "does not present provider logins, copy credentials, or replay browser sessions. Provider terms can change and this is not a legal guarantee; Rotli reviews these boundaries and disables a route instead of silently working around a restriction.": "maintainers",
@@ -359,7 +380,10 @@
     },
     "src/components/thanksDialog.tsx": {
       "Share Rotli": "rotli-project",
-      "Star Rotli on GitHub": "rotli-project",
+      "Star Rotli on GitHub": {
+        "category": "rotli-project",
+        "count": 2
+      },
       "Rotli is made in the open. If it earns a place on your Mac, a star on GitHub helps other people find it, and sharing it with a friend helps even more.": "rotli-project"
     },
     "src/components/titlebar.tsx": {
@@ -391,7 +415,10 @@
     },
     "src/editor/nativeFileDrop.ts": {
       "Files can’t be sent through Rotli Helper yet — drop images into a note instead.": "web-only",
-      "Rotli Web takes images only — other files stay where they are.": "web-only"
+      "Rotli Web takes images only — other files stay where they are.": {
+        "category": "web-only",
+        "count": 2
+      }
     },
     "src/host/registry.ts": {
       "Rotli": "defaults",

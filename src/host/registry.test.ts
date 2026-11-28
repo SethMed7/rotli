@@ -191,6 +191,7 @@ test("a host picks the starting theme family and can retire the quokka for its o
 test("an unknown theme family or mascot is refused at registration", () => {
   expect(() => createHostRegistry().register({ themeFamily: "neon" as never })).toThrow("theme family");
   expect(() => createHostRegistry().register({ mascot: "otter" as never })).toThrow("mascot");
+  expect(() => createHostRegistry().register({ productMark: "<svg/>" as never })).toThrow("product mark");
   expect(() => createHostRegistry().register({ themeFamily: "grove", mascot: "none" })).not.toThrow();
 });
 
