@@ -68,12 +68,24 @@ test("Settings › Appearance has no quokka studio and no quokka trails", async 
 });
 
 test("first run names the host and shows no quokka on any screen", async ({ page }) => {
+  // The island intro removes itself after a few seconds, and a loaded runner
+  // can be slower than that, so note everything it ever mounted rather than
+  // catching it on screen: it must play, and never with the quokka's shell.
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.addInitScript(() => {
+    const seen = { intro: false, quokka: false };
+    Object.assign(window, { introSeen: seen });
+    new MutationObserver(() => {
+      seen.intro ||= !!document.querySelector("[data-testid='onboarding-intro']");
+      seen.quokka ||= !!document.querySelector(".onb-intro-quokka");
+    }).observe(document, { childList: true, subtree: true });
+  });
   await asHost(page, "/?onboarding");
-  // the island intro plays its scene and word with no quokka shell
-  await expect(page.getByTestId("onboarding-intro")).toBeVisible();
-  await expect(page.locator(".onb-intro-quokka")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Make Example Host yours." })).toBeVisible();
   await expect(page.getByText("What should Example Host call you?")).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { introSeen: object }).introSeen))
+    .toEqual({ intro: true, quokka: false });
   await expectNoQuokka(page);
   await page.getByRole("button", { name: "Skip setup" }).click();
   const prompt = page.getByRole("dialog", { name: "Example Host needs a folder for your notes" });
