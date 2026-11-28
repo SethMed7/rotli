@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Finder in a host build open as they do in Rotli, but never inside a vault
   the host doesn't own. Standalone Rotli is unchanged: its menu-bar item
   still reads "Open rotli" and "Quit rotli".
+- **Host builds can open Settings on a pane and start quietly.** For apps
+  built on Rotli's shell: `host::open_settings` brings the window forward on
+  a Settings pane, Rotli's or the host's, and does nothing for a pane that
+  doesn't exist or doesn't show; `AppHost::start_hidden`, asked as the app
+  finishes launching (with `host::launched_as_login_item` to read the login
+  flag), keeps a login launch's window hidden until the host shows it. A file a host won't open
+  now says "This file is in a folder Rotli uses as a vault…" instead of a
+  sentence about folders. Standalone Rotli's window opens as before.
 
 ### Fixed
 

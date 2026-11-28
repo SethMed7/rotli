@@ -4,7 +4,7 @@
 //! name, capability files, front end), extra plugins whose commands are its
 //! own, its own words (`HostWords`: its refusals, its welcome note, the name
 //! in its menus), and the shell's parts it replaces (`without_tray`,
-//! `on_opened_urls`; `host.rs`).
+//! `on_opened_urls`, `start_hidden`; `host.rs`).
 //! The bundle ID is fixed at build time (`build.rs`, `app_identity.rs`); the
 //! app exits at launch if the context names another.
 //! (docs/architecture/host-seams.md)
@@ -61,6 +61,19 @@ impl AppHost {
     #[must_use]
     pub fn on_opened_urls(mut self, hook: impl Fn(&tauri::AppHandle, Vec<tauri::Url>) + Send + Sync + 'static) -> Self {
         self.shell = self.shell.on_opened_urls(Box::new(hook));
+        self
+    }
+
+    /// Asked once at launch, before the main window is made: true makes it
+    /// hidden and keeps the page from showing it as it loads, so a login
+    /// launch starts with no window. `rotli_lib::host::show_main` or
+    /// `rotli_lib::host::open_settings` shows it later. It runs before any
+    /// window or plugin exists, so it must answer from the process alone (an
+    /// argument, an environment variable). Set once: a later call replaces an
+    /// earlier one.
+    #[must_use]
+    pub fn start_hidden(mut self, hidden: impl Fn() -> bool + Send + Sync + 'static) -> Self {
+        self.shell = self.shell.start_hidden(Box::new(hidden));
         self
     }
 }

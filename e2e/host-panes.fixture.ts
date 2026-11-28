@@ -47,6 +47,8 @@ Object.assign(window, { syntheticHost: driver });
 
 const glyph = () => null;
 registerHost({
+  // `?notes=off` loads the same host without notes (host-settings-requests.spec.ts)
+  notes: new URLSearchParams(location.search).get("notes") !== "off",
   words: { productName: "Synthetic" },
   settingsPanes: [
     { id: "links", label: "Links", glyph, Pane: Links, after: "general" },

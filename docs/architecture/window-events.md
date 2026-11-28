@@ -52,7 +52,8 @@ writer, the floating windows announce), **W→R** webview to Rust.
 | `rotli:native-drop-refused` | R→W | A native drop delivered nothing that could be granted (folders, files gone mid-drag, a drag with no path, promise, or image bytes); the webview shows a notice instead of doing nothing. |
 | `rotli:vault-copy-progress` | R→W | "Work on a copy": files and bytes copied so far (throttled), for the import dialog's progress. |
 | `rotli:add-vault` | R→W | A folder window's "Add as vault": the folder (authorized by Rust, read from the window's own mount) and the window's label. Main asks copy-or-in-place and closes that window (`folder_window_close`) only once a vault opened. |
-| `rotli:open-notice` | R→W | Something Finder handed Rotli couldn't open, or a folder window couldn't save before closing; the window says so instead of doing nothing. |
+| `rotli:open-notice` | R→W | Something Finder handed Rotli couldn't open, or a folder window couldn't save before closing; the window says so instead of doing nothing. Main's copy goes through `host::notice`, held until the page calls `host_page_ready`, so a cold launch's notice still shows. |
+| `rotli:open-settings` | R→W | A host asked for Settings on a pane (`host::open_settings`); main opens it if the pane shows and brings the window forward. Held like main's notices until `host_page_ready`. |
 | `rotli:open-request` | R→W | `rotli open <id>` (CLI/deep link) or a Reopen wants the main webview to consume the open mailbox. |
 | `rotli:organizer-progress` | R→W | Librarian run progress for the live Activity lane. |
 | `rotli:quick-created` | W→W | A note was born in the Quick Note window; main files it into Main so it is a full note, never a capture. |

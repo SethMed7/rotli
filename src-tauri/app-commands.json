@@ -146,6 +146,7 @@
     "hide_chat_window",
     "hide_main_window",
     "hide_quick_window",
+    "host_page_ready",
     "local_model_default",
     "local_model_install",
     "local_model_install_cancel",

@@ -101,7 +101,7 @@ fn a_host_build_refuses_every_shared_writer() {
 #[test]
 fn rotli_words_are_neutral_until_a_host_supplies_its_own() {
     let defaults = HostWords::default();
-    for sentence in [&defaults.shared_state, &defaults.no_keychain, &defaults.existing_vault] {
+    for sentence in [&defaults.shared_state, &defaults.no_keychain, &defaults.existing_vault, &defaults.existing_vault_file] {
         assert!(!sentence.is_empty());
         assert!(sentence.ends_with('.'), "{sentence}");
     }
@@ -114,6 +114,23 @@ fn rotli_words_are_neutral_until_a_host_supplies_its_own() {
     for malformed in ["", "---\nid: x\n---\n# Title\n", "Title only\n", "\n# Late heading\n", "## Too deep\n", "# \n"] {
         assert!(!is_note_body(malformed), "{malformed:?}");
     }
+}
+
+/// A file gets the file sentence where a folder gets the folder's; any other
+/// refusal passes through unchanged.
+#[test]
+fn a_refused_file_reads_as_a_file_and_a_folder_as_it_always_has() {
+    assert_eq!(
+        for_a_file(words().existing_vault.clone()),
+        words().existing_vault_file
+    );
+    assert_ne!(words().existing_vault_file, words().existing_vault);
+    assert_eq!(for_a_file("the walk stopped".into()), "the walk stopped");
+    assert_eq!(
+        HostWords::default().existing_vault,
+        "Rotli already uses this folder as a vault, so this app won't open it. Choose another folder.",
+        "the folder sentence is unchanged"
+    );
 }
 
 fn folder(base: &Path, relative: &str) -> PathBuf {

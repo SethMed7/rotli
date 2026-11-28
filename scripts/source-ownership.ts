@@ -182,6 +182,7 @@ export const SERVICE_FILE_OWNERS = {
   "thanksShare.ts": "onboarding (the thank-you card: links and the share sheet)",
   "chatAutoTitle.ts": "chat",
   "chatSummon.ts": "chat",
+  "hostRequests.ts": "host seams (Settings requests and held notices from the native shell)",
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
   "folderWindow.ts": "open in Rotli (a folder window's notes service, listing, and native side)",
   "finderQuickAction.ts": "open in Rotli (Finder's opt-in Quick Action, for Settings)",

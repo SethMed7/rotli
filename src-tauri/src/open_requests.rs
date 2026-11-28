@@ -79,7 +79,7 @@ fn open_from_finder(app: &AppHandle, path: &std::path::Path) {
         Ok(Some((id, kind))) => queue_open_request(app, &id, kind),
         Ok(None) => {}
         Err(notice) => {
-            let _ = app.emit_to("main", "rotli:open-notice", notice);
+            crate::host::notice(app, notice);
             SummonIntent::ShowMain.perform(app);
         }
     }
@@ -89,8 +89,8 @@ fn open_from_finder(app: &AppHandle, path: &std::path::Path) {
 /// in `registry` behind the vault refusal, with `assets` granted its preview.
 /// Gives the open request's id and kind, `None` when the file can't be read
 /// or mounted, or the notice to show when the build refuses it: the host's
-/// own `existing_vault` sentence, alone, since it is written to stand alone
-/// (standalone Rotli never refuses here). A file meets
+/// own `existing_vault_file` sentence, alone, since it is written to stand
+/// alone (standalone Rotli never refuses here). A file meets
 /// only the vault refusal, not `reject_privileged_root`: the person chose it
 /// in Finder, as in standalone Rotli.
 fn mount_opened_file(
@@ -101,7 +101,7 @@ fn mount_opened_file(
     assets: Option<&tauri::scope::fs::Scope>,
 ) -> Result<Option<(String, &'static str)>, String> {
     let Ok(file) = std::fs::canonicalize(path) else { return Ok(None) };
-    crate::app_identity::refuse_existing_vault_for(identifier, &file)?;
+    crate::app_identity::refuse_existing_vault_for(identifier, &file).map_err(crate::app_identity::for_a_file)?;
     let root_id = corpus::raw::raw_root_id(&file);
     if !registry.contains(&root_id) {
         let Ok(store) = corpus::CorpusStore::open_raw_file(&file, &cache.join("opened-files")) else { // vault bind (refused): refuse_existing_vault_for above
@@ -197,7 +197,9 @@ mod tests {
 
         let mut registry = corpus::CorpusRegistry::new(corpus::DEFAULT_ROOT_ID.to_string());
         let refused = mount_opened_file(HOST, &mut registry, &cache, &in_vault, None);
-        assert_eq!(refused, Err(crate::app_identity::existing_vault_refusal()), "the host's sentence alone");
+        let file_sentence = crate::app_identity::HostWords::default().existing_vault_file;
+        assert_eq!(refused, Err(file_sentence.clone()), "the file's sentence alone, never the folder's");
+        assert!(file_sentence.contains("file") && !file_sentence.contains("Choose another folder"), "{file_sentence}");
         assert!(!registry.contains(&root_of(&in_vault)), "nothing mounted");
 
         let opened = mount_opened_file(HOST, &mut registry, &cache, &loose, None).unwrap().expect("mounted");
@@ -207,6 +209,31 @@ mod tests {
         let standalone = crate::app_identity::STANDALONE_IDENTIFIER;
         assert!(mount_opened_file(standalone, &mut registry, &cache, &in_vault, None).unwrap().is_some());
         assert!(registry.contains(&root_of(&in_vault)));
+    }
+
+    /// A file in a vault the host marked as its own opens in the host.
+    #[test]
+    fn a_finder_file_in_the_hosts_own_marked_vault_mounts() {
+        const HOST: &str = "com.example.host";
+        let temp = tempfile::tempdir().unwrap();
+        let vault = temp.path().join("vault");
+        std::fs::create_dir_all(vault.join(".rotli")).unwrap();
+        std::fs::create_dir_all(vault.join("Projects")).unwrap();
+        let in_vault = vault.join("Projects/plan.md");
+        std::fs::write(&in_vault, "# Plan\n").unwrap();
+        crate::app_identity::claim_for(HOST, &std::fs::canonicalize(&vault).unwrap()).unwrap();
+        let mut registry = corpus::CorpusRegistry::new(corpus::DEFAULT_ROOT_ID.to_string());
+        let opened = mount_opened_file(
+            HOST,
+            &mut registry,
+            &temp.path().join("cache"),
+            &in_vault,
+            None,
+        );
+        assert!(matches!(opened, Ok(Some(_))), "{opened:?}");
+        assert!(registry.contains(&corpus::raw::raw_root_id(
+            &std::fs::canonicalize(&in_vault).unwrap()
+        )));
     }
 
     #[test]

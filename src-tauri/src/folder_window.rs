@@ -30,7 +30,7 @@ pub(crate) fn open(app: &AppHandle, path: &Path) {
 
 /// A folder that couldn't open says why in the main window.
 pub(crate) fn refused(app: &AppHandle, message: &str) {
-    let _ = app.emit_to("main", "rotli:open-notice", format!("Couldn’t open that folder — {message}"));
+    crate::host::notice(app, format!("Couldn’t open that folder — {message}"));
     crate::SummonIntent::ShowMain.perform(app);
 }
 

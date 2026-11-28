@@ -35,8 +35,10 @@ pub struct HostWords {
     pub shared_state: String,
     /// A Keychain read or write.
     pub no_keychain: String,
-    /// A folder that is already a Rotli vault.
+    /// A folder that is already a Rotli vault, or holds one or sits inside one.
     pub existing_vault: String,
+    /// A file, opened from Finder, inside a Rotli vault this app doesn't own.
+    pub existing_vault_file: String,
     /// The first note of a new notes folder, as its whole Markdown body with
     /// `# Title` first: the heading names the note and its file. `None` writes
     /// Rotli's own. `set_host_words` checks the shape (`is_note_body`).
@@ -55,6 +57,7 @@ impl Default for HostWords {
                 .into(),
             existing_vault: "Rotli already uses this folder as a vault, so this app won't open it. Choose another folder."
                 .into(),
+            existing_vault_file: "This file is in a folder Rotli uses as a vault, so this app won't open it.".into(),
             welcome_note: None,
             product_name: None,
         }
@@ -404,6 +407,16 @@ fn refuse_existing_vault_within(identifier: &str, candidate: &Path, limit: usize
 /// The sentence a host build refuses an existing vault with.
 pub(crate) fn existing_vault_refusal() -> String {
     words().existing_vault.clone()
+}
+
+/// The vault refusal's sentence for a file (`existing_vault_file`) in place of
+/// the folder's; any other refusal stands as it is.
+pub(crate) fn for_a_file(refusal: String) -> String {
+    if refusal == words().existing_vault {
+        words().existing_vault_file.clone()
+    } else {
+        refusal
+    }
 }
 
 /// This build's vault refusal (`refuse_existing_vault_for`).

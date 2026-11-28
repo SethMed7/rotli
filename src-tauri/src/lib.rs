@@ -710,11 +710,6 @@ fn hide_main_window(app: AppHandle) {
 }
 
 #[tauri::command]
-fn show_main_window(app: AppHandle) {
-    SummonIntent::ShowMain.perform(&app);
-}
-
-#[tauri::command]
 fn hide_capture_window(app: AppHandle) {
     hide_capture(&app);
 }
@@ -2055,9 +2050,8 @@ pub fn run_with_host(host: AppHost) {
     launch(host.context, host.plugins, host.shell)
 }
 
-fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>, shell: host::ShellOptions) {
-    let host::ShellOptions { tray, on_opened_urls } = shell;
-    host::set_opened_urls(on_opened_urls);
+fn launch(mut context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>, shell: host::ShellOptions) {
+    let tray = host::apply_at_launch(shell, &mut context.config_mut().app.windows);
     // A host build is one process per support folder: a second one runs no
     // plugin, window or setup step (single_instance.rs; exits 75 or 73).
     single_instance::hold_at_launch(&context.config().identifier);
@@ -2151,7 +2145,8 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             quit_check_done,
             restart_after_flush,
             hide_main_window,
-            show_main_window,
+            host::show_main_window,
+            host::host_page_ready,
             hide_capture_window,
             finish_capture_window,
             toggle_quick_window,
@@ -2378,6 +2373,8 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
                 );
                 std::process::exit(78);
             }
+            // inside applicationDidFinishLaunching: the launch's Apple event is current
+            host::decide_at_launch(app.handle());
             #[cfg(target_os = "macos")]
             if native_drag::debug_drops() {
                 if let Some(main) = app.get_webview_window("main") {
