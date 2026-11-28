@@ -143,6 +143,14 @@ owns the threat side.
   (`app_identity::refuse_existing_vault`), which refuses a folder that is,
   sits in, or holds an unmarked vault. The standalone build writes and reads
   no mark.
+- **The command line's mark.** The headless CLI and its MCP server also write
+  that mark, when they are about to turn a folder into notes
+  (`app_identity::claim_new_vault`). Whoever sets their environment
+  (`ROTLI_CORPUS_ROOT`, `HOME`) chooses the folder and nobody confirms it, so
+  they mark only an empty folder that passes the vault refusal and the private
+  folders, under a support folder that is not a link. A folder with files
+  needs the person's choice in the app. See "The command line makes no
+  unmarked vault" in the contract.
 - **The nudge and the mailbox.** A host build also acts on two files a
   support-folder writer can plant: `instance/nudge` makes the running app
   raise its main window and read the `rotli open` mailbox, and for a host

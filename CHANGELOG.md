@@ -55,6 +55,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sent while the vault is still being copied. If the vault switch fails, the
   request is kept for later. `rotli://` links and files opened from Finder wait
   the same way.
+- **A host build's command line can keep using a folder it turned into
+  notes.** For apps built on Rotli's shell: the first `rotli` command on an
+  empty folder made it a vault without marking it as that app's, so every later
+  command refused it. The command line now marks the folder before it writes
+  anything. It turns only an empty folder into notes: a folder that already
+  has files is left alone until the app has opened it. A folder the bug
+  already affected stays refused. Standalone Rotli marks and refuses nothing
+  new. In every build, the Librarian now checks that a vault is still switched
+  on before it opens it, so a refused call no longer rebuilds a removed
+  `.rotli/` folder.
 
 ## [1.9.7] - 2026-11-24
 

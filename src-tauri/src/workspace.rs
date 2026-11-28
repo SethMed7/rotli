@@ -223,6 +223,11 @@ impl Workspace {
             .into_iter()
             .find(|root| root.id == id)
             .ok_or_else(|| format!("unknown Rotli root: {id}"))?;
+        // a writable open makes a folder a vault, so a host build marks it first;
+        // a connector's root is the app's own open vault
+        if !root.read_only && CONNECTOR_ROOT.with(|connected| connected.borrow().is_none()) {
+            crate::app_identity::claim_new_vault(&root.path)?; // vault bind (vetted): root_targets vetted it, and the claim refuses again
+        }
         Self::open_target(root) // vault bind (vetted): root_targets vets every root (vet_config, refuse_pinned_root, or the app's open root)
     }
 
@@ -3047,6 +3052,9 @@ mod agent_surface_tests;
 #[cfg(test)]
 #[path = "workspace_agent_differential_tests.rs"]
 mod agent_differential_tests;
+#[cfg(test)]
+#[path = "workspace_host_pin_tests.rs"]
+mod host_pin_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
