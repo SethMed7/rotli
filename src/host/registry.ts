@@ -9,6 +9,8 @@
 
 import type { ComponentType, ReactNode } from "react";
 
+import { THEME_FAMILIES, type ThemeFamily } from "../state/themeChoices";
+
 /** A Settings row's glyph, the same shape as Rotli's own (components/glyphs). */
 export type HostGlyph = (props: { size?: number }) => ReactNode;
 
@@ -61,8 +63,12 @@ export interface HostPaneBlock {
 export interface HostWords {
   /** Where the standalone build offers "Check for updates". */
   updates?: string;
-  /** The app's name where Settings says "Rotli" and means this app. */
+  /** The app's name wherever Rotli's copy says "Rotli" and means this app:
+   * Settings, first run, Home, chat, dialogs and notices. */
   productName?: string;
+  /** The name where Rotli writes its lower-case wordmark ("Message rotli…",
+   * "read-only for rotli"); productName when absent. */
+  inlineName?: string;
   /** The version beside that name; the bundle's version when absent. */
   version?: string;
   /** The About pane's nav row and heading, where Rotli says "About Rotli". */
@@ -96,10 +102,21 @@ export interface AppHost {
   /** The heading of each built-in pane: Rotli's quokka and object ("rotli",
    * the default), or the scenery alone, as a host's own panes show ("plain"). */
   paneHeads?: "rotli" | "plain";
+  /** The theme family a fresh install, first run, Skip setup and Reset start
+   * on: any of Rotli's family ids. Absent, Rotli's own ("warm"). */
+  themeFamily?: ThemeFamily;
+  /** Whether Rotli's quokka appears ("quokka", the default) or nowhere
+   * ("none"): the search-field mark, the chat buddy, banners, setup, empty
+   * states, its studio in Appearance and its trails. */
+  mascot?: "quokka" | "none";
+  /** The host's own mark, where Rotli shows its quokka mark (the titlebar's
+   * home mark, the search field). With no mascot and no mark, nothing. */
+  productMark?: HostGlyph;
 }
 
 export const DEFAULT_UPDATES_WORDS = "Updates arrive with this app";
 export const DEFAULT_PRODUCT_NAME = "Rotli";
+export const DEFAULT_INLINE_NAME = "rotli";
 export const DEFAULT_ABOUT_LABEL = "About Rotli";
 const connectionsLeadFor = (name: string) =>
   `Choose the outside services ${name} can contact. Each connection is explicit and never changes destination after a failure.`;
@@ -130,6 +147,12 @@ export function createHostRegistry(): HostRegistry {
       const takesBlocks = (pane: string) => (BLOCK_PANES as readonly string[]).includes(pane);
       if (blocks.some(({ pane, place }) => !takesBlocks(pane) || (place !== "before" && place !== "after")))
         throw new Error(`Host pane blocks go before or after ${BLOCK_PANES.join(", ")}`);
+      if (next.themeFamily !== undefined && !(THEME_FAMILIES as readonly string[]).includes(next.themeFamily))
+        throw new Error(`A host's theme family is one of ${THEME_FAMILIES.join(", ")}`);
+      if (next.productMark !== undefined && typeof next.productMark !== "function")
+        throw new Error("A host's product mark is a component that takes a size");
+      if (next.mascot !== undefined && next.mascot !== "quokka" && next.mascot !== "none")
+        throw new Error('A host\'s mascot is "quokka" or "none"');
       host = Object.freeze({
         ...next,
         settingsPanes: Object.freeze([...(next.settingsPanes ?? [])]),
@@ -178,6 +201,27 @@ export function paneBlocks(
  * main.tsx loads, and app.tsx reads it as it loads (the two action titles). */
 export function productName(host: AppHost | null = appHost()): string {
   return host?.words?.productName ?? DEFAULT_PRODUCT_NAME;
+}
+
+/** The name where Rotli writes its lower-case wordmark: "rotli" standalone,
+ * the host's inlineName or productName under a host. */
+export function inlineName(host: AppHost | null = appHost()): string {
+  return host?.words?.inlineName ?? host?.words?.productName ?? DEFAULT_INLINE_NAME;
+}
+
+/** The theme family a fresh start uses, or null for Rotli's own default. */
+export function hostThemeFamily(host: AppHost | null = appHost()): ThemeFamily | null {
+  return host?.themeFamily ?? null;
+}
+
+/** Whether Rotli's quokka appears anywhere in this build. */
+export function mascotShown(host: AppHost | null = appHost()): boolean {
+  return host?.mascot !== "none";
+}
+
+/** The host's own mark, where Rotli shows its quokka mark; null for none. */
+export function productMark(host: AppHost | null = appHost()): HostGlyph | null {
+  return host?.productMark ?? null;
 }
 
 /** What a host build says about system-wide shortcuts, which it never takes:

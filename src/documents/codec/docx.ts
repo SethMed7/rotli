@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 
+import { productName } from "../../host/registry";
 import { fileName } from "../../lib/fileKind";
 import { imageParagraphXml } from "../create";
 import type {
@@ -312,7 +313,7 @@ function paragraphXml(
 ): string {
   if (originalXml && hasUnsupportedInlineStructure(originalXml, parts.links)) {
     throw new Error(
-      "This paragraph contains unsupported Word inline content (such as an in-document link, field, content control, or tracked change). Rotli left the DOCX unchanged.",
+      `This paragraph contains unsupported Word inline content (such as an in-document link, field, content control, or tracked change). ${productName()} left the DOCX unchanged.`,
     );
   }
   const id = styleId(paragraph.namedStyle);

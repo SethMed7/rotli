@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { productName } from "../../host/registry";
 import {
   type BreveRoutine,
   type BreveSnapshot,
@@ -52,6 +53,7 @@ import {
   BreveHealthStrip,
   BreveSkeleton,
   EmptyMessage,
+  inAppLabel,
   PageHead,
   SaveNote,
   useBreveDraftGuard,
@@ -64,7 +66,7 @@ import { BREVE_QUERY_KEY, useBreveSnapshot } from "./useBreve";
 function SourceStrip({ snapshot }: { snapshot: BreveSnapshot }) {
   const label =
     snapshot.source === "rotli"
-      ? "Rotli library"
+      ? `${productName()} library`
       : snapshot.source === "legacy"
         ? "Legacy Breve detected"
         : "No Breve library detected";
@@ -133,7 +135,7 @@ function MigrationBands({ snapshot }: { snapshot: BreveSnapshot }) {
       {snapshot.source === "legacy" && !snapshot.imported && (
         <section className="breve-import-band" aria-labelledby="breve-import-title">
           <div>
-            <h3 id="breve-import-title">Bring the Breve library into Rotli</h3>
+            <h3 id="breve-import-title">{`Bring the Breve library into ${productName()}`}</h3>
             <p>The importer preserves the watchlist, schedules, brief Markdown, and related artifacts.</p>
           </div>
           <button
@@ -151,7 +153,7 @@ function MigrationBands({ snapshot }: { snapshot: BreveSnapshot }) {
       {snapshot.legacyRoot && snapshot.scheduler !== "rotli" && (
         <section className="breve-import-band" aria-labelledby="breve-takeover-title">
           <div>
-            <h3 id="breve-takeover-title">Move scheduling into Rotli</h3>
+            <h3 id="breve-takeover-title">{`Move scheduling into ${productName()}`}</h3>
             <p>
               Copies private runtime state, disables Breve&rsquo;s seven legacy launchd jobs, and starts the
               Rotli-managed scheduler. The legacy folder is kept as a backup.
@@ -163,7 +165,7 @@ function MigrationBands({ snapshot }: { snapshot: BreveSnapshot }) {
             disabled={takeoverState === "saving"}
             onClick={() => void takeOver()}
           >
-            {takeoverState === "saving" ? "Moving…" : "Move scheduling to Rotli"}
+            {takeoverState === "saving" ? "Moving…" : `Move scheduling to ${productName()}`}
           </button>
           <SaveNote state={takeoverState} error={error} />
         </section>
@@ -174,7 +176,7 @@ function MigrationBands({ snapshot }: { snapshot: BreveSnapshot }) {
           <div>
             <h3 id="breve-retire-title">Legacy project is ready to retire</h3>
             <p>
-              Rotli is running the scheduler. This verifies the managed state and moves
+              {`${productName()} is running the scheduler. This verifies the managed state and moves`}
               <code>{snapshot.legacyRoot}</code> to Trash.
             </p>
           </div>
@@ -804,7 +806,7 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
           </div>
           {snapshot.imported && (
             <span className="breve-inline-status">
-              <CheckGlyph size={12} /> In Rotli
+              <CheckGlyph size={12} /> {inAppLabel()}
             </span>
           )}
         </div>
@@ -888,7 +890,7 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
                       year: "numeric",
                     }).format(new Date(`${brief.date}T12:00:00`))}
                   </time>
-                  <span className="breve-brief-state">{brief.imported ? "In Rotli" : "Legacy"}</span>
+                  <span className="breve-brief-state">{brief.imported ? inAppLabel() : "Legacy"}</span>
                 </>
               );
               // a row READS the brief in place (the inline reader above) —
@@ -1335,7 +1337,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
                               })
                             }
                           />
-                          {lane === "inApp" ? "Rotli" : lane}
+                          {lane === "inApp" ? productName() : lane}
                         </label>
                       );
                     })}
@@ -1426,7 +1428,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
                       )
                     }
                   />
-                  {lane === "inApp" ? "Rotli" : lane}
+                  {lane === "inApp" ? productName() : lane}
                 </label>
               ))}
             </fieldset>
@@ -2058,8 +2060,7 @@ function ConfigureView({ snapshot, embedded = false }: { snapshot: BreveSnapshot
         <div>
           <strong>Secrets are saved in your Mac Keychain.</strong>
           <span>
-            Rotli never displays your Resend API key. Delivery addresses and Signal routing stay in
-            Rotli&rsquo;s managed Breve configuration.
+            {`${productName()} never displays your Resend API key. Delivery addresses and Signal routing stay in ${productName()}’s managed Breve configuration.`}
           </span>
         </div>
       </aside>
@@ -2097,7 +2098,7 @@ function ConfigureView({ snapshot, embedded = false }: { snapshot: BreveSnapshot
               }}
               onKeyDown={(event) => event.stopPropagation()}
             />
-            <small>The key is write-only. Rotli can check whether it exists but never displays it.</small>
+            <small>{`The key is write-only. ${productName()} can check whether it exists but never displays it.`}</small>
           </label>
           <label className="breve-field" htmlFor="breve-email-from">
             <span>From</span>
@@ -2308,7 +2309,7 @@ export function BreveSurface() {
         <div className="breve-page">
           <EmptyMessage
             title="Breve could not be loaded."
-            detail="Your Rotli data was not changed."
+            detail={`Your ${productName()} data was not changed.`}
             action={
               <button type="button" className="ghostbtn" onClick={() => void query.refetch()}>
                 Try again

@@ -43,6 +43,7 @@ import {
 import { renderMermaidElement } from "../../editor/mermaidRender";
 import { renderInline } from "../../editor/render";
 import { saveFailure, savedVersionMismatch } from "../../editor/savedVersion";
+import { inlineName, productName } from "../../host/registry";
 import {
   CHAT_IMAGE_ASSET_EXTS,
   CHAT_IMAGE_ASSET_MAX_BYTES,
@@ -1532,7 +1533,7 @@ export function ChatSurface({
         ...previous,
         {
           speaker: "rotli",
-          text: `⚠ ${turnModel.label} cannot receive image attachments through this Rotli integration.`,
+          text: `⚠ ${turnModel.label} cannot receive image attachments through this ${productName()} integration.`,
         },
       ]);
       return;
@@ -1548,7 +1549,7 @@ export function ChatSurface({
           ...previous,
           {
             speaker: "rotli",
-            text: "⚠ Rotli couldn’t verify this attached note’s security state, so nothing was sent to a model.",
+            text: `⚠ ${productName()} couldn’t verify this attached note’s security state, so nothing was sent to a model.`,
           },
         ]);
         return;
@@ -2734,7 +2735,9 @@ export function ChatSurface({
                         className="chat-msg"
                         rows={1}
                         placeholder={
-                          working ? "Write your next message…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"
+                          working
+                            ? "Write your next message…"
+                            : `Message ${inlineName()}…  (⏎ to send · ⇧⏎ new line)`
                         }
                         value={message}
                         onChange={(e) => setDraftMessage(tabId, e.target.value)}

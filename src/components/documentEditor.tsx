@@ -19,6 +19,7 @@ import {
   type ReadyDocumentSession,
 } from "../documents/session";
 import { registerEditor, unregisterEditor } from "../editor/commands";
+import { productName } from "../host/registry";
 import { corpusFileStat, openUrl } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import {
@@ -136,7 +137,7 @@ export default function DocumentEditor({
         } else {
           const outcome = await editManagedDocument(fileId);
           if (outcome.kind === "too-large") {
-            throw new Error("This document is too large to edit safely in Rotli.");
+            throw new Error(`This document is too large to edit safely in ${productName()}.`);
           }
           session = outcome;
           model = outcome.document;

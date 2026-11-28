@@ -301,8 +301,9 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
     if !problems.is_empty() {
         let shown: Vec<_> = problems.iter().take(8).cloned().collect();
         return Err(format!(
-            "The copy in {} doesn’t match your vault, so Rotli didn’t open it. Both folders are as they were. {}",
+            "The copy in {} doesn’t match your vault, so {} didn’t open it. Both folders are as they were. {}",
             destination.display(),
+            crate::app_identity::app_name(),
             shown.join("; ")
         ));
     }

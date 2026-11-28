@@ -13,7 +13,7 @@ import { allActions } from "../keys/registry";
 import { DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE } from "../lib/privateBrowser";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
 import { compareVersions } from "../lib/whatsNew";
-import { DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { defaultAppearance } from "./appearanceDefaults";
 import { FIRST_RUN_WINDOW, type OnboardingPhase } from "./onboardingPhase";
 import { useUiStore } from "./ui";
 
@@ -30,10 +30,13 @@ export const ONBOARDING_STEP_NUMBER = {
 
 export const ONBOARDING_TOTAL_STEPS = Object.keys(ONBOARDING_STEP_NUMBER).length;
 
-/** What every first run starts from: Rotli Light and a quokka wearing nothing,
- * even when a personalized install is re-onboarded from Settings. */
-export function startingAppearance(): typeof DEFAULT_APPEARANCE & { quokkaAccessory: QuokkaAccessory } {
-  return { ...DEFAULT_APPEARANCE, quokkaAccessory: "none" };
+/** What every first run starts from: Rotli Light (a host's own family under a
+ * host) and a quokka wearing nothing, even when a personalized install is
+ * re-onboarded from Settings. */
+export function startingAppearance(): ReturnType<typeof defaultAppearance> & {
+  quokkaAccessory: QuokkaAccessory;
+} {
+  return { ...defaultAppearance(), quokkaAccessory: "none" };
 }
 
 /** Whether this is a true first run: never onboarded, no recorded onboarding

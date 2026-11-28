@@ -1,5 +1,6 @@
 // Spreadsheet file-kind constants — single source for FileSurface, chat host, etc.
 
+import { inlineName } from "../host/registry";
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 
 /** Binary workbook formats the read path handles via base64 (exceljs).
@@ -45,9 +46,10 @@ export function sheetReadOnlyReason(
   if (stat === null)
     return {
       label: "view only",
-      title: "rotli couldn't verify this file, so it opened as a view-only table",
+      title: `${inlineName()} couldn't verify this file, so it opened as a view-only table`,
     };
-  if (!stat.writable) return { label: "read-only", title: "This root is read-only — rotli never writes it" };
+  if (!stat.writable)
+    return { label: "read-only", title: `This root is read-only — ${inlineName()} never writes it` };
   if (!SHEET_EDITABLE.has(ext))
     return {
       label: `view only · .${ext}`,
@@ -55,6 +57,6 @@ export function sheetReadOnlyReason(
     };
   return {
     label: "view only · too large",
-    title: `Too large to edit safely in rotli — ${editElsewhere}`,
+    title: `Too large to edit safely in ${inlineName()} — ${editElsewhere}`,
   };
 }

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { modelIsOnDevice } from "../ai/guard";
 import { refineModelFor } from "../ai/handToAiRefine";
 import { tauriHostFor, useLibrarianModels } from "../editor/librarianSession";
+import { productName } from "../host/registry";
 import { type HandToAi, handToAiFor, refineHandToAiFor } from "../services/handToAi";
 import { type HandToAiMode, useHandToAiMode } from "../state/handToAiMode";
 import { useUiStore } from "../state/ui";
@@ -25,9 +26,12 @@ type Refine =
   | { kind: "fallback"; reason: string };
 
 const REFUSAL: Record<Refusal, string> = {
-  secure: "This note is secure, so Rotli won’t build a prompt from it: secure notes never go to a remote AI.",
-  secureAttachment:
-    "This note links to a file in a secure place, or by a link Rotli can’t read safely, so Rotli won’t build a prompt from it: secure files never go to a remote AI.",
+  get secure() {
+    return `This note is secure, so ${productName()} won’t build a prompt from it: secure notes never go to a remote AI.`;
+  },
+  get secureAttachment() {
+    return `This note links to a file in a secure place, or by a link ${productName()} can’t read safely, so ${productName()} won’t build a prompt from it: secure files never go to a remote AI.`;
+  },
   secret:
     "This note looks like it holds a secret, such as a key, a card number, or an ID number. Remove it, or make the note secure, before handing it off.",
   empty: "This note is empty, so there’s nothing to hand off yet.",

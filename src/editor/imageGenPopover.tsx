@@ -3,6 +3,7 @@
 
 import { useRef } from "react";
 
+import { productName } from "../host/registry";
 import { useTransientPopover } from "../lib/popover";
 
 /** No subscription-authenticated image engine may be offered, even when stale
@@ -49,8 +50,7 @@ export function ImageGenPopover({
       }}
     >
       <p className="rotli-imagegen-empty">
-        Cloud image generation is unavailable until Rotli ships a provider-authorized API integration. Your
-        existing images remain in the vault.
+        {`Cloud image generation is unavailable until ${productName()} ships a provider-authorized API integration. Your existing images remain in the vault.`}
       </p>
       <div className="rotli-imagegen-row">
         <span className="rotli-imagegen-note">No provider account will be used.</span>

@@ -6,6 +6,7 @@
 // line names it (fifth review: a malformed file, a hard-linked one and one
 // that can't be opened each need different words).
 
+import { productName } from "../host/registry";
 import { isSettingsUnreadable, type SettingsTrouble } from "../lib/settingsTrouble";
 import { useSettingsTrouble } from "../services/hooks";
 
@@ -16,12 +17,15 @@ import { useSettingsTrouble } from "../services/hooks";
  * for the session (state/settingsGuard.ts) and nothing replaces it; the
  * organizer reads the file again on every run. */
 export const SETTINGS_HELP: Record<SettingsTrouble, string> = {
-  malformed:
-    "They’re in .rotli/settings.json inside the vault folder, and what’s there isn’t valid settings. Change any setting to save a new file: Rotli keeps the old one beside it as settings.json.unreadable-…, and never deletes it.",
-  hardLinked:
-    "They’re in .rotli/settings.json inside the vault folder, and that file has a hard link (a second name for a file that may be outside the vault), so Rotli doesn’t open or change it. Put an independent copy in its place (in Finder, Shift-Command-Period shows the folder: duplicate the file, delete the original, rename the copy); the Librarian starts again on its next run.",
-  unreadable:
-    "They’re in .rotli/settings.json inside the vault folder, and Rotli couldn’t open that file. Check that it’s readable (its permissions, or the disk it’s on); Rotli doesn’t change it meanwhile. Once it can be read, the Librarian starts again on its next run.",
+  get malformed() {
+    return `They’re in .rotli/settings.json inside the vault folder, and what’s there isn’t valid settings. Change any setting to save a new file: ${productName()} keeps the old one beside it as settings.json.unreadable-…, and never deletes it.`;
+  },
+  get hardLinked() {
+    return `They’re in .rotli/settings.json inside the vault folder, and that file has a hard link (a second name for a file that may be outside the vault), so ${productName()} doesn’t open or change it. Put an independent copy in its place (in Finder, Shift-Command-Period shows the folder: duplicate the file, delete the original, rename the copy); the Librarian starts again on its next run.`;
+  },
+  get unreadable() {
+    return `They’re in .rotli/settings.json inside the vault folder, and ${productName()} couldn’t open that file. Check that it’s readable (its permissions, or the disk it’s on); ${productName()} doesn’t change it meanwhile. Once it can be read, the Librarian starts again on its next run.`;
+  },
   readable: "The settings read correctly now; the Librarian uses them on its next run.",
 };
 

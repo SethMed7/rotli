@@ -21,3 +21,23 @@ describe("Tesven's navigator trail", () => {
     }
   });
 });
+
+describe("a host with no mascot", () => {
+  test("offers no quokka trail, and a stored one falls back to the quiet lines", () => {
+    for (const theme of ["light", "ocean-dark", undefined]) {
+      expect(navigatorChoices(theme, false)).toEqual(["lines", "dots"]);
+      expect(resolveNavigatorStyle("paws", theme, false)).toBe("lines");
+      expect(resolveNavigatorStyle("ears", theme, false)).toBe("lines");
+      expect(resolveNavigatorStyle("hexes", theme, false)).toBe("lines");
+      expect(resolveNavigatorStyle("dots", theme, false)).toBe("dots");
+    }
+  });
+
+  test("a theme family's own hexagon trail stays without the mascot", () => {
+    for (const theme of ["tesven-light", "tesven-dark"]) {
+      expect(navigatorChoices(theme, false)).toEqual(["lines", "dots", "hexes"]);
+      expect(resolveNavigatorStyle("paws", theme, false)).toBe("hexes");
+      expect(resolveNavigatorStyle("ears", theme, false)).toBe("hexes");
+    }
+  });
+});

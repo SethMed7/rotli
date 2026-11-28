@@ -14,6 +14,7 @@ import {
   providerCatalog,
   providerDefaultModel,
 } from "../../ai/models";
+import { productName } from "../../host/registry";
 import { PAUSED_LABEL, lanePaused } from "../../lib/lanePause";
 import {
   type ChatModelInfo,
@@ -48,8 +49,8 @@ type ModelSection = "local" | "install" | "subscription";
 
 /** Antigravity's install and sign-in live in Settings, not a terminal, so its
  * help stays a sentence; the terminal lanes render the shared walkthrough. */
-const ANTIGRAVITY_HELP =
-  "Google's official Antigravity ACP agent, which Rotli downloads and signs in from Settings → AI Models → Antigravity after setup. The `agy` command line and the Antigravity IDE are separate products with their own logins; Rotli does not use them. The lane stays off until you turn it on.";
+const antigravityHelp = (): string =>
+  `Google's official Antigravity ACP agent, which ${productName()} downloads and signs in from Settings → AI Models → Antigravity after setup. The \`agy\` command line and the Antigravity IDE are separate products with their own logins; ${productName()} does not use them. The lane stays off until you turn it on.`;
 
 function localSize(mb: number): string {
   return mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${Math.round(mb)} MB`;
@@ -178,9 +179,7 @@ export function ChatModelChoices({ onOpenSettings }: { onOpenSettings: () => voi
         Choose how chat thinks
       </h2>
       <p className="chat-models-lede">
-        Run a model entirely on this Mac, or use your own Claude, ChatGPT, Cursor, or Gemini account through
-        its official local client. Rotli already looked at what this Mac has; nothing connects until you turn
-        it on.
+        {`Run a model entirely on this Mac, or use your own Claude, ChatGPT, Cursor, or Gemini account through its official local client. ${productName()} already looked at what this Mac has; nothing connects until you turn it on.`}
       </p>
       <div className="setup-model-disclosures">
         <section className="setup-model-disclosure" aria-labelledby="local-model-title">
@@ -406,7 +405,7 @@ export function ChatModelChoices({ onOpenSettings }: { onOpenSettings: () => voi
                       )}
                       {expanded === provider &&
                         (provider === "antigravity" ? (
-                          <p className="setup-provider-help">{ANTIGRAVITY_HELP}</p>
+                          <p className="setup-provider-help">{antigravityHelp()}</p>
                         ) : (
                           <div className="setup-provider-help">
                             <ConnectorGuide
@@ -421,9 +420,7 @@ export function ChatModelChoices({ onOpenSettings }: { onOpenSettings: () => voi
                 })}
               </div>
               <p className="setup-provider-help">
-                Rotli never reads or stores provider credentials and never presents a provider login.
-                Antigravity signs in through Google&rsquo;s own agent, from Settings, and stays off by
-                default.
+                {`${productName()} never reads or stores provider credentials and never presents a provider login. Antigravity signs in through Google’s own agent, from Settings, and stays off by default.`}
               </p>
             </div>
           )}

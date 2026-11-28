@@ -6,6 +6,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, 
 // the focused pane's active tab; ⌘⏎ opens in a new tab. Esc closes through
 // the transient stack (the registry's app.hide), not an ad-hoc listener.
 
+import { productName } from "../host/registry";
 import { useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { type KeyAction, allActions, currentChordFromBindings, dispatch, getAction } from "../keys/registry";
@@ -370,7 +371,9 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
           aria-activedescendant={flat[selected] ? `${listId}-option-${selected}` : undefined}
           value={query}
           placeholder={
-            breveActive ? "Search Rotli, files, chats, actions…" : "Search notes, files, chats, actions…"
+            breveActive
+              ? `Search ${productName()}, files, chats, actions…`
+              : "Search notes, files, chats, actions…"
           }
           aria-label={searchActionLabel(breveActive)}
           onChange={(e) => {

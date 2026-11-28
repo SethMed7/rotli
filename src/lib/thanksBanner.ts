@@ -5,6 +5,8 @@
 // any choice they made (that would be personal data leaving through a link
 // or a share sheet).
 
+import { productName } from "../host/registry";
+
 export const SITE_URL = "https://rotli.co";
 
 export const SHARE_CAPTION =
@@ -54,6 +56,6 @@ export function bannerText(userName: string): BannerText {
   const name = shortName(userName);
   return {
     headline: name ? `Thank you, ${name}` : "Thank you",
-    subline: "for trying Rotli. We’re so glad you’re here.",
+    subline: `for trying ${productName()}. We’re so glad you’re here.`,
   };
 }

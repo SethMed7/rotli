@@ -5,6 +5,7 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { SaveStatus, useAutosave } from "../components/autosave";
+import { inlineName } from "../host/registry";
 import { bytesRevision, contentRevision } from "../lib/contentRevision";
 import { fileName } from "../lib/fileKind";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
@@ -191,7 +192,7 @@ export default function SheetEditor({
           revisionRef.current = contentRevision(csv);
           sourceBase64Ref.current = b64FromText(csv);
           if (new TextEncoder().encode(csv).length > SHEET_EDIT_MAX_BYTES) {
-            throw new Error("this file is too large to edit in rotli — opening read-only is fine");
+            throw new Error(`this file is too large to edit in ${inlineName()} — opening read-only is fine`);
           }
           diskLenRef.current = new TextEncoder().encode(csv).length;
           const rows = parseCsvExact(csv);
@@ -204,7 +205,7 @@ export default function SheetEditor({
           revisionRef.current = bytesRevision(bytes);
           sourceBase64Ref.current = b64;
           if (bytes.length > SHEET_EDIT_MAX_BYTES) {
-            throw new Error("this file is too large to edit in rotli — opening read-only is fine");
+            throw new Error(`this file is too large to edit in ${inlineName()} — opening read-only is fine`);
           }
           diskLenRef.current = bytes.length;
           wb = await loadXlsx(bytes.buffer as ArrayBuffer);

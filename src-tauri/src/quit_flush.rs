@@ -204,14 +204,20 @@ impl QuitFlush {
             silent.sort();
             let names = silent.iter().map(|label| label.as_str()).collect::<Vec<_>>().join(", ");
             return Err(if phase == 1 {
-                format!("Rotli did not quit because a window ({names}) did not finish saving. Your files remain open.")
+                format!("{} did not quit because a window ({names}) did not finish saving. Your files remain open.", crate::app_identity::app_name())
             } else {
-                format!("Rotli did not quit because a window ({names}) did not say whether everything was saved. Your files remain open.")
+                format!(
+                    "{} did not quit because a window ({names}) did not say whether everything was saved. Your files remain open.",
+                    crate::app_identity::app_name()
+                )
             });
         }
         if status.failed {
             let reasons = if status.errors.is_empty() { "a save failed".to_string() } else { status.errors.join("; ") };
-            return Err(format!("Rotli did not quit: {reasons}. Your files remain open."));
+            return Err(format!(
+                "{} did not quit: {reasons}. Your files remain open.",
+                crate::app_identity::app_name()
+            ));
         }
         Ok(())
     }

@@ -1060,7 +1060,8 @@ on its first read, so a late registration throws. A host can give:
   notes panes (Keybindings, Browser, Librarian, Security, AI Models, Chat,
   Location). General, Appearance, Connections and About stay.
 - **`words`**: the updates line; `productName`, which replaces "Rotli"
-  wherever Settings' copy means the running app, including the nav's foot,
+  wherever the app's copy means the running app (see "The words, everywhere"),
+  in Settings including the nav's foot,
   Connections' lead, the Dock row's explanation, the connected-tool setup
   steps, "Why a copy?" and the Keybindings titles "Hide …" and "Open or hide
   …" (what stays is listed under "What a host still sees"); `version`, which
@@ -1105,33 +1106,119 @@ on its first read, so a late registration throws. A host can give:
   host gave them.
 - **`aboutGlyph`**: the About row's glyph, where Rotli shows its quokka.
 
+## The words, everywhere
+
+`productName` is not only Settings' word. Wherever Rotli's copy says "Rotli"
+and means the running app, the copy reads it: first run and the vault screens,
+Home's activity card and the dashboard, the search field, chat's notices,
+Breve's panes, dialogs, and the errors and notices from the services and from
+Rust. With no host every sentence reads exactly as before.
+
+- **`productName()`** (`src/host/registry.ts`) where Rotli writes "Rotli".
+- **`inlineName()`** where Rotli writes its lower-case wordmark: "Message
+  rotli…", "read-only for rotli". It is the host's `words.inlineName`, else its
+  `productName`, else "rotli".
+- **Rust.** `app_identity::app_name()` ("Rotli") and
+  `app_identity::product_name()` ("rotli"), both from
+  `HostWords::product_name`, so a host repinning sets no new field. The
+  folder pickers' titles ("Add a folder to rotli"), the quit refusals, the
+  Finder-open refusals, and the vault and file errors a person reads use
+  them.
+- **The window title.** Under a host the page sets `document.title` to
+  `productName` as `app.tsx` loads; standalone leaves `index.html`'s title
+  alone. The native window's title and the app menu's name come from the
+  host's own Tauri config.
+- **Never as a module loads.** A host's registration module imports its own
+  panes, and they import Rotli's components and stores before it calls
+  `registerHost`, so a constant that read the name at import would lock the
+  registry first and registering would throw. Every routed constant reads it
+  inside a function or a getter (`mainReloadedNotice()`,
+  `HEALTH_LABELS.managed`), and `check:product-name` fails a `productName()`,
+  `inlineName()` or `appHost()` call at a module's top level anywhere but
+  `src/app.tsx`, which loads after the host has registered.
+- **The theme family a parsed settings file lacks** is the host's too
+  (`parseSettings`), because a host's first launch already has its scratch
+  vault bound and reads that vault's empty settings.
+- **The note card's "Saved in … at …"** comes from the host's own note flow,
+  not from Rotli, so the host words it.
+
+### Keeping the name honest
+
+`check:product-name` (`scripts/check-product-name.mjs`, in both lint chains)
+reads every string a person can read that names the app: TS and TSX under
+`src/` with the TypeScript compiler (string literals, template parts and JSX
+text; not comments, imports, class names or console lines), Rust string
+literals under `src-tauri/src/` (not test modules, printed lines or `rotli: `
+log lines), and `index.html`'s title. Each one either goes through the words
+above or is listed in `scripts/product-name-allowlist.json` with a category.
+A new string fails, and so does a listed string that is gone or has no
+category. An entry covers one copy of its text in its file; a text that
+appears more often says `{ "category": …, "count": n }`, so one listed "Rotli"
+can't cover a second. Rust is read by line, so a string literal split across
+lines isn't seen. It doesn't read JSON assets (the Welcome catalog), CSS `content`
+or Markdown notes; those are listed under "What a host still sees".
+
+## The look
+
+- **`themeFamily`**: the theme family a fresh install, first run, Skip setup
+  and Settings › Reset start on, any of Rotli's family ids (`ocean`,
+  `grove`…); an unknown id throws at registration. A saved choice still wins.
+  It is read at each use (`defaultAppearance()` in
+  `src/state/appearanceDefaults.ts`, and the start of
+  `hydratePersistedState`), never kept in a module constant. Standalone
+  starts on `warm` as before. Every family keeps its tuned light and dark
+  environments; the host picks one, it doesn't add one.
+- **`mascot: "none"`**: no quokka anywhere. `Character` draws nothing, so the
+  chat buddy, the Settings banners' character, first run's companion and
+  intro, the vault screen and the thank-you banner lose it; the quokka mark
+  (the search field) gives way to `productMark`, or to nothing.
+  Appearance drops the Chat buddy studio and the two quokka navigator trails
+  (a stored trail falls back to the quiet lines), and the copy that names the
+  quokka (the first-run lede, the Settings hint) leaves it out. Standalone
+  keeps the quokka (`"quokka"`, the default). Rotli's pane heads keep their
+  objects (a lamp, a shield) without the quokka; `paneHeads: "plain"` takes
+  those away too. The thank-you card keeps its scenery until the plain first
+  run replaces it with words alone.
+- **`productMark`**: the host's own mark, a component like a Settings glyph
+  that takes a `size`, drawn in `.host-product-mark` where the quokka mark
+  was, tinted by `--text`. `aboutGlyph` is still the About row's.
+- **Not covered:** the tray icon (a host replaces it with `without_tray()` and
+  its own), the Dock and app icons (the host's bundle), and the web build's
+  favicon and brand mark, which no host ships.
+
 ## What a host still sees
 
-With `productName` set, these still say "Rotli" in Settings, on purpose:
+Everything left saying "Rotli" is listed in
+`scripts/product-name-allowlist.json` with its category:
 
-- **Sentences about Rotli itself.** "Rotli reviews these boundaries…" under
-  AI Models (a promise from Rotli's maintainers); "Older versions of Rotli"
-  under Security; "Rotli's own format" under General › Link format; "from the
-  Rotli studio" under Ambient audio.
-- **Rotli's names.** The theme family and the Markdown source palette called
-  Rotli; the "What's new in Rotli" action (the highlights are Rotli's
-  releases); the "Rotli activity dashboard", named the same way on the
-  dashboard and its sidebar card.
-- **Rotli's Finder Quick Action.** General still shows "Open in Rotli from
-  Finder", though a host never adds it.
-- **The agent card (development builds only).** "Use Rotli for your docs" and
-  the instruction it copies, which runs Rotli's own app and CLI.
-- **About.** The row and heading read `aboutLabel`, and the body `aboutBody`;
-  `productName` alone changes neither. The feedback note says "your Rotli
-  version" until `aboutBody` replaces it.
-- **Rotli (dev), Rotli Web, Rotli Helper and "Rotli for Mac"** copy, which
-  only development and web builds show. The updater's description, which no
-  host build shows.
-
-**Outside Settings the sweep has not been made.** First-run and vault
-screens, chat, the dashboard and sidebar, Librarian Activity, dialogs, error
-messages from the services and from Rust, the Welcome catalog and the prompts
-models receive still say "Rotli".
+- **Rotli's names** (`rotli-name`). The theme family and the Markdown source
+  palette called Rotli, "Rotli's own format" under General › Link format,
+  "from the Rotli studio" under Ambient audio, the "What's new in Rotli"
+  action (the highlights are Rotli's releases), Breve's "Rotli linen, cocoa,
+  and clay" PDF themes, and "a Rotli vault" where a vault's kind is meant.
+- **Rotli the project** (`rotli-project`). The thank-you card's GitHub star
+  and share line, and the feedback issue's build line ("Rotli 1.9.7").
+- **Promises from Rotli's maintainers** (`maintainers`). "Rotli reviews these
+  boundaries…" under AI Models, "Older versions of Rotli" under Security, and
+  About's own body until `aboutBody` replaces it.
+- **Standalone only** (`standalone-only`): the updater, the Finder Quick
+  Action, Breve's scheduler and login item. **Web only** (`web-only`): Rotli
+  Web, Rotli Helper and "Rotli for Mac". **Development only** (`dev-only`):
+  Rotli (dev) and the agent card.
+- **What models read** (`model-read`): prompts, tool descriptions and tool
+  results. Rewording them needs the model evals.
+- **The headless CLI and MCP server** (`cli-mcp`), which never read host
+  words.
+- **The vault's format** (`vault-format`): folder names such as
+  "Trash (Rotli)", `MAP.md`'s first line, the format version's wording.
+- **Matched words** (`keyed`, `parity-pinned`): sentences another side
+  recognises by their words. The settings-unreadable refusal and the
+  secure-notes warming notice (a Rust↔TS twin), "Rotli is already finishing
+  saves…" (compared in code), "outside Rotli storage", and the Cursor pause
+  message (pinned in `scripts/fixtures/parity.json`).
+- **Not read by the guard**: the Welcome catalog (`src/assets/welcome.json`)
+  and Rotli's own welcome note, which `welcome_note` replaces for a host's
+  empty folder.
 
 Some words are shared with Settings, so they follow `productName` outside it
 too: "Why a copy?", the connected-tool setup steps, and the two action titles.
@@ -1255,6 +1342,45 @@ shows "Hide …" only, since it leaves system-wide chords out.
 ## Proof
 
 This list says only what was run.
+
+- **The words everywhere, the look, and the name guard** (2026-11-28, tests
+  and the browser lane; no native build launched).
+  - TypeScript: `src/host/registry.test.ts` (`inlineName`, `hostThemeFamily`,
+    `mascotShown`, `productMark`, and the refusal of an unknown family or
+    mascot), `src/state/appearanceDefaultsHost.test.ts` (a host's family on
+    every fresh start, read at each use, and in parsed settings with no
+    family), `src/state/chatNavigatorStyle.test.ts` (no quokka trail without
+    the mascot), `src/host/mascot.test.tsx`
+    (no quokka drawn, the host's mark in the quokka mark's place). Each failed
+    on `origin/dev` before the change.
+  - `scripts/check-product-name.test.ts`: what counts as naming the app, in
+    TS, JSX and Rust; an unlisted, a stale and an uncategorised entry fail; a
+    name read at module load fails; the tree passes. A raw "Files Rotli didn’t
+    open" put back into the sidebar failed the guard, and the module-load rule
+    lists all 21 reads an earlier cut of this change made.
+  - The synthetic host's entry imports Rotli's Settings, chat and first-run
+    components and the Main and views stores before it registers, then the
+    app's entry, as a host build's entry does. With the earlier cut's
+    module-load reads the page threw "A host registers before the app
+    starts"; on `origin/dev` and now it doesn't.
+  - Rust: `sentences_name_the_app_a_host_names_and_rotli_otherwise`
+    (`app_identity_tests.rs`), standalone and under
+    `ROTLI_APP_IDENTIFIER=com.example.host`.
+  - Browser lane, synthetic host (`e2e/host-identity.spec.ts`): the window
+    title, the Ocean family, "Example Host activity" on Home, the host's mark
+    in the search field, Settings › Appearance with two navigator trails and
+    no studio, About, and first run through Skip to the thank-you card, each
+    with no `.quokka`, `.quokka-mark` or `[data-pose]` and no "quokka" in the
+    shell's words. The chat composer doesn't render in the twin (no vault), so
+    its placeholder is proven by the guard only.
+  - Standalone, browser lane: the note, Home's dashboard, chat, all 12
+    Settings panes and every first-run screen (the four steps, Skip's folder
+    prompt, the thank-you card and the Settings hint), three runs on
+    `origin/dev` and three on the change, taken back to back. The DOM matched
+    in all 66 after shots (ULIDs and relative times aside). The pixels that
+    differed were the Settings banners' scenery (at most 627 against the
+    closest base; two base runs differ by up to 3,895) and the note's "19m"
+    age line.
 
 - **The command line's mark** (2026-11-28, tests only; no native build
   launched). `workspace_host_pin_tests.rs` re-runs the test binary as one

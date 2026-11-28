@@ -21,6 +21,7 @@ import { type EditorState, type Range, StateEffect, StateField } from "@codemirr
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
 
 import { createEditableBoardFromMermaid } from "../boards/composition";
+import { productName } from "../host/registry";
 import { rootIdOf, splitRootId } from "../lib/corpusWireId";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
@@ -89,7 +90,7 @@ type StaticLangKey = Exclude<LangKey, "board" | "sheet" | "document">;
 /** A block whose renderer couldn't be loaded, in words. */
 function rendererFailed(lang: string, error: unknown): string {
   const reason = error instanceof Error ? error.message : "it didn’t load";
-  return `${lang}: couldn’t load the renderer — ${reason}. Reload Rotli to try again.`;
+  return `${lang}: couldn’t load the renderer — ${reason}. Reload ${productName()} to try again.`;
 }
 
 function errorBox(message: string): HTMLElement {

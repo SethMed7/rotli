@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 
+import { productName } from "../host/registry";
 import { sendChatWindow } from "../lib/chatWindowBridge";
 import type { PathId } from "../lib/corpusWireId";
 import { corpusMainRead, corpusMainWrite, hasDurableCorpus } from "../lib/tauri";
@@ -59,8 +60,8 @@ const mainWriter = createRevisionedTrackedWrite((contents, revision) => corpusMa
 /** Shown only when Main was rearranged on disk while a different arrangement
  * was being made here — the one case with no honest merge. Plain words: the
  * revision ids behind it mean nothing to the person reading. */
-export const MAIN_RELOADED_NOTICE =
-  "Main changed outside Rotli, so your last change wasn’t kept. Make it again.";
+export const mainReloadedNotice = (): string =>
+  `Main changed outside ${productName()}, so your last change wasn’t kept. Make it again.`;
 
 export const useMainStore = create<MainState>((set) => ({
   manifest: EMPTY_MAIN,
@@ -121,7 +122,7 @@ async function recoverMain(local: MainManifest, mayRetry: boolean): Promise<void
       useMainStore.setState({
         manifest: parseMainManifest(outcome.remote || "{}"),
         saveState: "error",
-        error: MAIN_RELOADED_NOTICE,
+        error: mainReloadedNotice(),
         dirty: false,
       });
       return;

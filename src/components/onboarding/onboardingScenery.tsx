@@ -11,6 +11,7 @@
 
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 
+import { mascotShown, productName } from "../../host/registry";
 import { type ThemeFamily, useUiStore } from "../../state/ui";
 import { Character } from "../character";
 import { cloud } from "../sceneParts";
@@ -223,7 +224,7 @@ export function SceneIntro({
           </span>
         )}
       </div>
-      <p className="onb-intro-word">Rotli</p>
+      <p className="onb-intro-word">{productName()}</p>
     </div>
   );
 }
@@ -242,7 +243,17 @@ export function markOpened(): void {
  * stands, and the scene opens onto setup. */
 export function OnboardingIntro({ onDone }: { onDone: () => void }) {
   useEffect(markOpened, []);
-  return <SceneIntro art={ISLAND_SCENE} viewBox="0 0 1200 240" onDone={onDone} testId="onboarding-intro" />;
+  // a host with no mascot keeps the scene and the word, with no quokka's
+  // hop and no empty shell where it stood (host/registry.ts)
+  return (
+    <SceneIntro
+      art={ISLAND_SCENE}
+      viewBox="0 0 1200 240"
+      onDone={onDone}
+      testId="onboarding-intro"
+      {...(mascotShown() ? {} : { quokka: false })}
+    />
+  );
 }
 
 export { ISLAND_SCENE, prefersReducedMotion };

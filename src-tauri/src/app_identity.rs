@@ -103,12 +103,33 @@ pub(crate) const STANDALONE_PRODUCT_NAME: &str = "rotli";
 
 /// The name in these words' menu labels.
 pub(crate) fn product_name_in(words: &HostWords) -> &str {
-    words.product_name.as_deref().filter(|name| !name.trim().is_empty()).unwrap_or(STANDALONE_PRODUCT_NAME)
+    host_name_or(words, STANDALONE_PRODUCT_NAME)
 }
 
-/// This build's name in its menu labels (`host::open_label`, `host::quit_label`).
+/// The host's name when it gave one that isn't blank, else Rotli's `standalone`.
+fn host_name_or<'a>(words: &'a HostWords, standalone: &'a str) -> &'a str {
+    words.product_name.as_deref().filter(|name| !name.trim().is_empty()).unwrap_or(standalone)
+}
+
+/// This build's name in its menu labels (`host::open_label`, `host::quit_label`)
+/// and wherever Rotli's own sentences write its lower-case wordmark.
 pub(crate) fn product_name() -> &'static str {
     product_name_in(words())
+}
+
+/// The name Rotli's own sentences use when a host gives none.
+pub(crate) const STANDALONE_APP_NAME: &str = "Rotli";
+
+/// The name in these words' sentences.
+pub(crate) fn app_name_in(words: &HostWords) -> &str {
+    host_name_or(words, STANDALONE_APP_NAME)
+}
+
+/// This build's name where Rotli's sentences say "Rotli" and mean the
+/// running app: dialogs, refusals and errors a person reads
+/// (docs/architecture/host-seams.md, "Keeping the name honest").
+pub(crate) fn app_name() -> &'static str {
+    app_name_in(words())
 }
 
 /// Shown where a host build refuses the Keychain.

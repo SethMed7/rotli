@@ -4,6 +4,7 @@
 // seventeen days of "missing generated brief" can never again hide behind
 // "Managed by Rotli" (audit 2026-09-02 §1.1).
 
+import { productName } from "../../host/registry";
 import type { BreveRoutineHealth, BreveSnapshot } from "../../routines/briefs";
 
 export type BreveHealthLevel = "ok" | "warn" | "off";
@@ -24,7 +25,9 @@ const DAY_MS = 86_400_000;
 
 /** The rail-status vocabulary, exported so tests and callers never restate it. */
 export const HEALTH_LABELS = {
-  managed: "Managed by Rotli",
+  get managed() {
+    return `Managed by ${productName()}`;
+  },
   legacy: "Legacy scheduler active",
   unconfigured: "Not configured",
   unscheduled: "Not scheduled",
@@ -62,8 +65,8 @@ export function breveHealthSummary(snapshot: BreveSnapshot, nowMs: number): Brev
             : HEALTH_LABELS.unscheduled,
       detail:
         snapshot.scheduler === "legacy-launchd"
-          ? "The previous Breve scheduler is still in charge. Changes are preserved here, but Rotli does not deliver scheduled briefs yet."
-          : "Rotli stores these routines, but its delivery scheduler is not active in this vault yet.",
+          ? `The previous Breve scheduler is still in charge. Changes are preserved here, but ${productName()} does not deliver scheduled briefs yet.`
+          : `${productName()} stores these routines, but its delivery scheduler is not active in this vault yet.`,
       failing: [],
       daysSinceBrief,
     };
@@ -100,8 +103,7 @@ export function breveHealthSummary(snapshot: BreveSnapshot, nowMs: number): Brev
   return {
     level: "ok",
     label: HEALTH_LABELS.managed,
-    detail:
-      "Rotli is actively managing these routines and the always-on Signal assistant. Saved changes are adopted automatically.",
+    detail: `${productName()} is actively managing these routines and the always-on Signal assistant. Saved changes are adopted automatically.`,
     failing,
     daysSinceBrief,
   };

@@ -51,6 +51,7 @@ import {
   aboutLabel,
   appHost,
   dockRow,
+  mascotShown,
   noShortcutsWords,
   notesOn,
   plainPaneHeads,
@@ -1034,7 +1035,7 @@ function AppearancePane() {
       </p>
       <AccentRow />
 
-      <ChatBuddyStudio />
+      {mascotShown() && <ChatBuddyStudio />}
 
       <NavigatorSettings />
 

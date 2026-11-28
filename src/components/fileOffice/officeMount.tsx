@@ -1,6 +1,7 @@
 import { Suspense, lazy, type RefObject } from "react";
 
 import { DOCX_EDITABLE, DOCUMENT_CONVERTIBLE } from "../../documents/kinds";
+import { inlineName, productName } from "../../host/registry";
 import { LAUNCH_FEATURES, PLATFORM } from "../../lib/featurePolicy";
 
 /** How to edit a PDF or legacy document on Rotli Web, where conversion (a
@@ -47,11 +48,11 @@ export function OfficeMount({
       <p className="file-loading">
         {kind === "document"
           ? PLATFORM === "desktop"
-            ? "This document is too large to edit safely in Rotli — open it externally instead."
-            : "This document is too large to edit safely in Rotli. Open the original in another app."
+            ? `This document is too large to edit safely in ${productName()} — open it externally instead.`
+            : `This document is too large to edit safely in ${productName()}. Open the original in another app.`
           : PLATFORM === "desktop"
-            ? "this file is too large to view in rotli — Open externally shows the whole thing"
-            : "This file is too large to view in Rotli. Open the original in another app."}
+            ? `this file is too large to view in ${inlineName()} — Open externally shows the whole thing`
+            : `This file is too large to view in ${productName()}. Open the original in another app.`}
       </p>
     );
   if (kind === "sheet") {
@@ -60,8 +61,7 @@ export function OfficeMount({
         <div className="file-document-fallback">
           <h2>.{ext} is unsupported in this build</h2>
           <p>
-            Spreadsheets aren’t available in this build yet. Open the original externally, or save a CSV copy
-            to edit it in Rotli.
+            {`Spreadsheets aren’t available in this build yet. Open the original externally, or save a CSV copy to edit it in ${productName()}.`}
           </p>
         </div>
       );
@@ -110,8 +110,8 @@ export function OfficeMount({
         <>
           <h2>Convert a copy to edit here</h2>
           <p>
-            Rotli can use the local macOS document converter for .{ext}. It creates a new managed DOCX in
-            Assets and leaves the original unchanged.
+            {`${productName()} can use the local macOS document converter for .`}
+            {ext}. It creates a new managed DOCX in Assets and leaves the original unchanged.
           </p>
           <button
             type="button"
@@ -134,8 +134,7 @@ export function OfficeMount({
         <>
           <h2>.{ext || "unknown"} is unsupported</h2>
           <p>
-            Rotli does not have a faithful local conversion path for this format. Open the original externally
-            and export a DOCX copy to edit it in Rotli.
+            {`${productName()} does not have a faithful local conversion path for this format. Open the original externally and export a DOCX copy to edit it in ${productName()}.`}
           </p>
         </>
       )}

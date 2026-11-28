@@ -42,7 +42,7 @@ afterAll(() => {
   void mock.module("../lib/tauri", () => realTauri);
 });
 
-const { MAIN_RELOADED_NOTICE, hydrateMain, useMainStore } = await import("./main");
+const { mainReloadedNotice, hydrateMain, useMainStore } = await import("./main");
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
 const diskTree = () => parseMainManifest(disk.contents).tree;
@@ -75,7 +75,7 @@ describe("Main survives a write from outside the app", () => {
     await settle();
 
     const state = useMainStore.getState();
-    expect(state.error).toBe(MAIN_RELOADED_NOTICE);
+    expect(state.error).toBe(mainReloadedNotice());
     expect(state.error).not.toContain("revision");
     expect(state.dirty).toBe(false);
     expect(state.manifest.tree).toEqual(diskTree());

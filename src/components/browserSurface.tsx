@@ -1,5 +1,6 @@
 import { type SyntheticEvent, useCallback, useEffect, useRef, useState } from "react";
 
+import { productName } from "../host/registry";
 import {
   PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS,
   adoptPrivateBrowserTab,
@@ -287,7 +288,7 @@ export function BrowserSurface({
               <BrowserGlyph size={22} />
             </div>
             <span className="browser-start-provider">{engine.label}</span>
-            <h2>Search without leaving Rotli</h2>
+            <h2>{`Search without leaving ${productName()}`}</h2>
             <p>Private, temporary research in the environment you already chose.</p>
             <form className="browser-start-search" onSubmit={navigate}>
               <input

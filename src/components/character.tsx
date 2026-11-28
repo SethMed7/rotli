@@ -12,7 +12,7 @@
 // The detailed logo mark stays eager: it's ~6 KB and sits in the titlebar at
 // first paint.
 
-import { type CSSProperties, useEffect, useState } from "react";
+import { createElement, type CSSProperties, useEffect, useState } from "react";
 
 import logoMark from "../assets/characters/_logo.svg?raw";
 import {
@@ -25,6 +25,7 @@ import {
   type QuokkaAccessoryPlacement,
   type QuokkaStyle,
 } from "../brand/quokka";
+import { mascotShown, productMark } from "../host/registry";
 import { useDataTheme } from "../state/theme";
 import { useUiStore } from "../state/ui";
 import type {
@@ -195,8 +196,13 @@ function poseAccessoryArt(set: AccessoryCharacterArtSet, pose: CharacterName): A
 
 /** A full-body quokka illustration. The caller picks the pose; without an
  * explicit treatment it wears the person's chosen look (Settings → Appearance).
- * A theme lock (brand/quokka.ts quokkaThemeLock) overrides both. */
-export function Character({
+ * A theme lock (brand/quokka.ts quokkaThemeLock) overrides both. A host with
+ * no mascot draws nothing here (docs/architecture/host-seams.md). */
+export function Character(props: CharacterProps) {
+  return mascotShown() ? <QuokkaCharacter {...props} /> : null;
+}
+
+function QuokkaCharacter({
   name,
   size = 120,
   className,
@@ -347,6 +353,19 @@ export function Character({
 /** The compact rotli mark — the upper-body quokka used as the in-app logo
  * (titlebar identity, about). Same currentColor line so it tints with the theme. */
 export function QuokkaMark({ size = 18, className }: { size?: number; className?: string }) {
+  if (!mascotShown()) {
+    // a host with no mascot shows its own mark here, or nothing
+    const Mark = productMark();
+    return Mark ? (
+      <span
+        className={className ? `host-product-mark ${className}` : "host-product-mark"}
+        style={{ width: size, height: size }}
+        aria-hidden="true"
+      >
+        {createElement(Mark, { size })}
+      </span>
+    ) : null;
+  }
   return (
     <span
       className={className ? `quokka-mark ${className}` : "quokka-mark"}

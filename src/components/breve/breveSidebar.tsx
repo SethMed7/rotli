@@ -1,5 +1,6 @@
 import type { ComponentType, KeyboardEvent } from "react";
 
+import { productName } from "../../host/registry";
 import { useNow } from "../../lib/useNow";
 import type { BreveView } from "../../state/ui";
 import { useUiStore } from "../../state/ui";
@@ -104,7 +105,9 @@ export function BreveSidebar({ zoom }: { zoom: number }) {
       {snapshot?.scheduler !== "none" && (
         <div className="breve-rail-foot">
           <ClockGlyph size={12} />
-          <span>{snapshot?.scheduler === "rotli" ? "Scheduled by Rotli" : "Scheduled by Breve"}</span>
+          <span>
+            {snapshot?.scheduler === "rotli" ? `Scheduled by ${productName()}` : "Scheduled by Breve"}
+          </span>
         </div>
       )}
     </nav>

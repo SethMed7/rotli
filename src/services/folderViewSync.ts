@@ -1,3 +1,4 @@
+import { productName } from "../host/registry";
 // Named-view transaction twin of corpus.rs views_write_unlocked. Rollback
 // restores only our own bytes; a newer external edit always wins.
 import { composeNoteDocument, emptyFrontmatter, parseNoteDocument } from "../lib/frontmatter";
@@ -14,7 +15,7 @@ const broadRotliExclusions = [".rotli", ".rotli/"];
 function membership(raw: string): Map<string, string> {
   const manifest = JSON.parse(raw || '{"version":1,"views":[]}') as ViewsManifest;
   if (manifest.version !== 1 || !Array.isArray(manifest.views))
-    throw new Error("views format is not writable by this Rotli build");
+    throw new Error(`views format is not writable by this ${productName()} build`);
   const names = new Set<string>();
   const members = new Map<string, string>();
   const walk = (nodes: MainNode[], name: string) => {
@@ -77,7 +78,7 @@ export async function writeFolderViews(
       : '{"version":1,"tree":[]}',
   ) as { version: number; tree: MainNode[] };
   if (main.version !== 1 || !Array.isArray(main.tree))
-    throw new Error("Main format is not writable by this Rotli build");
+    throw new Error(`Main format is not writable by this ${productName()} build`);
   let mainChanged = false;
   for (const id of next.keys())
     if (!contains(main.tree, id)) {

@@ -1,3 +1,4 @@
+import { productName } from "../host/registry";
 export function paletteMatchScore(query: string, title: string, body: string): number {
   const q = query.trim().toLocaleLowerCase();
   const name = title.toLocaleLowerCase();
@@ -15,5 +16,5 @@ export function rankSearchGroups<T extends { score: number }>(groups: readonly T
 
 /** The launcher and open search field describe the same action. */
 export function searchActionLabel(breve: boolean): string {
-  return breve ? "Search Rotli and actions" : "Search notes and actions";
+  return breve ? `Search ${productName()} and actions` : "Search notes and actions";
 }

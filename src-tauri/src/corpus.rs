@@ -159,7 +159,7 @@ pub fn relocate(old_root: &Path, new_root: &Path) -> Result<(), String> {
                     .unwrap_or(true)
             });
         if has_real {
-            return Err("Pick an empty folder — rotli won't merge into existing files.".into());
+            return Err(format!("Pick an empty folder — {} won't merge into existing files.", crate::app_identity::product_name()));
         }
     } else {
         fs::create_dir_all(new_root).map_err(|e| e.to_string())?;
@@ -918,8 +918,10 @@ fn upsert_brain_config(
             .is_some_and(|previous| previous != new_id)
         {
             return Err(
-                "This folder is a different vault than the one rotli connected to — refusing."
-                    .into(),
+                format!(
+                    "This folder is a different vault than the one {} connected to — refusing.",
+                    crate::app_identity::product_name()
+                ),
             );
         }
     }
@@ -2602,8 +2604,9 @@ fn reference_contains(nodes: &[ReferenceNode], item_id: &str) -> bool {
 fn validated_view_membership(manifest: &ViewsManifest) -> Result<HashMap<String, String>, String> {
     if manifest.version != 1 {
         return Err(format!(
-            "views format v{} is not writable by this Rotli build",
-            manifest.version
+            "views format v{} is not writable by this {} build",
+            manifest.version,
+            crate::app_identity::app_name()
         ));
     }
     let mut names = HashSet::new();
@@ -3285,7 +3288,7 @@ impl CorpusStore {
         }
         crate::note_protection::refuse_field(key, value, &[&RESERVED_KEYS[..], &AI_KEYS[..]].concat())?;
         if RESERVED_KEYS.contains(&key) {
-            return Err(format!("`{key}` is managed by rotli, not editable here"));
+            return Err(format!("`{key}` is managed by {}, not editable here", crate::app_identity::product_name()));
         }
         if AI_KEYS.contains(&key) {
             return Err(format!(
@@ -4068,8 +4071,10 @@ impl CorpusStore {
         // both refuse every user write.
         if self.band_read_only {
             return Err(
-                "this vault's format is outside the range rotli supports — it opens read-only"
-                    .into(),
+                format!(
+                    "this vault's format is outside the range {} supports — it opens read-only",
+                    crate::app_identity::product_name()
+                ),
             );
         }
         if self.perms_read_only {
@@ -4090,7 +4095,8 @@ impl CorpusStore {
         match surfaced(self.layout, rel) {
             Surface::NoteRW => Ok(()),
             _ => Err(format!(
-                "this location is read-only to rotli in this vault — it writes Library notes, chats, and boards (refused: {})",
+                "this location is read-only to {} in this vault — it writes Library notes, chats, and boards (refused: {})",
+                crate::app_identity::product_name(),
                 if rel.is_empty() { "<root>" } else { rel }
             )),
         }
@@ -5279,14 +5285,15 @@ impl CorpusStore {
     fn filer_writable(&self, rel: &str) -> Result<(), String> {
         self.guard_rel(rel)?;
         if !self.librarian_writes() {
-            return Err("the Librarian only runs in a Rotli vault or a copy Rotli made".into());
+            return Err(format!("the Librarian only runs in a Rotli vault or a copy {} made", crate::app_identity::app_name()));
         }
         // #3 (audit 2026-07): the FILER lane honors the same read-only verdicts as
         // the user lane — an out-of-band contract or read-only perms close BOTH.
         if self.band_read_only {
-            return Err(
-                "this vault's format is outside the range rotli supports — the Librarian may not write it".into(),
-            );
+            return Err(format!(
+                "this vault's format is outside the range {} supports — the Librarian may not write it",
+                crate::app_identity::product_name()
+            ));
         }
         if self.perms_read_only {
             return Err(
@@ -5600,8 +5607,9 @@ impl CorpusStore {
             .map_err(|error| format!("invalid Main manifest: {error}"))?;
         if manifest.version != 1 {
             return Err(format!(
-                "Main format v{} is not writable by this Rotli build",
-                manifest.version
+                "Main format v{} is not writable by this {} build",
+                manifest.version,
+                crate::app_identity::app_name()
             ));
         }
         self.suppress
@@ -5669,8 +5677,9 @@ impl CorpusStore {
         };
         if main.version != 1 {
             return Err(format!(
-                "Main format v{} is not writable by this Rotli build",
-                main.version
+                "Main format v{} is not writable by this {} build",
+                main.version,
+                crate::app_identity::app_name()
             ));
         }
         let mut main_changed = false;

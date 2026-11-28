@@ -1,3 +1,4 @@
+import { productName } from "../host/registry";
 // What a person can hide (the owner, 2026-09-28: "a place in settings where
 // you can choose things to hide, like the overview or the browser button").
 // Settings → Appearance → Show in Rotli lists these; each is shown unless
@@ -53,7 +54,9 @@ export const HIDEABLE = [
     group: "Sidebar",
     title: "Activity overview",
     desc: "The “This week” card on Home and the Model usage card on Chat.",
-    still: "in ⌘K, as the Rotli activity dashboard",
+    get still() {
+      return `in ⌘K, as the ${productName()} activity dashboard`;
+    },
   },
   {
     id: "allNotes",

@@ -4,6 +4,9 @@
 // Literal-typed on purpose: ui.ts imports this file, so it cannot import the
 // store's unions back without a module cycle.
 
+import { hostThemeFamily } from "../host/registry";
+import type { ThemeFamily } from "./themeChoices";
+
 export const DEFAULT_ACCENT_HUE = 210;
 
 export const DEFAULT_APPEARANCE = {
@@ -14,3 +17,12 @@ export const DEFAULT_APPEARANCE = {
   accentHue: DEFAULT_ACCENT_HUE,
   boardBackground: "theme",
 } as const;
+
+/** The appearance a fresh start uses: Rotli's default, on the theme family a
+ * host chose when one did (docs/architecture/host-seams.md). Read at each use,
+ * never kept, so it is read only after a host registers. */
+export function defaultAppearance(): Omit<typeof DEFAULT_APPEARANCE, "themeFamily"> & {
+  themeFamily: ThemeFamily;
+} {
+  return { ...DEFAULT_APPEARANCE, themeFamily: hostThemeFamily() ?? DEFAULT_APPEARANCE.themeFamily };
+}

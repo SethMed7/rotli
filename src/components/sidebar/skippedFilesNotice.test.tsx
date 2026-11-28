@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { HardLinkedNote } from "../../editor/hardLinkedNote";
-import { INDEPENDENT_COPY, isHardLinkRefusal } from "../../lib/hardLinks";
+import { independentCopy, isHardLinkRefusal } from "../../lib/hardLinks";
 import { HelperVaultDir } from "../../lib/helperVaultDir";
 import { FolderNotesService } from "../../services/folderNotes";
 import { MemoryVaultDir } from "../../services/vaultDir";
@@ -46,7 +46,7 @@ describe("the sidebar notice", () => {
     expect(open).toContain(HIDE_FILES);
     expect(open).toContain("wiki/Ledger.md");
     expect(open).toContain("Storage/scan.pdf");
-    expect(open).toContain(INDEPENDENT_COPY);
+    expect(open).toContain(independentCopy());
   });
 });
 
@@ -74,7 +74,7 @@ describe("a note open when it became hard-linked", () => {
     expect(isHardLinkRefusal(new Error("read wiki/Ledger.md: not found"))).toBe(false);
     const view = renderToStaticMarkup(<HardLinkedNote />);
     expect(view).toContain("This note wasn’t opened because it has a hard link. Your file is still on disk.");
-    expect(view).toContain(INDEPENDENT_COPY);
+    expect(view).toContain(independentCopy());
   });
 });
 

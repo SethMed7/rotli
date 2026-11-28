@@ -74,7 +74,7 @@ impl FolderAuthorizations {
         if grants.contains_key(&canonical) {
             Ok(canonical)
         } else {
-            Err("this operation requires a folder selected in Rotli's native picker".into())
+            Err(format!("this operation requires a folder selected in {}'s native picker", crate::app_identity::app_name()))
         }
     }
 }
@@ -138,7 +138,8 @@ fn assert_writable(rel: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "rotli only writes chats, Library intake, and secure notes here — the rest of this vault's reference layer is read-only (refused: {rel})"
+            "{} only writes chats, Library intake, and secure notes here — the rest of this vault's reference layer is read-only (refused: {rel})",
+            crate::app_identity::product_name()
         ))
     }
 }
@@ -403,7 +404,7 @@ fn registered_write_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, 
     if cfg.is_some_and(|cfg| memex_write_allowed(&cfg, &want)) {
         Ok(want)
     } else {
-        Err("this vault is read-only for Rotli".into())
+        Err(format!("this vault is read-only for {}", crate::app_identity::app_name()))
     }
 }
 
@@ -759,7 +760,7 @@ pub const WELCOME_PRESET_FILE: &str = "Welcome to Rotli.md";
 /// refuses a non-empty folder.
 pub fn scaffold_memex(root: &Path) -> Result<String, String> {
     if root.exists() && !dir_has_no_real_entries(root) {
-        return Err("Pick an empty folder — rotli starts a fresh vault there.".into());
+        return Err(format!("Pick an empty folder — {} starts a fresh vault there.", crate::app_identity::product_name()));
     }
     fs::create_dir_all(root).map_err(|e| e.to_string())?;
     for d in [
@@ -1255,11 +1256,13 @@ fn safe_validation_report(root: &Path) -> ValidateReport {
         ok: true,
         skipped: true,
         stdout: if has_script {
-            "Library script not run — Rotli treats files in a vault as untrusted data. Use the vault's own trusted tooling to validate it."
+            format!(
+                "Library script not run — {} treats files in a vault as untrusted data. Use the vault's own trusted tooling to validate it.",
+                crate::app_identity::app_name()
+            )
         } else {
-            "No built-in safe validator is available for this library yet."
-        }
-        .into(),
+            "No built-in safe validator is available for this library yet.".into()
+        },
         errors: 0,
         warnings: 0,
     }

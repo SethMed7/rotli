@@ -8,6 +8,7 @@
 
 import { useEffect, useRef } from "react";
 
+import { productName } from "../../host/registry";
 import { formatChord } from "../../keys/chords";
 import { currentChord } from "../../keys/registry";
 import { containDialogFocus } from "../../lib/dialogFocus";
@@ -56,11 +57,10 @@ export function VaultNeeded({
           onKeyDown={containDialogFocus}
         >
           <h2 id="vault-needed-title" className="vault-needed-title">
-            Rotli needs a folder for your notes
+            {`${productName()} needs a folder for your notes`}
           </h2>
           <p id="vault-needed-text" className="vault-needed-text">
-            It’s the one part of setup you can’t skip. Pick a new folder and Rotli starts a fresh vault there,
-            or pick the Markdown folder you already use, like an Obsidian vault: it stays as it is.
+            {`It’s the one part of setup you can’t skip. Pick a new folder and ${productName()} starts a fresh vault there, or pick the Markdown folder you already use, like an Obsidian vault: it stays as it is.`}
           </p>
           {error && (
             <p role="alert" className="rename-error">

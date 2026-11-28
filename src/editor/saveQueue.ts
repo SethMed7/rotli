@@ -18,6 +18,7 @@
 
 import { useSyncExternalStore } from "react";
 
+import { productName } from "../host/registry";
 import { titleOf } from "../services/derive";
 import { applyNoteWrite, cachedNote, invalidateNotes } from "../services/hooks";
 import { markNoteDraftSaved } from "../services/noteDrafts";
@@ -130,7 +131,7 @@ async function mutation<T>(noteId: string, change: () => Promise<T>): Promise<T>
   // what the note said before (a conflict, say) comes back when the disk answers
   let before: string | null = null;
   const timer = clock.setTimeout(() => {
-    const words = `${noteName(noteId)} is taking longer than expected to save. Its words are kept here; Rotli waits for the disk before it tries anything else`;
+    const words = `${noteName(noteId)} is taking longer than expected to save. Its words are kept here; ${productName()} waits for the disk before it tries anything else`;
     before = documentSaveError(noteId);
     slow.set(noteId, words);
     setSaveError(noteId, words);

@@ -4,6 +4,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { mascotShown, productName } from "../../host/registry";
 import { dispatch } from "../../keys/registry";
 import { dismissSettingsHint, useSettingsHint } from "../../state/settingsHint";
 import { placeStep } from "./guidedTourModel";
@@ -54,10 +55,11 @@ export function SettingsHintCard() {
       aria-label="More in Settings"
       style={at ? { left: at.left, top: at.top } : { visibility: "hidden" }}
     >
-      <h2>Make Rotli more yours</h2>
+      <h2>{`Make ${productName()} more yours`}</h2>
       <p>
-        Your quokka, music, how the window lives, chat models, and more are in Settings. Change any of it
-        whenever you like.
+        {mascotShown()
+          ? "Your quokka, music, how the window lives, chat models, and more are in Settings. Change any of it whenever you like."
+          : "Music, how the window lives, chat models, and more are in Settings. Change any of it whenever you like."}
       </p>
       <div className="settings-hint-actions">
         <button type="button" className="ghostbtn" onClick={dismissSettingsHint}>

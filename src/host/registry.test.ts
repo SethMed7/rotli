@@ -6,6 +6,7 @@ import {
   DEFAULT_ABOUT_LABEL,
   DEFAULT_CONNECTIONS_LEAD,
   DEFAULT_DOCK_ROW,
+  DEFAULT_INLINE_NAME,
   DEFAULT_PRODUCT_NAME,
   DEFAULT_UPDATES_WORDS,
   aboutLabel,
@@ -13,12 +14,16 @@ import {
   connectionsLead,
   createHostRegistry,
   dockRow,
+  hostThemeFamily,
   hostVersion,
+  inlineName,
+  mascotShown,
   navFootLabel,
   notesOn,
   notesSectionTag,
   paneBlocks,
   plainPaneHeads,
+  productMark,
   productName,
   registerHost,
   updatesWords,
@@ -151,4 +156,34 @@ test("a block can only go in a pane that takes blocks, before or after its body"
   ]) {
     expect(() => createHostRegistry().register({ paneBlocks: [bad as never] })).toThrow("Host pane blocks");
   }
+});
+
+test("standalone Rotli keeps its wordmark, its theme family and its quokka", () => {
+  expect(inlineName()).toBe("rotli");
+  expect(DEFAULT_INLINE_NAME).toBe("rotli");
+  expect(hostThemeFamily()).toBeNull();
+  expect(mascotShown()).toBe(true);
+  expect(productMark()).toBeNull();
+});
+
+test("a host's name stands in for the wordmark, unless it gives its own", () => {
+  expect(inlineName({ words: { productName: "Synthetic App" } })).toBe("Synthetic App");
+  expect(inlineName({ words: { productName: "Synthetic App", inlineName: "synthetic" } })).toBe("synthetic");
+  expect(inlineName({})).toBe("rotli");
+});
+
+test("a host picks the starting theme family and can retire the quokka for its own mark", () => {
+  const mark = () => null;
+  const host: AppHost = { themeFamily: "ocean", mascot: "none", productMark: mark };
+  expect(hostThemeFamily(host)).toBe("ocean");
+  expect(mascotShown(host)).toBe(false);
+  expect(productMark(host)).toBe(mark);
+  expect(mascotShown({ mascot: "quokka" })).toBe(true);
+});
+
+test("an unknown theme family or mascot is refused at registration", () => {
+  expect(() => createHostRegistry().register({ themeFamily: "neon" as never })).toThrow("theme family");
+  expect(() => createHostRegistry().register({ mascot: "otter" as never })).toThrow("mascot");
+  expect(() => createHostRegistry().register({ productMark: "<svg/>" as never })).toThrow("product mark");
+  expect(() => createHostRegistry().register({ themeFamily: "grove", mascot: "none" })).not.toThrow();
 });

@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { productName } from "../../host/registry";
 import type { VaultRemovePlan } from "../../services/vaultSwitcher";
 
 export function VaultRowPanel({
@@ -44,12 +45,14 @@ export function VaultRowPanel({
             {plan.kind === "replace" ? (
               <>
                 <strong>{label}</strong> is your only vault. Choose or make another one to use instead, then{" "}
-                {label} is removed from Rotli.
+                {label}
+                {` is removed from ${productName()}.`}
               </>
             ) : (
               <>
-                Remove <strong>{label}</strong> from Rotli?
-                {plan.kind === "switch" ? ` Rotli switches to ${plan.to.label} first.` : ""}
+                Remove <strong>{label}</strong>
+                {` from ${productName()}?`}
+                {plan.kind === "switch" ? ` ${productName()} switches to ${plan.to.label} first.` : ""}
               </>
             )}{" "}
             The folder and its files stay where they are. Nothing is deleted.
@@ -74,7 +77,7 @@ export function VaultRowPanel({
             role="menuitem"
             onClick={() => setConfirming(true)}
           >
-            Remove from Rotli…
+            {`Remove from ${productName()}…`}
           </button>
         </>
       )}

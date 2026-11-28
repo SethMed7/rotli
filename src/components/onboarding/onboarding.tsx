@@ -7,13 +7,14 @@
 import { type KeyboardEvent, useEffect, useState } from "react";
 
 import { DEFAULT_QUOKKA_ACCESSORY_HUE, DEFAULT_QUOKKA_CUSTOM_HUE } from "../../brand/quokka";
+import { mascotShown, productName } from "../../host/registry";
 import { resolveChord, useBindingsStore } from "../../keys/bindings";
 import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
 import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../../keys/registry";
 import { DEFAULT_AMBIENT } from "../../lib/ambient";
 import { setDockVisible, setGlobalShortcut } from "../../lib/tauri";
 import { useAmbient } from "../../state/ambient";
-import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
+import { defaultAppearance } from "../../state/appearanceDefaults";
 import {
   ONBOARDING_STEP_NUMBER,
   ONBOARDING_TOTAL_STEPS,
@@ -34,7 +35,13 @@ import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
 export type SetupScreen = "you" | "librarian" | "shortcuts";
 
 const HOTKEYS = [
-  { id: "app.toggleWindow", label: "Open Rotli", hint: "Summon or tuck away the main window." },
+  {
+    id: "app.toggleWindow",
+    get label() {
+      return `Open ${productName()}`;
+    },
+    hint: "Summon or tuck away the main window.",
+  },
   { id: "capture.summon", label: "Quick capture", hint: "Catch a thought without changing apps." },
   { id: "quick.summon", label: "Quick note", hint: "Open a small floating note." },
 ] as const;
@@ -190,13 +197,16 @@ function YouScreen({ advance }: { advance: () => void }) {
   const setUserName = useUiStore((state) => state.setUserName);
   return (
     <>
-      <h1 id="setup-title">Make Rotli yours.</h1>
+      <h1 id="setup-title">{`Make ${productName()} yours.`}</h1>
       <p className="setup-lede">
-        Your name and a theme now; your notes folder next. Your quokka, music, and the rest wait in Settings.
+        {mascotShown()
+          ? "Your name and a theme now; your notes folder next. Your quokka, music, and the rest wait in Settings."
+          : "Your name and a theme now; your notes folder next. Music and the rest wait in Settings."}
       </p>
       <label className="setup-name-field">
         <span>
-          What should Rotli call you? <em>Optional</em>
+          {`What should ${productName()} call you? `}
+          <em>Optional</em>
         </span>
         <input
           type="text"
@@ -270,7 +280,7 @@ function skipToDefaults(): void {
     void setGlobalShortcut(action.id, action.defaultChord ? toAccelerator(action.defaultChord) : null);
   }
   useUiStore.setState({
-    ...DEFAULT_APPEARANCE,
+    ...defaultAppearance(),
     quokkaStyle: "cocoa",
     quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
     quokkaAccessory: "none",

@@ -1,3 +1,4 @@
+import { productName } from "../host/registry";
 // Raw-metadata codec twin of corpus.rs merge_raw_frontmatter. This surface
 // preserves the user's layout; normal note writes use composeNoteDocument.
 import { parseNoteDocument } from "./frontmatter";
@@ -34,7 +35,7 @@ export function mergeRawFrontmatter(original: string, submitted: string): string
     const before = orig.filter(isKey);
     const after = lines.filter(isKey);
     if (JSON.stringify(before) !== JSON.stringify(after))
-      throw new Error(`\`${key}\` is managed by Rotli, not editable here`);
+      throw new Error(`\`${key}\` is managed by ${productName()}, not editable here`);
   }
   const body = parseNoteDocument(original).body;
   return lines.length ? `---\n${lines.join("\n")}\n---\n${body}` : body;

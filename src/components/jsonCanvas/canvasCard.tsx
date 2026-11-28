@@ -4,6 +4,7 @@
 
 import type { CSSProperties } from "react";
 
+import { productName } from "../../host/registry";
 import type { CanvasNoteView } from "../../jsonCanvas/canvasNotes";
 import { type CanvasNode, type CanvasSide, colorName, fileTitle } from "../../jsonCanvas/model";
 import { MarkdownPeek } from "../markdownPeek";
@@ -158,7 +159,7 @@ export function Card({
           ) : note.secure ? (
             <p className="jc-quiet">Secure note. Open it to read.</p>
           ) : note.failed ? (
-            <p className="jc-quiet">Rotli couldn’t read this note just now. Double-click to open it.</p>
+            <p className="jc-quiet">{`${productName()} couldn’t read this note just now. Double-click to open it.`}</p>
           ) : note.body === null ? (
             <p className="jc-quiet">Loading…</p>
           ) : (
@@ -173,7 +174,7 @@ export function Card({
       )}
       {node.type === "unknown" && (
         <div className="jc-body">
-          <p className="jc-quiet">Made in another app. Rotli keeps it as it is.</p>
+          <p className="jc-quiet">{`Made in another app. ${productName()} keeps it as it is.`}</p>
         </div>
       )}
       {node.type !== "group" &&

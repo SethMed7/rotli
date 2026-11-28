@@ -60,8 +60,9 @@ impl RawMount {
 pub(super) fn refuse_in_raw(store: &CorpusStore, what: &str) -> Result<(), String> {
     match &store.raw {
         Some(raw) => Err(format!(
-            "{} opened from Finder stays exactly where it is — Rotli doesn't {what} it. Add it as a vault first.",
-            if raw.only.is_some() { "A file" } else { "A folder" }
+            "{} opened from Finder stays exactly where it is — {} doesn't {what} it. Add it as a vault first.",
+            if raw.only.is_some() { "A file" } else { "A folder" },
+            crate::app_identity::app_name()
         )),
         None => Ok(()),
     }
@@ -81,7 +82,7 @@ impl CorpusStore {
     pub fn open_raw_file(file: &Path, sidecar_base: &Path) -> Result<Self, String> {
         let file = fs::canonicalize(file).map_err(|e| format!("open {}: {e}", file.display()))?;
         if !file.is_file() {
-            return Err("Rotli opens a file here, not a folder".into());
+            return Err(format!("{} opens a file here, not a folder", crate::app_identity::app_name()));
         }
         let name = file
             .file_name()
@@ -102,10 +103,10 @@ impl CorpusStore {
     pub fn open_raw_folder(dir: &Path, sidecar_base: &Path) -> Result<Self, String> {
         let dir = fs::canonicalize(dir).map_err(|e| format!("open {}: {e}", dir.display()))?;
         if !dir.is_dir() {
-            return Err("Rotli opens a folder here, not a file".into());
+            return Err(format!("{} opens a folder here, not a file", crate::app_identity::app_name()));
         }
         if dir.parent().is_none() {
-            return Err("Rotli can't open the whole disk as a folder".into());
+            return Err(format!("{} can't open the whole disk as a folder", crate::app_identity::app_name()));
         }
         let sidecar = sidecar_base.join(raw_root_id(&dir));
         fs::create_dir_all(&sidecar).map_err(|e| format!("create {}: {e}", sidecar.display()))?;

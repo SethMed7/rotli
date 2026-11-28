@@ -4,6 +4,7 @@
 // is the second layer), and applies the access-mode/contract reads. Components
 // never call lib/tauri's memex_* directly — they go through useMemex hooks.
 
+import { inlineName } from "../host/registry";
 import {
   type DetectedMemex,
   type MemexChatSummary,
@@ -132,7 +133,7 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
   const slug = input.existingSlug ?? input.slug ?? chatSlug({ title: input.title, source: ROTLI_SOURCE });
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) {
-    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+    throw new Error(`This vault is read-only for ${inlineName()} — connect it with write access first.`);
   }
   const date = today();
   // Each call represents one real send/receive boundary. Stamp missing turns
@@ -186,7 +187,7 @@ export async function setChatMemoryNoteStem(
 ): Promise<void> {
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) {
-    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+    throw new Error(`This vault is read-only for ${inlineName()} — connect it with write access first.`);
   }
   await rewriteChat(instance, slug, (contents) => setChatMemoryNote(contents, stem));
 }
@@ -202,7 +203,7 @@ export async function readChatMemoryNoteStem(instance: MemexInstance, slug: stri
 export async function setChatAttachedTo(instance: MemexInstance, slug: string, stem: string): Promise<void> {
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) {
-    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+    throw new Error(`This vault is read-only for ${inlineName()} — connect it with write access first.`);
   }
   await rewriteChat(instance, slug, (contents) => setAttachedTo(contents, stem));
 }
@@ -314,7 +315,7 @@ export async function registerChatArtifact(
   artifact: ChatArtifact,
 ): Promise<void> {
   if (!canWrite(`chats/${slug}.md`, instance.perms)) {
-    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+    throw new Error(`This vault is read-only for ${inlineName()} — connect it with write access first.`);
   }
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const existing = await memexReadChat(instance.root, slug);
@@ -338,7 +339,7 @@ export async function registerChatArtifactTurn(
   artifacts: readonly ChatArtifact[],
 ): Promise<void> {
   if (!canWrite(`chats/${slug}.md`, instance.perms)) {
-    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+    throw new Error(`This vault is read-only for ${inlineName()} — connect it with write access first.`);
   }
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const existing = await memexReadChat(instance.root, slug);
@@ -448,7 +449,7 @@ export async function writeNote(input: WriteNoteInput): Promise<{ id: string; st
   const rel = `${input.secure ? SPINE.wikiSecure : SPINE.wikiInbox}/${stem}.md`;
   // TS gate first (the Rust assert_writable is the second layer).
   if (!canWrite(rel, instance.perms)) {
-    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+    throw new Error(`This vault is read-only for ${inlineName()} — connect it with write access first.`);
   }
   // reach default = the owning user (the brain's primary). Single-tenant / unreadable
   // ⇒ owner-only ([]); never invent a user. (Phase 3 adds the active-user picker.)

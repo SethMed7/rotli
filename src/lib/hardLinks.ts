@@ -5,6 +5,7 @@
 // so (DESIGN.md: no badge, no alarm), in the sidebar, under search results,
 // and in place of a note that turned into one while it was open.
 
+import { productName } from "../host/registry";
 import type { SkippedFile } from "../types";
 
 /** The notice's sentence. */
@@ -15,8 +16,8 @@ export function skippedSummary(count: number): string {
 }
 
 /** The one line on what to do about it. Rotli changes nothing itself. */
-export const INDEPENDENT_COPY =
-  "To use one in Rotli, make an independent copy: select it in Finder and choose Duplicate. Rotli never changes a linked file.";
+export const independentCopy = (): string =>
+  `To use one in ${productName()}, make an independent copy: select it in Finder and choose Duplicate. ${productName()} never changes a linked file.`;
 
 /** The line under search results. */
 export function searchSkippedLine(count: number): string {

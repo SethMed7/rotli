@@ -209,7 +209,7 @@ pub(crate) fn open_own_file(path: &Path) -> std::io::Result<std::fs::File> {
     }
     if !has_one_name(&metadata) {
         // the app's notices recognise these words (src/lib/hardLinks.ts)
-        return Err(std::io::Error::other("this file has a hard link, so Rotli doesn't open it"));
+        return Err(std::io::Error::other(format!("this file has a hard link, so {} doesn't open it", crate::app_identity::app_name())));
     }
     Ok(file)
 }

@@ -38,8 +38,6 @@ pub(crate) mod acp;
 #[path = "antigravity.rs"]
 pub(crate) mod antigravity;
 
-pub(crate) const CONNECTED_PROVIDER_POLICY_MESSAGE: &str =
-    "This provider lane is unavailable. Rotli supports only the user's locally authenticated official Claude Code, Codex, Cursor, and Antigravity clients; choose one of those or an on-device model.";
 pub(crate) const CLOUD_IMAGE_POLICY_MESSAGE: &str =
     "Provider-backed image generation is unavailable; no provider account was used.";
 
@@ -323,7 +321,7 @@ pub(crate) fn build_args_for(
                 ));
             }
             if imgs.is_some() {
-                return Err("Cursor code chat does not accept image attachments in Rotli".into());
+                return Err(format!("Cursor code chat does not accept image attachments in {}", crate::app_identity::app_name()));
             }
             let mut args = Vec::new();
             if model != "cursor-auto" {
