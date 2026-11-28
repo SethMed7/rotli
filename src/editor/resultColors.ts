@@ -2,6 +2,8 @@
 // in rainbow order for the picker. One list, two consumers: the parser accepts
 // exactly these names and the picker offers exactly these names.
 
+import { luminance } from "../brand/themeEngine/color";
+
 export const RESULT_COLOR_NAMES = [
   "red",
   "orange",
@@ -55,14 +57,7 @@ export function colorValue(color: ResultColor | null): string {
 export function selectedInk(color: ResultColor | null): string {
   if (color === null) return NAMED.accent.ink;
   if (isResultColorName(color)) return NAMED[color].ink;
-  const value = color.slice(1);
-  const full = value.length === 3 ? value.replace(/(.)/g, "$1$1") : value;
-  const channels = [0, 2, 4].map((at) => Number.parseInt(full.slice(at, at + 2), 16) / 255);
-  const linear = channels.map((channel) =>
-    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-  );
-  const luminance = 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
-  return luminance > 0.42 ? "var(--rotli-cocoa)" : "var(--rotli-linen)";
+  return luminance(color) > 0.42 ? "var(--rotli-cocoa)" : "var(--rotli-linen)";
 }
 
 /** Black on a dark theme and white on a light one need an edge of their own. */

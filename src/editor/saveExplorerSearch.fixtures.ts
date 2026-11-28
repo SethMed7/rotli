@@ -1,3 +1,4 @@
+import { seededRandom } from "../lib/seededRandom";
 // The save-state explorer's search (seventh review of pull request 267): run
 // one schedule, replay a printed one, every schedule up to a depth, or seeded
 // random walks. The world and the invariants are in saveExplorer.fixtures.ts.
@@ -103,14 +104,7 @@ export async function walk(
 ): Promise<Exploration> {
   const started = performance.now();
   const out: Exploration = { schedules: 0, failures: new Map(), ms: 0 };
-  let state = seed >>> 0;
-  const random = () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  const random = seededRandom(seed);
   for (let i = 0; i < walks; i += 1) {
     const run = await runSchedule(scenario, (moves) => Math.floor(random() * moves.length), depth);
     out.schedules += 1;

@@ -53,7 +53,8 @@
 :root[data-theme="iris-dark"],
 :root[data-theme="blossom-dark"],
 :root[data-theme="midnight-dark"],
-:root[data-theme="tesven-dark"] {
+:root[data-theme="tesven-dark"],
+:root[data-theme="custom-dark"] {
   color-scheme: dark;
   --accent-custom-swatch: oklch(78% 0.13 var(--accent-hue));
   --accent-custom-on: #161616;
@@ -273,8 +274,11 @@
   --preview-selected: #182b40;
 }
 
-/* — MONO · paper (light) — */
-:root[data-theme="paper"] {
+/* — MONO · paper (light) — also the complete fallback under a custom theme's
+   day half: the custom theme's runtime sheet paints over it, and if that
+   sheet never loads the attribute is still a whole environment — */
+:root[data-theme="paper"],
+:root[data-theme="custom-light"] {
   --ground: #fafaf9;
   --surface: #ffffff;
   --surface-2: #f5f5f4;
@@ -307,8 +311,10 @@
   --chat-welcome-evening-ground: #cbc8cf;
 }
 
-/* — MONO · charcoal (dark) — breve theme values, verbatim where possible — */
-:root[data-theme="charcoal"] {
+/* — MONO · charcoal (dark) — breve theme values, verbatim where possible; the
+   custom theme's night fallback, as Paper is its day — */
+:root[data-theme="charcoal"],
+:root[data-theme="custom-dark"] {
   --ground: #161616;
   --surface: #1f1e1c;
   --surface-2: #2a2825;
@@ -613,7 +619,9 @@
 :root[data-theme="midnight-light"],
 :root[data-theme="midnight-dark"],
 :root[data-theme="tesven-light"],
-:root[data-theme="tesven-dark"] {
+:root[data-theme="tesven-dark"],
+:root[data-theme="custom-light"],
+:root[data-theme="custom-dark"] {
   --icon-clay: currentColor;
   --icon-olive: currentColor;
   /* warm-token leaks re-pointed: pass-result ink + Aa segment accent */
@@ -642,7 +650,9 @@
 :root[data-theme="midnight-light"],
 :root[data-theme="midnight-dark"],
 :root[data-theme="tesven-light"],
-:root[data-theme="tesven-dark"] {
+:root[data-theme="tesven-dark"],
+:root[data-theme="custom-light"],
+:root[data-theme="custom-dark"] {
   --quote-bar: color-mix(in srgb, var(--text-muted) 55%, transparent);
 }
 

@@ -1,3 +1,5 @@
+import { contrast, normHex } from "./themeEngine/color";
+
 /** PDF-only palettes for Breve output. These are brand definitions, not app
  * surface tokens: the renderer consumes the same values outside the webview. */
 export const BREVE_PDF_PRESETS = {
@@ -62,25 +64,15 @@ export type BrevePdfPaletteLike = {
   rule: string;
 };
 
-function colorLuminance(value: string): number {
-  const channels = value
-    .slice(1)
-    .match(/.{2}/g)
-    ?.map((channel) => Number.parseInt(channel, 16) / 255) ?? [0, 0, 0];
-  const linear = channels.map((channel) =>
-    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-  );
-  return 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
-}
-
-export function contrastRatio(a: string, b: string): number {
-  const light = Math.max(colorLuminance(a), colorLuminance(b));
-  const dark = Math.min(colorLuminance(a), colorLuminance(b));
-  return (light + 0.05) / (dark + 0.05);
-}
+/** WCAG contrast. Its one home is the custom-theme engine; this name stays
+ * for the PDF palette and check:design-system. */
+export const contrastRatio = contrast;
 
 /** One shared accessibility gate for presets and custom PDF palettes. */
 export function validateBrevePdfPalette(palette: BrevePdfPaletteLike): string {
+  // contrast reads an unparsable colour as black, so the shape comes first
+  if (Object.values(palette).some((value) => !normHex(value)))
+    return "Every PDF color must be a #rrggbb color.";
   if (contrastRatio(palette.text, palette.background) < 4.5)
     return "Text needs more contrast against the PDF page.";
   if (contrastRatio(palette.muted, palette.background) < 4.5)

@@ -1,0 +1,3810 @@
+{
+ "engine": 1,
+ "named": {
+  "forest-paper": {
+   "seeds": {
+    "light": {
+     "page": "#f6f1e7",
+     "accent": "#3f7d51"
+    },
+    "dark": {
+     "page": "#101814",
+     "accent": "#82be96"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "tokens": {
+       "--ground": "#f6f1e7",
+       "--surface": "#fdfbf8",
+       "--surface-2": "#ece7dc",
+       "--tint": "#e5dfd2",
+       "--text": "#433c2e",
+       "--text-muted": "#645b49",
+       "--border": "#dcd7cc",
+       "--accent": "#3f7d51",
+       "--theme-accent-swatch": "#3f7d51",
+       "--accent-text": "#29683d",
+       "--on-accent": "#fbfaf7",
+       "--theme-on-accent": "#fbfaf7",
+       "--success": "#2f6f40",
+       "--failure": "#b02b27",
+       "--syntax-blue": "#1d679c",
+       "--hov": "rgba(67, 60, 46, 0.07)",
+       "--act": "rgba(67, 60, 46, 0.11)",
+       "--scrim": "rgba(67, 60, 46, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#f8e3d5",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#e4cbbc",
+       "--chat-welcome-noon": "#d3ecf7",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#b9d6e2",
+       "--chat-welcome-afternoon": "#fae2d8",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#e6cabe",
+       "--chat-welcome-evening": "#eae4f9",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#d4cce5",
+       "--chart-seq-1": "#9db1a1",
+       "--chart-seq-2": "#809e87",
+       "--chart-seq-3": "#648c6d",
+       "--chart-seq-4": "#477954",
+       "--chart-seq-5": "#28673c"
+      },
+      "notes": [],
+      "rows": "adb78fdae4706b61",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#101814",
+       "--surface": "#18201c",
+       "--surface-2": "#212a25",
+       "--tint": "#28312d",
+       "--text": "#d6e1db",
+       "--text-muted": "#a1afa8",
+       "--border": "#252f2a",
+       "--accent": "#82be96",
+       "--theme-accent-swatch": "#82be96",
+       "--accent-text": "#82be96",
+       "--on-accent": "#0b1410",
+       "--theme-on-accent": "#0b1410",
+       "--success": "#7cc58c",
+       "--failure": "#f2897e",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(214, 225, 219, 0.08)",
+       "--act": "rgba(214, 225, 219, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#2c1c12",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#3b291c",
+       "--chat-welcome-noon": "#0f232b",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#19313b",
+       "--chat-welcome-afternoon": "#2c1c14",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#3d281f",
+       "--chat-welcome-evening": "#221d2d",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#302a3d",
+       "--chart-seq-1": "#415347",
+       "--chart-seq-2": "#516c5a",
+       "--chart-seq-3": "#61876d",
+       "--chart-seq-4": "#71a281",
+       "--chart-seq-5": "#82be96"
+      },
+      "notes": [],
+      "rows": "27cf2749e7491028",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "tokens": {
+       "--ground": "#f6f1e7",
+       "--surface": "#fdfbf8",
+       "--surface-2": "#ece7dc",
+       "--tint": "#e5dfd2",
+       "--text": "#342d1f",
+       "--text-muted": "#635a48",
+       "--border": "#dcd7cc",
+       "--accent": "#3f7d51",
+       "--theme-accent-swatch": "#3f7d51",
+       "--accent-text": "#29683d",
+       "--on-accent": "#fbfaf7",
+       "--theme-on-accent": "#fbfaf7",
+       "--success": "#2f6f40",
+       "--failure": "#b02b27",
+       "--syntax-blue": "#1d679c",
+       "--hov": "rgba(52, 45, 31, 0.07)",
+       "--act": "rgba(52, 45, 31, 0.11)",
+       "--scrim": "rgba(52, 45, 31, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#f8e3d5",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#e4cbbc",
+       "--chat-welcome-noon": "#d3ecf7",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#b9d6e2",
+       "--chat-welcome-afternoon": "#fae2d8",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#e6cabe",
+       "--chat-welcome-evening": "#eae4f9",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#d4cce5",
+       "--chart-seq-1": "#9db1a1",
+       "--chart-seq-2": "#809e87",
+       "--chart-seq-3": "#648c6d",
+       "--chart-seq-4": "#477954",
+       "--chart-seq-5": "#28673c"
+      },
+      "notes": [],
+      "rows": "9606c1edcf2ccf15",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#101814",
+       "--surface": "#18201c",
+       "--surface-2": "#212a25",
+       "--tint": "#28312d",
+       "--text": "#d6e1db",
+       "--text-muted": "#a1afa8",
+       "--border": "#252f2a",
+       "--accent": "#82be96",
+       "--theme-accent-swatch": "#82be96",
+       "--accent-text": "#82be96",
+       "--on-accent": "#0b1410",
+       "--theme-on-accent": "#0b1410",
+       "--success": "#7cc58c",
+       "--failure": "#f2897e",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(214, 225, 219, 0.08)",
+       "--act": "rgba(214, 225, 219, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#2c1c12",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#3b291c",
+       "--chat-welcome-noon": "#0f232b",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#19313b",
+       "--chat-welcome-afternoon": "#2c1c14",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#3d281f",
+       "--chat-welcome-evening": "#221d2d",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#302a3d",
+       "--chart-seq-1": "#415347",
+       "--chart-seq-2": "#516c5a",
+       "--chart-seq-3": "#61876d",
+       "--chart-seq-4": "#71a281",
+       "--chart-seq-5": "#82be96"
+      },
+      "notes": [],
+      "rows": "ad89f52998df6ddc",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "tokens": {
+       "--ground": "#f6f1e7",
+       "--surface": "#fdfbf8",
+       "--surface-2": "#ece7dc",
+       "--tint": "#e5dfd2",
+       "--text": "#221c0f",
+       "--text-muted": "#59503f",
+       "--border": "#dcd7cc",
+       "--accent": "#3d7b4f",
+       "--theme-accent-swatch": "#3d7b4f",
+       "--accent-text": "#1b5c32",
+       "--on-accent": "#fbfaf7",
+       "--theme-on-accent": "#fbfaf7",
+       "--success": "#1a5d2f",
+       "--failure": "#a0191a",
+       "--syntax-blue": "#005589",
+       "--hov": "rgba(34, 28, 15, 0.07)",
+       "--act": "rgba(34, 28, 15, 0.11)",
+       "--scrim": "rgba(34, 28, 15, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#f8e3d5",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#e4cbbc",
+       "--chat-welcome-noon": "#d3ecf7",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#b9d6e2",
+       "--chat-welcome-afternoon": "#fae2d8",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#e6cabe",
+       "--chat-welcome-evening": "#eae4f9",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#d4cce5",
+       "--chart-seq-1": "#9db1a1",
+       "--chart-seq-2": "#7d9b84",
+       "--chart-seq-3": "#5e8668",
+       "--chart-seq-4": "#3f714d",
+       "--chart-seq-5": "#1c5c32"
+      },
+      "notes": [
+       {
+        "role": "Accent",
+        "from": "#3f7d51",
+        "to": "#3d7b4f",
+        "why": "darkened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "461756b1c50adc90",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#101814",
+       "--surface": "#18201c",
+       "--surface-2": "#212a25",
+       "--tint": "#28312d",
+       "--text": "#e1ede7",
+       "--text-muted": "#a2b0a9",
+       "--border": "#252f2a",
+       "--accent": "#82be96",
+       "--theme-accent-swatch": "#82be96",
+       "--accent-text": "#82be96",
+       "--on-accent": "#0b1410",
+       "--theme-on-accent": "#0b1410",
+       "--success": "#7cc58c",
+       "--failure": "#f58b80",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(225, 237, 231, 0.08)",
+       "--act": "rgba(225, 237, 231, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#2c1c12",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#3b291c",
+       "--chat-welcome-noon": "#0f232b",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#19313b",
+       "--chat-welcome-afternoon": "#2c1c14",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#3d281f",
+       "--chat-welcome-evening": "#221d2d",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#302a3d",
+       "--chart-seq-1": "#415347",
+       "--chart-seq-2": "#516c5a",
+       "--chart-seq-3": "#61876d",
+       "--chart-seq-4": "#71a281",
+       "--chart-seq-5": "#82be96"
+      },
+      "notes": [],
+      "rows": "2ffbfd65a6620710",
+      "pass": true
+     }
+    }
+   }
+  },
+  "neon": {
+   "seeds": {
+    "light": {
+     "page": "#ff5cf4",
+     "accent": "#f9ff3c"
+    },
+    "dark": {
+     "page": "#3a00ff",
+     "accent": "#220044"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "tokens": {
+       "--ground": "#efd8ec",
+       "--surface": "#efe7ee",
+       "--surface-2": "#e6cde3",
+       "--tint": "#e0c4dd",
+       "--text": "#3f323d",
+       "--text-muted": "#5b4c59",
+       "--border": "#d6bdd3",
+       "--accent": "#737600",
+       "--theme-accent-swatch": "#737600",
+       "--accent-text": "#535500",
+       "--on-accent": "#fcf9fb",
+       "--theme-on-accent": "#fcf9fb",
+       "--success": "#216334",
+       "--failure": "#a72120",
+       "--syntax-blue": "#0b5b8f",
+       "--hov": "rgba(63, 50, 61, 0.07)",
+       "--act": "rgba(63, 50, 61, 0.11)",
+       "--scrim": "rgba(63, 50, 61, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b5601c",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#e7d2c4",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#d3bbab",
+       "--chat-welcome-noon": "#c2dbe6",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#a9c5d1",
+       "--chat-welcome-afternoon": "#e8d1c7",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#d4b9ae",
+       "--chat-welcome-evening": "#d9d2e8",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#c3bbd4",
+       "--chart-seq-1": "#9ea176",
+       "--chart-seq-2": "#898d4d",
+       "--chart-seq-3": "#767916",
+       "--chart-seq-4": "#626400",
+       "--chart-seq-5": "#4e5000"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#ff5cf4",
+        "to": "#efd8ec",
+        "why": "kept light and calm enough to read on"
+       },
+       {
+        "role": "Accent",
+        "from": "#f9ff3c",
+        "to": "#737600",
+        "why": "darkened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "abfc9aa53efd208b",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#1b213a",
+       "--surface": "#232a43",
+       "--surface-2": "#2d344e",
+       "--tint": "#343b58",
+       "--text": "#e4e7f2",
+       "--text-muted": "#b8bcc8",
+       "--border": "#303853",
+       "--accent": "#9379c5",
+       "--theme-accent-swatch": "#9379c5",
+       "--accent-text": "#b99fee",
+       "--on-accent": "#0f1118",
+       "--theme-on-accent": "#0f1118",
+       "--success": "#7cc58c",
+       "--failure": "#f2897e",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(228, 231, 242, 0.08)",
+       "--act": "rgba(228, 231, 242, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#3a2a1f",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#4b372a",
+       "--chat-welcome-noon": "#1d3139",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#27404a",
+       "--chat-welcome-afternoon": "#3b2921",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#4c362d",
+       "--chat-welcome-evening": "#302b3b",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#3f384c",
+       "--chart-seq-1": "#5d556e",
+       "--chart-seq-2": "#73678c",
+       "--chart-seq-3": "#8979ab",
+       "--chart-seq-4": "#a18ccc",
+       "--chart-seq-5": "#b99fee"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#3a00ff",
+        "to": "#1b213a",
+        "why": "kept dark and calm enough to read on"
+       },
+       {
+        "role": "Accent",
+        "from": "#220044",
+        "to": "#9379c5",
+        "why": "lightened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "184b5ae4803eb331",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "tokens": {
+       "--ground": "#efd8ec",
+       "--surface": "#efe7ee",
+       "--surface-2": "#e6cde3",
+       "--tint": "#e0c4dd",
+       "--text": "#281d27",
+       "--text-muted": "#5a4b58",
+       "--border": "#d6bdd3",
+       "--accent": "#737600",
+       "--theme-accent-swatch": "#737600",
+       "--accent-text": "#535500",
+       "--on-accent": "#fcf9fb",
+       "--theme-on-accent": "#fcf9fb",
+       "--success": "#216334",
+       "--failure": "#a72120",
+       "--syntax-blue": "#0b5b8f",
+       "--hov": "rgba(40, 29, 39, 0.07)",
+       "--act": "rgba(40, 29, 39, 0.11)",
+       "--scrim": "rgba(40, 29, 39, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b5601c",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#e7d2c4",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#d3bbab",
+       "--chat-welcome-noon": "#c2dbe6",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#a9c5d1",
+       "--chat-welcome-afternoon": "#e8d1c7",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#d4b9ae",
+       "--chat-welcome-evening": "#d9d2e8",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#c3bbd4",
+       "--chart-seq-1": "#9ea176",
+       "--chart-seq-2": "#898d4d",
+       "--chart-seq-3": "#767916",
+       "--chart-seq-4": "#626400",
+       "--chart-seq-5": "#4e5000"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#ff5cf4",
+        "to": "#efd8ec",
+        "why": "kept light and calm enough to read on"
+       },
+       {
+        "role": "Accent",
+        "from": "#f9ff3c",
+        "to": "#737600",
+        "why": "darkened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "d74fa67593a451e9",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#1b213a",
+       "--surface": "#232a43",
+       "--surface-2": "#2d344e",
+       "--tint": "#343b58",
+       "--text": "#e3e7f1",
+       "--text-muted": "#b8bcc8",
+       "--border": "#303853",
+       "--accent": "#9379c5",
+       "--theme-accent-swatch": "#9379c5",
+       "--accent-text": "#b99fee",
+       "--on-accent": "#0f1118",
+       "--theme-on-accent": "#0f1118",
+       "--success": "#7cc58c",
+       "--failure": "#f2897e",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(227, 231, 241, 0.08)",
+       "--act": "rgba(227, 231, 241, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#3a2a1f",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#4b372a",
+       "--chat-welcome-noon": "#1d3139",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#27404a",
+       "--chat-welcome-afternoon": "#3b2921",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#4c362d",
+       "--chat-welcome-evening": "#302b3b",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#3f384c",
+       "--chart-seq-1": "#5d556e",
+       "--chart-seq-2": "#73678c",
+       "--chart-seq-3": "#8979ab",
+       "--chart-seq-4": "#a18ccc",
+       "--chart-seq-5": "#b99fee"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#3a00ff",
+        "to": "#1b213a",
+        "why": "kept dark and calm enough to read on"
+       },
+       {
+        "role": "Accent",
+        "from": "#220044",
+        "to": "#9379c5",
+        "why": "lightened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "45ea37859b539b89",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "tokens": {
+       "--ground": "#efd8ec",
+       "--surface": "#efe7ee",
+       "--surface-2": "#e6cde3",
+       "--tint": "#e0c4dd",
+       "--text": "#0e050d",
+       "--text-muted": "#51424f",
+       "--border": "#d6bdd3",
+       "--accent": "#646600",
+       "--theme-accent-swatch": "#646600",
+       "--accent-text": "#484900",
+       "--on-accent": "#fcf9fb",
+       "--theme-on-accent": "#fcf9fb",
+       "--success": "#085023",
+       "--failure": "#92000c",
+       "--syntax-blue": "#004976",
+       "--hov": "rgba(14, 5, 13, 0.07)",
+       "--act": "rgba(14, 5, 13, 0.11)",
+       "--scrim": "rgba(14, 5, 13, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b5601c",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#e7d2c4",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#d3bbab",
+       "--chat-welcome-noon": "#c2dbe6",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#a9c5d1",
+       "--chat-welcome-afternoon": "#e8d1c7",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#d4b9ae",
+       "--chat-welcome-evening": "#d9d2e8",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#c3bbd4",
+       "--chart-seq-1": "#9ea176",
+       "--chart-seq-2": "#888b4b",
+       "--chart-seq-3": "#72750f",
+       "--chart-seq-4": "#5d5f00",
+       "--chart-seq-5": "#474900"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#ff5cf4",
+        "to": "#efd8ec",
+        "why": "kept light and calm enough to read on"
+       },
+       {
+        "role": "Accent",
+        "from": "#f9ff3c",
+        "to": "#646600",
+        "why": "darkened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "336b646de5663b26",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#1b213a",
+       "--surface": "#232a43",
+       "--surface-2": "#2d344e",
+       "--tint": "#343b58",
+       "--text": "#f8faff",
+       "--text-muted": "#bcc0cc",
+       "--border": "#303853",
+       "--accent": "#9f85d2",
+       "--theme-accent-swatch": "#9f85d2",
+       "--accent-text": "#c5aafa",
+       "--on-accent": "#0f1118",
+       "--theme-on-accent": "#0f1118",
+       "--success": "#7ec88e",
+       "--failure": "#ff9c91",
+       "--syntax-blue": "#77bdf8",
+       "--hov": "rgba(248, 250, 255, 0.08)",
+       "--act": "rgba(248, 250, 255, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#3a2a1f",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#4b372a",
+       "--chat-welcome-noon": "#1d3139",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#27404a",
+       "--chat-welcome-afternoon": "#3b2921",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#4c362d",
+       "--chat-welcome-evening": "#302b3b",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#3f384c",
+       "--chart-seq-1": "#5d556e",
+       "--chart-seq-2": "#756a8f",
+       "--chart-seq-3": "#8f7fb1",
+       "--chart-seq-4": "#a994d5",
+       "--chart-seq-5": "#c5aafa"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#3a00ff",
+        "to": "#1b213a",
+        "why": "kept dark and calm enough to read on"
+       },
+       {
+        "role": "Accent",
+        "from": "#220044",
+        "to": "#9f85d2",
+        "why": "lightened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "b8df18a53461547d",
+      "pass": true
+     }
+    }
+   }
+  },
+  "inked": {
+   "seeds": {
+    "light": {
+     "page": "#eef2f7",
+     "accent": "#7b2cbf",
+     "ink": "#203040"
+    },
+    "dark": {
+     "page": "#0b1020",
+     "accent": "#ffb703",
+     "ink": "#e0f0ff"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "tokens": {
+       "--ground": "#eef2f7",
+       "--surface": "#fafcfd",
+       "--surface-2": "#e4e8ee",
+       "--tint": "#dbe0e6",
+       "--text": "#2e3f50",
+       "--text-muted": "#465b71",
+       "--border": "#d3d8dd",
+       "--accent": "#7b2ebe",
+       "--theme-accent-swatch": "#7b2ebe",
+       "--accent-text": "#743dab",
+       "--on-accent": "#f8fafd",
+       "--theme-on-accent": "#f8fafd",
+       "--success": "#2f6f40",
+       "--failure": "#b02b27",
+       "--syntax-blue": "#1d679c",
+       "--hov": "rgba(46, 63, 80, 0.07)",
+       "--act": "rgba(46, 63, 80, 0.11)",
+       "--scrim": "rgba(46, 63, 80, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#f8e3d5",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#e4cbbc",
+       "--chat-welcome-noon": "#d4edf7",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#b9d6e2",
+       "--chat-welcome-afternoon": "#fae2d8",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#e6cabe",
+       "--chat-welcome-evening": "#eae4f9",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#d4cce5",
+       "--chart-seq-1": "#b6a6ce",
+       "--chart-seq-2": "#a48cc5",
+       "--chart-seq-3": "#9271bc",
+       "--chart-seq-4": "#8157b2",
+       "--chart-seq-5": "#7139a7"
+      },
+      "notes": [
+       {
+        "role": "Accent",
+        "from": "#7b2cbf",
+        "to": "#7b2ebe",
+        "why": "darkened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "a2a05fb38cea9308",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#0b1020",
+       "--surface": "#131829",
+       "--surface-2": "#1c2133",
+       "--tint": "#22293b",
+       "--text": "#d0e0ef",
+       "--text-muted": "#95a7b8",
+       "--border": "#21283b",
+       "--accent": "#ffb703",
+       "--theme-accent-swatch": "#ffb703",
+       "--accent-text": "#ffb707",
+       "--on-accent": "#0f1118",
+       "--theme-on-accent": "#0f1118",
+       "--success": "#7cc58c",
+       "--failure": "#f2897e",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(208, 224, 239, 0.08)",
+       "--act": "rgba(208, 224, 239, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#26170d",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#362417",
+       "--chat-welcome-noon": "#0a1e26",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#132c35",
+       "--chat-welcome-afternoon": "#27170f",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#37231a",
+       "--chat-welcome-evening": "#1d1827",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#2b2437",
+       "--chart-seq-1": "#5d4824",
+       "--chart-seq-2": "#836226",
+       "--chart-seq-3": "#aa7d25",
+       "--chart-seq-4": "#d49a1e",
+       "--chart-seq-5": "#ffb707"
+      },
+      "notes": [],
+      "rows": "480481b7b6323e96",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "tokens": {
+       "--ground": "#eef2f7",
+       "--surface": "#fafcfd",
+       "--surface-2": "#e4e8ee",
+       "--tint": "#dbe0e6",
+       "--text": "#1f2f3f",
+       "--text-muted": "#465b71",
+       "--border": "#d3d8dd",
+       "--accent": "#7b2ebe",
+       "--theme-accent-swatch": "#7b2ebe",
+       "--accent-text": "#743dab",
+       "--on-accent": "#f8fafd",
+       "--theme-on-accent": "#f8fafd",
+       "--success": "#2f6f40",
+       "--failure": "#b02b27",
+       "--syntax-blue": "#1d679c",
+       "--hov": "rgba(31, 47, 63, 0.07)",
+       "--act": "rgba(31, 47, 63, 0.11)",
+       "--scrim": "rgba(31, 47, 63, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#f8e3d5",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#e4cbbc",
+       "--chat-welcome-noon": "#d4edf7",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#b9d6e2",
+       "--chat-welcome-afternoon": "#fae2d8",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#e6cabe",
+       "--chat-welcome-evening": "#eae4f9",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#d4cce5",
+       "--chart-seq-1": "#b6a6ce",
+       "--chart-seq-2": "#a48cc5",
+       "--chart-seq-3": "#9271bc",
+       "--chart-seq-4": "#8157b2",
+       "--chart-seq-5": "#7139a7"
+      },
+      "notes": [
+       {
+        "role": "Accent",
+        "from": "#7b2cbf",
+        "to": "#7b2ebe",
+        "why": "darkened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "5033c14e9745749b",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#0b1020",
+       "--surface": "#131829",
+       "--surface-2": "#1c2133",
+       "--tint": "#22293b",
+       "--text": "#d0e0ef",
+       "--text-muted": "#95a7b8",
+       "--border": "#21283b",
+       "--accent": "#ffb703",
+       "--theme-accent-swatch": "#ffb703",
+       "--accent-text": "#ffb707",
+       "--on-accent": "#0f1118",
+       "--theme-on-accent": "#0f1118",
+       "--success": "#7cc58c",
+       "--failure": "#f2897e",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(208, 224, 239, 0.08)",
+       "--act": "rgba(208, 224, 239, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#26170d",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#362417",
+       "--chat-welcome-noon": "#0a1e26",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#132c35",
+       "--chat-welcome-afternoon": "#27170f",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#37231a",
+       "--chat-welcome-evening": "#1d1827",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#2b2437",
+       "--chart-seq-1": "#5d4824",
+       "--chart-seq-2": "#836226",
+       "--chart-seq-3": "#aa7d25",
+       "--chart-seq-4": "#d49a1e",
+       "--chart-seq-5": "#ffb707"
+      },
+      "notes": [],
+      "rows": "52cd244ff509d935",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "tokens": {
+       "--ground": "#eef2f7",
+       "--surface": "#fafcfd",
+       "--surface-2": "#e4e8ee",
+       "--tint": "#dbe0e6",
+       "--text": "#0e1e2d",
+       "--text-muted": "#3e5367",
+       "--border": "#d3d8dd",
+       "--accent": "#7b2ebe",
+       "--theme-accent-swatch": "#7b2ebe",
+       "--accent-text": "#6b33a1",
+       "--on-accent": "#f8fafd",
+       "--theme-on-accent": "#f8fafd",
+       "--success": "#1a5d2f",
+       "--failure": "#a0191a",
+       "--syntax-blue": "#005589",
+       "--hov": "rgba(14, 30, 45, 0.07)",
+       "--act": "rgba(14, 30, 45, 0.11)",
+       "--scrim": "rgba(14, 30, 45, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#f8e3d5",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#e4cbbc",
+       "--chat-welcome-noon": "#d4edf7",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#b9d6e2",
+       "--chat-welcome-afternoon": "#fae2d8",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#e6cabe",
+       "--chat-welcome-evening": "#eae4f9",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#d4cce5",
+       "--chart-seq-1": "#b6a6ce",
+       "--chart-seq-2": "#a38ac4",
+       "--chart-seq-3": "#8f6fb9",
+       "--chart-seq-4": "#7d52ad",
+       "--chart-seq-5": "#6b33a1"
+      },
+      "notes": [
+       {
+        "role": "Accent",
+        "from": "#7b2cbf",
+        "to": "#7b2ebe",
+        "why": "darkened so buttons and focus rings stand out"
+       }
+      ],
+      "rows": "5e0983eee5e02230",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#0b1020",
+       "--surface": "#131829",
+       "--surface-2": "#1c2133",
+       "--tint": "#22293b",
+       "--text": "#d7e7f6",
+       "--text-muted": "#95a7b8",
+       "--border": "#21283b",
+       "--accent": "#ffb703",
+       "--theme-accent-swatch": "#ffb703",
+       "--accent-text": "#ffb707",
+       "--on-accent": "#0f1118",
+       "--theme-on-accent": "#0f1118",
+       "--success": "#7cc58c",
+       "--failure": "#f2897e",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(215, 231, 246, 0.08)",
+       "--act": "rgba(215, 231, 246, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#26170d",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#362417",
+       "--chat-welcome-noon": "#0a1e26",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#132c35",
+       "--chat-welcome-afternoon": "#27170f",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#37231a",
+       "--chat-welcome-evening": "#1d1827",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#2b2437",
+       "--chart-seq-1": "#5d4824",
+       "--chart-seq-2": "#836226",
+       "--chart-seq-3": "#aa7d25",
+       "--chart-seq-4": "#d49a1e",
+       "--chart-seq-5": "#ffb707"
+      },
+      "notes": [],
+      "rows": "36075140f9c3c22f",
+      "pass": true
+     }
+    }
+   }
+  },
+  "black-white": {
+   "seeds": {
+    "light": {
+     "page": "#000000",
+     "accent": "#000000"
+    },
+    "dark": {
+     "page": "#ffffff",
+     "accent": "#ffffff"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "tokens": {
+       "--ground": "#e0e0e0",
+       "--surface": "#eaeaea",
+       "--surface-2": "#d6d6d6",
+       "--tint": "#cecece",
+       "--text": "#36262a",
+       "--text-muted": "#574248",
+       "--border": "#c6c6c6",
+       "--accent": "#000000",
+       "--theme-accent-swatch": "#000000",
+       "--accent-text": "#000000",
+       "--on-accent": "#fdf9fa",
+       "--theme-on-accent": "#fdf9fa",
+       "--success": "#226435",
+       "--failure": "#a92321",
+       "--syntax-blue": "#0d5c91",
+       "--hov": "rgba(54, 38, 42, 0.07)",
+       "--act": "rgba(54, 38, 42, 0.11)",
+       "--scrim": "rgba(54, 38, 42, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#e7d2c4",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#d3baab",
+       "--chat-welcome-noon": "#c2dbe5",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#a9c5d1",
+       "--chat-welcome-afternoon": "#e8d1c7",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#d4b9ae",
+       "--chat-welcome-evening": "#d9d2e8",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#c3bbd4",
+       "--chart-seq-1": "#9f9f9f",
+       "--chart-seq-2": "#6b6b6b",
+       "--chart-seq-3": "#3b3b3b",
+       "--chart-seq-4": "#111111",
+       "--chart-seq-5": "#000000"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#000000",
+        "to": "#e0e0e0",
+        "why": "kept light and calm enough to read on"
+       }
+      ],
+      "rows": "17f40083a8805206",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#232323",
+       "--surface": "#2c2c2c",
+       "--surface-2": "#363636",
+       "--tint": "#3d3d3d",
+       "--text": "#fffcfc",
+       "--text-muted": "#d9cace",
+       "--border": "#393939",
+       "--accent": "#ffffff",
+       "--theme-accent-swatch": "#ffffff",
+       "--accent-text": "#ffffff",
+       "--on-accent": "#170f11",
+       "--theme-on-accent": "#170f11",
+       "--success": "#7cc58c",
+       "--failure": "#f38a7f",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(255, 252, 252, 0.08)",
+       "--act": "rgba(255, 252, 252, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#3a2a20",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#4b372a",
+       "--chat-welcome-noon": "#1d3139",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#27404a",
+       "--chat-welcome-afternoon": "#3b2922",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#4c362d",
+       "--chat-welcome-evening": "#302b3b",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#3f384c",
+       "--chart-seq-1": "#5a5a5a",
+       "--chart-seq-2": "#808080",
+       "--chart-seq-3": "#a9a9a9",
+       "--chart-seq-4": "#d3d3d3",
+       "--chart-seq-5": "#ffffff"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#ffffff",
+        "to": "#232323",
+        "why": "kept dark and calm enough to read on"
+       }
+      ],
+      "rows": "b3c370cb52d2580c",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "tokens": {
+       "--ground": "#e0e0e0",
+       "--surface": "#eaeaea",
+       "--surface-2": "#d6d6d6",
+       "--tint": "#cecece",
+       "--text": "#2d1e22",
+       "--text-muted": "#574248",
+       "--border": "#c6c6c6",
+       "--accent": "#000000",
+       "--theme-accent-swatch": "#000000",
+       "--accent-text": "#000000",
+       "--on-accent": "#fdf9fa",
+       "--theme-on-accent": "#fdf9fa",
+       "--success": "#226435",
+       "--failure": "#a92321",
+       "--syntax-blue": "#0d5c91",
+       "--hov": "rgba(45, 30, 34, 0.07)",
+       "--act": "rgba(45, 30, 34, 0.11)",
+       "--scrim": "rgba(45, 30, 34, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#e7d2c4",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#d3baab",
+       "--chat-welcome-noon": "#c2dbe5",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#a9c5d1",
+       "--chat-welcome-afternoon": "#e8d1c7",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#d4b9ae",
+       "--chat-welcome-evening": "#d9d2e8",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#c3bbd4",
+       "--chart-seq-1": "#9f9f9f",
+       "--chart-seq-2": "#6b6b6b",
+       "--chart-seq-3": "#3b3b3b",
+       "--chart-seq-4": "#111111",
+       "--chart-seq-5": "#000000"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#000000",
+        "to": "#e0e0e0",
+        "why": "kept light and calm enough to read on"
+       }
+      ],
+      "rows": "973e006f50136b8a",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#232323",
+       "--surface": "#2c2c2c",
+       "--surface-2": "#363636",
+       "--tint": "#3d3d3d",
+       "--text": "#fffcfc",
+       "--text-muted": "#d9cace",
+       "--border": "#393939",
+       "--accent": "#ffffff",
+       "--theme-accent-swatch": "#ffffff",
+       "--accent-text": "#ffffff",
+       "--on-accent": "#170f11",
+       "--theme-on-accent": "#170f11",
+       "--success": "#7cc58c",
+       "--failure": "#f38a7f",
+       "--syntax-blue": "#72b8f2",
+       "--hov": "rgba(255, 252, 252, 0.08)",
+       "--act": "rgba(255, 252, 252, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#3a2a20",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#4b372a",
+       "--chat-welcome-noon": "#1d3139",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#27404a",
+       "--chat-welcome-afternoon": "#3b2922",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#4c362d",
+       "--chat-welcome-evening": "#302b3b",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#3f384c",
+       "--chart-seq-1": "#5a5a5a",
+       "--chart-seq-2": "#808080",
+       "--chart-seq-3": "#a9a9a9",
+       "--chart-seq-4": "#d3d3d3",
+       "--chart-seq-5": "#ffffff"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#ffffff",
+        "to": "#232323",
+        "why": "kept dark and calm enough to read on"
+       }
+      ],
+      "rows": "08831ca927edccc1",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "tokens": {
+       "--ground": "#e0e0e0",
+       "--surface": "#eaeaea",
+       "--surface-2": "#d6d6d6",
+       "--tint": "#cecece",
+       "--text": "#13060a",
+       "--text-muted": "#564147",
+       "--border": "#c6c6c6",
+       "--accent": "#000000",
+       "--theme-accent-swatch": "#000000",
+       "--accent-text": "#000000",
+       "--on-accent": "#fdf9fa",
+       "--theme-on-accent": "#fdf9fa",
+       "--success": "#0a5224",
+       "--failure": "#92000c",
+       "--syntax-blue": "#004a78",
+       "--hov": "rgba(19, 6, 10, 0.07)",
+       "--act": "rgba(19, 6, 10, 0.11)",
+       "--scrim": "rgba(19, 6, 10, 0.42)",
+       "--quokka-line-auto": "#111214",
+       "--accent-swatch-blue": "#2f6fae",
+       "--accent-swatch-green": "#3f7d51",
+       "--accent-swatch-violet": "#6a5ab2",
+       "--accent-swatch-rose": "#ad5470",
+       "--accent-swatch-amber": "#9a6f1e",
+       "--accent-swatch-orange": "#b8621f",
+       "--accent-swatch-cyan": "#1f7f8f",
+       "--accent-swatch-brown": "#6f4a2c",
+       "--chat-welcome-morning": "#e7d2c4",
+       "--chat-welcome-morning-detail": "#c0765d",
+       "--chat-welcome-morning-ground": "#d3baab",
+       "--chat-welcome-noon": "#c2dbe5",
+       "--chat-welcome-noon-detail": "#a8873e",
+       "--chat-welcome-noon-ground": "#a9c5d1",
+       "--chat-welcome-afternoon": "#e8d1c7",
+       "--chat-welcome-afternoon-detail": "#c17562",
+       "--chat-welcome-afternoon-ground": "#d4b9ae",
+       "--chat-welcome-evening": "#d9d2e8",
+       "--chat-welcome-evening-detail": "#ac853f",
+       "--chat-welcome-evening-ground": "#c3bbd4",
+       "--chart-seq-1": "#9f9f9f",
+       "--chart-seq-2": "#6b6b6b",
+       "--chart-seq-3": "#3b3b3b",
+       "--chart-seq-4": "#111111",
+       "--chart-seq-5": "#000000"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#000000",
+        "to": "#e0e0e0",
+        "why": "kept light and calm enough to read on"
+       }
+      ],
+      "rows": "748b57b86d3f6d91",
+      "pass": true
+     },
+     "dark": {
+      "tokens": {
+       "--ground": "#232323",
+       "--surface": "#2c2c2c",
+       "--surface-2": "#363636",
+       "--tint": "#3d3d3d",
+       "--text": "#fff8f9",
+       "--text-muted": "#d9cace",
+       "--border": "#393939",
+       "--accent": "#ffffff",
+       "--theme-accent-swatch": "#ffffff",
+       "--accent-text": "#ffffff",
+       "--on-accent": "#170f11",
+       "--theme-on-accent": "#170f11",
+       "--success": "#7ec88e",
+       "--failure": "#ff9e93",
+       "--syntax-blue": "#78bff9",
+       "--hov": "rgba(255, 248, 249, 0.08)",
+       "--act": "rgba(255, 248, 249, 0.13)",
+       "--scrim": "rgba(0, 0, 0, 0.55)",
+       "--quokka-line-auto": "#ffffff",
+       "--accent-swatch-blue": "#78b7e3",
+       "--accent-swatch-green": "#8fc9a0",
+       "--accent-swatch-violet": "#b3a6ee",
+       "--accent-swatch-rose": "#e3a0b3",
+       "--accent-swatch-amber": "#dfb15f",
+       "--accent-swatch-orange": "#e79a5c",
+       "--accent-swatch-cyan": "#7ccfdc",
+       "--accent-swatch-brown": "#b98a66",
+       "--chat-welcome-morning": "#3a2a20",
+       "--chat-welcome-morning-detail": "#da8f74",
+       "--chat-welcome-morning-ground": "#4b372a",
+       "--chat-welcome-noon": "#1d3139",
+       "--chat-welcome-noon-detail": "#c1a057",
+       "--chat-welcome-noon-ground": "#27404a",
+       "--chat-welcome-afternoon": "#3b2922",
+       "--chat-welcome-afternoon-detail": "#db8e7a",
+       "--chat-welcome-afternoon-ground": "#4c362d",
+       "--chat-welcome-evening": "#302b3b",
+       "--chat-welcome-evening-detail": "#c69e58",
+       "--chat-welcome-evening-ground": "#3f384c",
+       "--chart-seq-1": "#5a5a5a",
+       "--chart-seq-2": "#808080",
+       "--chart-seq-3": "#a9a9a9",
+       "--chart-seq-4": "#d3d3d3",
+       "--chart-seq-5": "#ffffff"
+      },
+      "notes": [
+       {
+        "role": "Page",
+        "from": "#ffffff",
+        "to": "#232323",
+        "why": "kept dark and calm enough to read on"
+       }
+      ],
+      "rows": "3ccba039893321e2",
+      "pass": true
+     }
+    }
+   }
+  }
+ },
+ "random": [
+  {
+   "seeds": {
+    "light": {
+     "page": "#2ff6a2",
+     "accent": "#e9d4bd",
+     "ink": "#a780c9"
+    },
+    "dark": {
+     "page": "#12e04e",
+     "accent": "#8ee28a"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "eb259bbb91c4a712",
+      "notes": "24453e787fdeb17a",
+      "rows": "2170aec5cf84ef98",
+      "pass": true
+     },
+     "dark": {
+      "roles": "cbe79494bb563a0b",
+      "notes": "2a180dda5d196d80",
+      "rows": "373a1d210b316b3d",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "c0f4e1f353212764",
+      "notes": "24453e787fdeb17a",
+      "rows": "b3b35ba24a5e15ca",
+      "pass": true
+     },
+     "dark": {
+      "roles": "cbe79494bb563a0b",
+      "notes": "2a180dda5d196d80",
+      "rows": "97f8c56e316704fa",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "10d908cefdfd3352",
+      "notes": "5915e2ac34d01320",
+      "rows": "86c288d8c9b84281",
+      "pass": true
+     },
+     "dark": {
+      "roles": "b8e1829797abbc32",
+      "notes": "2a180dda5d196d80",
+      "rows": "4fbf7fa01a0701a9",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#7a7f73",
+     "accent": "#420662"
+    },
+    "dark": {
+     "page": "#93a51f",
+     "accent": "#e21822"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "f18cfb9a79630244",
+      "notes": "4a4a5562cd745f99",
+      "rows": "1a8617320265f52a",
+      "pass": true
+     },
+     "dark": {
+      "roles": "07a5f0f81b4b8e26",
+      "notes": "f2457958a8f9087c",
+      "rows": "9ac8d87586516a04",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "26f6a7d0c8f5e9a4",
+      "notes": "4a4a5562cd745f99",
+      "rows": "27be9914a0d66e8f",
+      "pass": true
+     },
+     "dark": {
+      "roles": "07a5f0f81b4b8e26",
+      "notes": "f2457958a8f9087c",
+      "rows": "9b8c847d37d0f0be",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "67a900478ed09c83",
+      "notes": "4a4a5562cd745f99",
+      "rows": "2f3428666b19ac35",
+      "pass": true
+     },
+     "dark": {
+      "roles": "ecde3654338ac404",
+      "notes": "506a53e94ad7e8b3",
+      "rows": "f265570062f3069b",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#489e5e",
+     "accent": "#78edbe"
+    },
+    "dark": {
+     "page": "#c65f7e",
+     "accent": "#b3b080"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "d035dc470813bc4e",
+      "notes": "f92272fb845ddd5b",
+      "rows": "ae86959d2327214e",
+      "pass": true
+     },
+     "dark": {
+      "roles": "01e442e74c2b618b",
+      "notes": "393cbb4ef87cbdfb",
+      "rows": "a478bbb507360e69",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "2bf68234792ab5e4",
+      "notes": "f92272fb845ddd5b",
+      "rows": "ea87304277151f68",
+      "pass": true
+     },
+     "dark": {
+      "roles": "8dd4b7166c1f8d07",
+      "notes": "393cbb4ef87cbdfb",
+      "rows": "7ff912a81a94b10b",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "fd49b04e49fe2f6d",
+      "notes": "119efa55198f943a",
+      "rows": "22119942f176b45e",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e2242b29b09abb0c",
+      "notes": "393cbb4ef87cbdfb",
+      "rows": "b5a1686939b95dfb",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#146c91",
+     "accent": "#01d4c4"
+    },
+    "dark": {
+     "page": "#12d704",
+     "accent": "#03c592",
+     "ink": "#634d35"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "4cfeb89efaee63bb",
+      "notes": "ea0358c54978208c",
+      "rows": "a00c60eb08f04b0d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "8ecb6320c004619b",
+      "notes": "f26844c2d7fd1447",
+      "rows": "e2fc62bd6e0ff66e",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "27a564d581435630",
+      "notes": "ea0358c54978208c",
+      "rows": "5ac73ae9ca79ab93",
+      "pass": true
+     },
+     "dark": {
+      "roles": "70e36a85fb2ee6d5",
+      "notes": "f26844c2d7fd1447",
+      "rows": "eb68d307a4352335",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "f79abe7383968fed",
+      "notes": "5c9e42a3a30729cc",
+      "rows": "9680234b0e316729",
+      "pass": true
+     },
+     "dark": {
+      "roles": "c47f5905d2e4be9c",
+      "notes": "f26844c2d7fd1447",
+      "rows": "70c2d075912d5d65",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#a3771b",
+     "accent": "#32c606"
+    },
+    "dark": {
+     "page": "#e32cd8",
+     "accent": "#c5cc35",
+     "ink": "#9a4ac9"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "8f7a8f222627d84a",
+      "notes": "850dca5084cfb178",
+      "rows": "157f56302cd33802",
+      "pass": true
+     },
+     "dark": {
+      "roles": "c6b59b6daea7ca24",
+      "notes": "a179218f4281d266",
+      "rows": "2f4c200f704bc16d",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "e3dc0799104d2ed1",
+      "notes": "850dca5084cfb178",
+      "rows": "cca1642dbd9103c5",
+      "pass": true
+     },
+     "dark": {
+      "roles": "7e2932d6746320a8",
+      "notes": "a179218f4281d266",
+      "rows": "cefc5346ec91387b",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "079d18f194979b2e",
+      "notes": "8475fd652e901406",
+      "rows": "81d5e5455b2a9df9",
+      "pass": true
+     },
+     "dark": {
+      "roles": "b2575a7a1f78f5ec",
+      "notes": "a179218f4281d266",
+      "rows": "f9df7a28183860c3",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#ceff75",
+     "accent": "#eafee4"
+    },
+    "dark": {
+     "page": "#fa1112",
+     "accent": "#1a80b8",
+     "ink": "#35f10c"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "0ea6f8c5c098a077",
+      "notes": "21502a511eef64d8",
+      "rows": "55dd8b9c5bb3fa09",
+      "pass": true
+     },
+     "dark": {
+      "roles": "76636eddf774e50b",
+      "notes": "28ae06340187c417",
+      "rows": "f9eee4a4972dc8e4",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "2efe8b21f57dc416",
+      "notes": "21502a511eef64d8",
+      "rows": "58f2ac51a394bc0e",
+      "pass": true
+     },
+     "dark": {
+      "roles": "76636eddf774e50b",
+      "notes": "28ae06340187c417",
+      "rows": "2a2dd2bf80a05949",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "6b7acb62a256b2f1",
+      "notes": "a6eba1edcd0779d4",
+      "rows": "5c95b34b95e48411",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e8b1adab98da0a5e",
+      "notes": "008dab0706bbb658",
+      "rows": "94ca9b3e4dced366",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#e3d904",
+     "accent": "#a07a91"
+    },
+    "dark": {
+     "page": "#021d12",
+     "accent": "#e8b77a"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "60d2533439f1926e",
+      "notes": "bc9b84a7f4ceebf6",
+      "rows": "1cb5c27163a3b77d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "9967d804f6c41b42",
+      "notes": "4f53cda18c2baa0c",
+      "rows": "138d0178b830ed73",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "3c6f5f8f7cbb1520",
+      "notes": "bc9b84a7f4ceebf6",
+      "rows": "f491906bd63bfe86",
+      "pass": true
+     },
+     "dark": {
+      "roles": "9967d804f6c41b42",
+      "notes": "4f53cda18c2baa0c",
+      "rows": "9392298a69987db9",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "4525eb513c8d5a0e",
+      "notes": "f3a62c6b662ab5d8",
+      "rows": "a8c35d9641a5785b",
+      "pass": true
+     },
+     "dark": {
+      "roles": "ba6ac6ba9487fe6a",
+      "notes": "4f53cda18c2baa0c",
+      "rows": "b11aad02d1769f83",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#7988cf",
+     "accent": "#659ccd"
+    },
+    "dark": {
+     "page": "#eac32a",
+     "accent": "#1dc13c",
+     "ink": "#31343f"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "4995c0deb38acdda",
+      "notes": "9f44d8f0d0df0c5f",
+      "rows": "40d1824ab280b932",
+      "pass": true
+     },
+     "dark": {
+      "roles": "5c79a92d958d435d",
+      "notes": "e9a5c4b0ed17b396",
+      "rows": "8d7cf5eafb4c4b21",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "a3f6d4a3c5799ab8",
+      "notes": "9f44d8f0d0df0c5f",
+      "rows": "21f4c2b2ce174e8d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "5c79a92d958d435d",
+      "notes": "e9a5c4b0ed17b396",
+      "rows": "b293bdff237e4dec",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "70a3b66abb26a6b2",
+      "notes": "28ea34d79043efa3",
+      "rows": "542db3501a82d9c3",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e9ef8d9b6bd209a1",
+      "notes": "e9a5c4b0ed17b396",
+      "rows": "1951230955967be4",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#0e2ece",
+     "accent": "#61db67",
+     "ink": "#6eee39"
+    },
+    "dark": {
+     "page": "#a6aa2f",
+     "accent": "#8408c9"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "a8ada2f54874c123",
+      "notes": "2b2bcaf4c87b1dd7",
+      "rows": "a11894822850dbe0",
+      "pass": true
+     },
+     "dark": {
+      "roles": "9ffd439879dc68be",
+      "notes": "7c4d29d743918254",
+      "rows": "e94f5f351ba1bd7d",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "c9cda42c14f84712",
+      "notes": "2b2bcaf4c87b1dd7",
+      "rows": "3e8b04c022734dfa",
+      "pass": true
+     },
+     "dark": {
+      "roles": "9946235dc5bfb2c7",
+      "notes": "7c4d29d743918254",
+      "rows": "338bbed3dd416a42",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "14fda33245e22880",
+      "notes": "5d4e2674b8bc5905",
+      "rows": "877441eacd9e5551",
+      "pass": true
+     },
+     "dark": {
+      "roles": "bd89a05541805a8a",
+      "notes": "b83db51ac1007b73",
+      "rows": "86df0d6b37ca764a",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#3dc6c0",
+     "accent": "#44131d",
+     "ink": "#bf7d60"
+    },
+    "dark": {
+     "page": "#073108",
+     "accent": "#6b541a",
+     "ink": "#f85747"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "0f19dfd179c64f8d",
+      "notes": "321c147adf01e7b7",
+      "rows": "27f99944c0bf89ce",
+      "pass": true
+     },
+     "dark": {
+      "roles": "7376902dec004efc",
+      "notes": "c19d1309946701b1",
+      "rows": "17c2764fdcec8016",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "5dc1912d740cd1ea",
+      "notes": "321c147adf01e7b7",
+      "rows": "c07d8910e31ae0d4",
+      "pass": true
+     },
+     "dark": {
+      "roles": "91a10bf54e66c85e",
+      "notes": "c19d1309946701b1",
+      "rows": "7359f8235dfbb3d5",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "3c38aeea21957b50",
+      "notes": "321c147adf01e7b7",
+      "rows": "2107a2447c170abb",
+      "pass": true
+     },
+     "dark": {
+      "roles": "9e31bb59a7d36178",
+      "notes": "670b7d1f53bc323a",
+      "rows": "10f746f6788b3f25",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#3f890c",
+     "accent": "#862cd7",
+     "ink": "#388d97"
+    },
+    "dark": {
+     "page": "#9d0e02",
+     "accent": "#4c2ea4"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "b28a395ac67adb54",
+      "notes": "dd1ea861689c1bc5",
+      "rows": "d9b34cc669090864",
+      "pass": true
+     },
+     "dark": {
+      "roles": "278ed725d6104119",
+      "notes": "c0e1cbc9d9573762",
+      "rows": "7c5ce499a075a15b",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "55a3fcadd8c2dead",
+      "notes": "dd1ea861689c1bc5",
+      "rows": "7f8b392e8ff1f0f3",
+      "pass": true
+     },
+     "dark": {
+      "roles": "552d927d8199d161",
+      "notes": "c0e1cbc9d9573762",
+      "rows": "b103629ecf71c311",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "534259ab359ea039",
+      "notes": "dd1ea861689c1bc5",
+      "rows": "81550bccfa5ecd84",
+      "pass": true
+     },
+     "dark": {
+      "roles": "de6ce518719b83a0",
+      "notes": "c79902cbc382adf8",
+      "rows": "4a8ed29e7aea5e4a",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#abbc2d",
+     "accent": "#8288dd"
+    },
+    "dark": {
+     "page": "#9195ea",
+     "accent": "#5f781b"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "7e3c8f709c37e3b5",
+      "notes": "118d2a9747fe1370",
+      "rows": "5572dde03a53b0cc",
+      "pass": true
+     },
+     "dark": {
+      "roles": "96daf175bf704644",
+      "notes": "a6e2cb925acff1ec",
+      "rows": "0e03fb944ab5838c",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "c0de14684dc87768",
+      "notes": "118d2a9747fe1370",
+      "rows": "9a8c0f330d239de5",
+      "pass": true
+     },
+     "dark": {
+      "roles": "96daf175bf704644",
+      "notes": "a6e2cb925acff1ec",
+      "rows": "c1f62fc3d0d1f35d",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "b9a79256314da89b",
+      "notes": "70ddb1025b9a536e",
+      "rows": "9870ac725404eb9d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "17017dd86c3e8be5",
+      "notes": "7182908481dbccee",
+      "rows": "1d01a974c54b8dd7",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#ad4852",
+     "accent": "#99d556",
+     "ink": "#b0f400"
+    },
+    "dark": {
+     "page": "#60ddc5",
+     "accent": "#fa98fd",
+     "ink": "#03c5b5"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "125816a9dd548155",
+      "notes": "15dea44338849818",
+      "rows": "a46c97cbf0298d7b",
+      "pass": true
+     },
+     "dark": {
+      "roles": "4a766bf929089bc2",
+      "notes": "24b11fd2202e7bfc",
+      "rows": "cd7dc5d6ffd8d4d5",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "a083903732249f41",
+      "notes": "15dea44338849818",
+      "rows": "acd4d4f4f8e794db",
+      "pass": true
+     },
+     "dark": {
+      "roles": "823ab17793b95679",
+      "notes": "24b11fd2202e7bfc",
+      "rows": "11c310967f82f480",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "7a8862e72ef0efc6",
+      "notes": "1f15f2ac60414607",
+      "rows": "581b80d53916330d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "ab1a120c2f26c94c",
+      "notes": "24b11fd2202e7bfc",
+      "rows": "ee1b85a7475fa320",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#9ddfb2",
+     "accent": "#145f5f"
+    },
+    "dark": {
+     "page": "#36d9c6",
+     "accent": "#596958"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "89e50c9e3d309009",
+      "notes": "9949750b17052809",
+      "rows": "e491872d9d362fc8",
+      "pass": true
+     },
+     "dark": {
+      "roles": "601fe030e2ddf3f1",
+      "notes": "8989ff58bd4af14f",
+      "rows": "1f96822127b99c7e",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "32bf88791ef98cb0",
+      "notes": "9949750b17052809",
+      "rows": "b2608f8bb2f988fa",
+      "pass": true
+     },
+     "dark": {
+      "roles": "45631522023abdd3",
+      "notes": "8989ff58bd4af14f",
+      "rows": "c7b1f97ad3193c54",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "a774b11d578f3ae4",
+      "notes": "9949750b17052809",
+      "rows": "8b3df01ebd77bcc1",
+      "pass": true
+     },
+     "dark": {
+      "roles": "30140afc5b9f7fe3",
+      "notes": "94ce1d36912217b6",
+      "rows": "287856f3608a2e53",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#bac755",
+     "accent": "#652dac",
+     "ink": "#64106d"
+    },
+    "dark": {
+     "page": "#1eef95",
+     "accent": "#a8255f"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "ce9cdb0f5d534c2b",
+      "notes": "4ae54b1e6ec9dfe8",
+      "rows": "8cbc1e1ace77b0ce",
+      "pass": true
+     },
+     "dark": {
+      "roles": "08b81534dd55b927",
+      "notes": "917d433550241d3d",
+      "rows": "ddf144c9f7882f57",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "99ddb1d52264326c",
+      "notes": "4ae54b1e6ec9dfe8",
+      "rows": "03bbaa512bcbd1c0",
+      "pass": true
+     },
+     "dark": {
+      "roles": "b3a1d1bf10ca2476",
+      "notes": "917d433550241d3d",
+      "rows": "49be5761f886786c",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "4cb40171f2bc566a",
+      "notes": "4ae54b1e6ec9dfe8",
+      "rows": "4da3c261c386149f",
+      "pass": true
+     },
+     "dark": {
+      "roles": "3092015e9a3065e0",
+      "notes": "df43c4d2dfee7616",
+      "rows": "787c2fea5b2dcd6b",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#5052ad",
+     "accent": "#2b1ffc"
+    },
+    "dark": {
+     "page": "#a46a74",
+     "accent": "#98c1e9",
+     "ink": "#dac687"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "027a28181ab52cb9",
+      "notes": "b35f891bf89290bc",
+      "rows": "29b287d40c663629",
+      "pass": true
+     },
+     "dark": {
+      "roles": "2e62bd2aed86bc4a",
+      "notes": "73a21dac9ffd9b3f",
+      "rows": "ac2168460d24bce1",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "3bd785dde9e26e59",
+      "notes": "b35f891bf89290bc",
+      "rows": "b027c718603b881d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "d9e7f468bef5d371",
+      "notes": "73a21dac9ffd9b3f",
+      "rows": "f7b36faed7216dc1",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "323f5d64f7f4c45b",
+      "notes": "b35f891bf89290bc",
+      "rows": "6d2486b360a60d87",
+      "pass": true
+     },
+     "dark": {
+      "roles": "be26f7812bc545ba",
+      "notes": "73a21dac9ffd9b3f",
+      "rows": "b00287681158e1e6",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#752809",
+     "accent": "#b7bdd8",
+     "ink": "#3e363f"
+    },
+    "dark": {
+     "page": "#c59c4e",
+     "accent": "#9d8dda",
+     "ink": "#fd8a43"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "e9f611be676f7fd9",
+      "notes": "ddc05e2e67ed98d7",
+      "rows": "c33e335fbfd3a2ee",
+      "pass": true
+     },
+     "dark": {
+      "roles": "c87c18f5055eb6d3",
+      "notes": "917760c0ad755b06",
+      "rows": "00da15b462615e61",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "da8ec362ee5e1b99",
+      "notes": "ddc05e2e67ed98d7",
+      "rows": "64b652ba5bd64387",
+      "pass": true
+     },
+     "dark": {
+      "roles": "d84083a1c7ac7051",
+      "notes": "917760c0ad755b06",
+      "rows": "0387caba43d49950",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "3209a1ba9dcb31a0",
+      "notes": "4bac3ab8c1bcc301",
+      "rows": "97ea690bbf110a0e",
+      "pass": true
+     },
+     "dark": {
+      "roles": "324903ed89c4f5e2",
+      "notes": "917760c0ad755b06",
+      "rows": "1eb8a46b03294a8e",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#e2c59f",
+     "accent": "#6817e6",
+     "ink": "#1dea87"
+    },
+    "dark": {
+     "page": "#db2c5b",
+     "accent": "#67e0a9"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "519a8f21cf6b3ae0",
+      "notes": "8b6a90b1a82c1653",
+      "rows": "6347a2bfaa707460",
+      "pass": true
+     },
+     "dark": {
+      "roles": "21ef8e5506e089e9",
+      "notes": "5466a10ffbf91f34",
+      "rows": "5d362b44e2bcb4a6",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "90558a671534dd81",
+      "notes": "8b6a90b1a82c1653",
+      "rows": "17c9e75e47eb172a",
+      "pass": true
+     },
+     "dark": {
+      "roles": "21ef8e5506e089e9",
+      "notes": "5466a10ffbf91f34",
+      "rows": "078dbc617a9dcc89",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "1ab3e9642a73bc81",
+      "notes": "8b6a90b1a82c1653",
+      "rows": "3b475c67218bba15",
+      "pass": true
+     },
+     "dark": {
+      "roles": "dc601ba5566aef87",
+      "notes": "5466a10ffbf91f34",
+      "rows": "b5b07ea65e1705a1",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#26cf14",
+     "accent": "#ec1f01",
+     "ink": "#d1ec6d"
+    },
+    "dark": {
+     "page": "#f37a0e",
+     "accent": "#523fd2"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "96b76b1bfa0bbaa2",
+      "notes": "ddaaa0343e200e15",
+      "rows": "2560439d82540dc8",
+      "pass": true
+     },
+     "dark": {
+      "roles": "b8ece890a8e81089",
+      "notes": "efd23b2f1bb46873",
+      "rows": "60ba7f10c5762987",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "7ff42372edc2464b",
+      "notes": "ddaaa0343e200e15",
+      "rows": "47f48d9db8d4c476",
+      "pass": true
+     },
+     "dark": {
+      "roles": "054357946c2b03b7",
+      "notes": "efd23b2f1bb46873",
+      "rows": "2357825ec811cfce",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "d9296ba62944d01d",
+      "notes": "79cd310898084911",
+      "rows": "dd4886d890449500",
+      "pass": true
+     },
+     "dark": {
+      "roles": "417e9bfa2323fc4c",
+      "notes": "601aa31a56d19a55",
+      "rows": "f536868a4053f711",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#cb00d3",
+     "accent": "#355d6f",
+     "ink": "#6168ef"
+    },
+    "dark": {
+     "page": "#85c56a",
+     "accent": "#557e66",
+     "ink": "#50d853"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "547fdabfd18477f7",
+      "notes": "9ae9cda89ac06b9d",
+      "rows": "df544723dc916f44",
+      "pass": true
+     },
+     "dark": {
+      "roles": "cd2b3ec072443caa",
+      "notes": "48413b977d6fd9c9",
+      "rows": "8213f91e0c5f7b80",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "d69b13eb394509b1",
+      "notes": "9ae9cda89ac06b9d",
+      "rows": "f214a4d3704973ae",
+      "pass": true
+     },
+     "dark": {
+      "roles": "8445fd1cd1825181",
+      "notes": "48413b977d6fd9c9",
+      "rows": "81d8aa15fda39cdf",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "5841bf9b46d9917c",
+      "notes": "9ae9cda89ac06b9d",
+      "rows": "35c26557a7c3ba83",
+      "pass": true
+     },
+     "dark": {
+      "roles": "b5c33bafdb37f9b7",
+      "notes": "64f88c42166035bb",
+      "rows": "af7c57a661629af9",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#eb36ab",
+     "accent": "#aa7a49",
+     "ink": "#cf5866"
+    },
+    "dark": {
+     "page": "#5cb41b",
+     "accent": "#a6c4b0"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "68e1df22e28ae965",
+      "notes": "316ac4028fd50892",
+      "rows": "fe0491f80a5fe63e",
+      "pass": true
+     },
+     "dark": {
+      "roles": "4e6d6f59616583ef",
+      "notes": "c599271145d8b93d",
+      "rows": "b084010cb6334bc6",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "f631d91d1d1ea686",
+      "notes": "316ac4028fd50892",
+      "rows": "0324dc75a1fe0b40",
+      "pass": true
+     },
+     "dark": {
+      "roles": "5709d535be293e76",
+      "notes": "c599271145d8b93d",
+      "rows": "67cfeab90c3c48b1",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "0b47409a4ebbec3d",
+      "notes": "6cd6033b8ce282ac",
+      "rows": "5f0bbff3e59255f5",
+      "pass": true
+     },
+     "dark": {
+      "roles": "7ec14229408d442d",
+      "notes": "c599271145d8b93d",
+      "rows": "b77d614af8579986",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#09aa31",
+     "accent": "#49eb0a"
+    },
+    "dark": {
+     "page": "#0d57d7",
+     "accent": "#ae700f"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "c4d64636592fa0b3",
+      "notes": "2b09c9112e389715",
+      "rows": "d3302f2cf9a26be0",
+      "pass": true
+     },
+     "dark": {
+      "roles": "329fdc47d7803c52",
+      "notes": "9b5eba7f923fb806",
+      "rows": "7124cc2122fc2efb",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "57616bb8c42cb5d5",
+      "notes": "2b09c9112e389715",
+      "rows": "5419bbc5c48aa7d4",
+      "pass": true
+     },
+     "dark": {
+      "roles": "93d170c37f0588a8",
+      "notes": "9b5eba7f923fb806",
+      "rows": "f685f82d56dbeb6a",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "b3e661b11bb2e734",
+      "notes": "ea8ed86666db8064",
+      "rows": "a843556dd7d469b7",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e2ab356869983b8d",
+      "notes": "60e71b6c6d482cb6",
+      "rows": "70e4fbc79ddc8822",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#5ccef3",
+     "accent": "#cfb8aa"
+    },
+    "dark": {
+     "page": "#34d0cb",
+     "accent": "#056cdc"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "af427325bb6c38a9",
+      "notes": "d9225fd22c9ecf39",
+      "rows": "00a0a6eeb680bf99",
+      "pass": true
+     },
+     "dark": {
+      "roles": "3cd03ac9150c7758",
+      "notes": "1d0029e2e19f73eb",
+      "rows": "b95ab6d3b86ddf64",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "6f200862582f14e0",
+      "notes": "d9225fd22c9ecf39",
+      "rows": "afaf66ddb2799d5c",
+      "pass": true
+     },
+     "dark": {
+      "roles": "bc0c900d1e9698ef",
+      "notes": "1d0029e2e19f73eb",
+      "rows": "4a733aa389f97817",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "c66534440c127f32",
+      "notes": "457c3c8fca5eca59",
+      "rows": "28ec590a072a0019",
+      "pass": true
+     },
+     "dark": {
+      "roles": "cb8e2b3912b0f67f",
+      "notes": "4642d89d95990d7b",
+      "rows": "77f570f20fc4f7b2",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#a66ec2",
+     "accent": "#f65f4a",
+     "ink": "#78865c"
+    },
+    "dark": {
+     "page": "#ff5d66",
+     "accent": "#10065f",
+     "ink": "#da4f9f"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "a84a3fe71cfe618a",
+      "notes": "ef719bfaf5a6b858",
+      "rows": "c3a697bdc032b3fb",
+      "pass": true
+     },
+     "dark": {
+      "roles": "41c2e4dbda045cab",
+      "notes": "cd238c72860a4de5",
+      "rows": "932895cfd86d0180",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "e93fce9c031d0196",
+      "notes": "ef719bfaf5a6b858",
+      "rows": "dedfe1b7ffef8e87",
+      "pass": true
+     },
+     "dark": {
+      "roles": "3a401ee3bec5447c",
+      "notes": "cd238c72860a4de5",
+      "rows": "c76c67ee34e8c142",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "068fd537febc2c21",
+      "notes": "4db698495c4d4ce7",
+      "rows": "88f36f1d9ecc0797",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e95edab8e3a38de7",
+      "notes": "09b4c3242b28b372",
+      "rows": "d15a5f41f90ddcdf",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#b44340",
+     "accent": "#dda98c",
+     "ink": "#4fa9da"
+    },
+    "dark": {
+     "page": "#60e082",
+     "accent": "#305297",
+     "ink": "#3d9d03"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "7f72363922c6c49b",
+      "notes": "1591fcb3f5fb8f02",
+      "rows": "c1425880f13ea29f",
+      "pass": true
+     },
+     "dark": {
+      "roles": "58e87024cb37ace3",
+      "notes": "810cb63597eb53b1",
+      "rows": "cc6ce6fc3448f0eb",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "09823deeef1dbd84",
+      "notes": "1591fcb3f5fb8f02",
+      "rows": "703c64fe971736af",
+      "pass": true
+     },
+     "dark": {
+      "roles": "0f3da0f2cf7b614c",
+      "notes": "810cb63597eb53b1",
+      "rows": "b6ae4a885e3e44bb",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "6eff3e1e1875a2e9",
+      "notes": "e508af1d08ab0797",
+      "rows": "82d32472c035a59e",
+      "pass": true
+     },
+     "dark": {
+      "roles": "6e1d7183cefc36bb",
+      "notes": "bff33ffda791be95",
+      "rows": "7b2a4bb769ca52f8",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#218016",
+     "accent": "#4ac7f0",
+     "ink": "#26e981"
+    },
+    "dark": {
+     "page": "#2cf2ec",
+     "accent": "#55d608",
+     "ink": "#3de7aa"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "a4b5e5ae25f89f58",
+      "notes": "3acb4bc6793016db",
+      "rows": "b218d2e7fa059921",
+      "pass": true
+     },
+     "dark": {
+      "roles": "2397209a3b7e58ed",
+      "notes": "6036dcf20dd3f38e",
+      "rows": "287d143fc0e9da4d",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "bad03517943d32e9",
+      "notes": "3acb4bc6793016db",
+      "rows": "7bb76b68d655428d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "9d8f70aa176ee1c6",
+      "notes": "6036dcf20dd3f38e",
+      "rows": "4f926a8019f2b2bf",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "422eae0692e2fbb8",
+      "notes": "9120f79b69e1c9e7",
+      "rows": "cba413a0b1909c0d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e1050ee55e4a8b3c",
+      "notes": "6036dcf20dd3f38e",
+      "rows": "cc8750ca53cccbaf",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#179df9",
+     "accent": "#ce33c1",
+     "ink": "#72fab4"
+    },
+    "dark": {
+     "page": "#982e12",
+     "accent": "#860fa9",
+     "ink": "#30824d"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "5834bf4e6d4fa96b",
+      "notes": "05f41f354bda1d38",
+      "rows": "7d852d99de24997f",
+      "pass": true
+     },
+     "dark": {
+      "roles": "c96ded13cd2a2cce",
+      "notes": "8ea13d23728faedb",
+      "rows": "aabf7bff7959c47b",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "d9630844fa006acc",
+      "notes": "05f41f354bda1d38",
+      "rows": "3c3c7a69b0d4e23a",
+      "pass": true
+     },
+     "dark": {
+      "roles": "c96ded13cd2a2cce",
+      "notes": "8ea13d23728faedb",
+      "rows": "af5a6eff8d306a5c",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "4e86ba1b3bababf8",
+      "notes": "ca8314c3848148d2",
+      "rows": "750d70d8ccaac4c8",
+      "pass": true
+     },
+     "dark": {
+      "roles": "fea54918923360b0",
+      "notes": "fb06548fb1aee371",
+      "rows": "c08dabb315efa3da",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#549f20",
+     "accent": "#d2737b",
+     "ink": "#027dc5"
+    },
+    "dark": {
+     "page": "#8407fe",
+     "accent": "#ac98f5"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "b0487fb27d8e5ad7",
+      "notes": "914f4b8c0e2ff8b0",
+      "rows": "e712c852aad3ec6f",
+      "pass": true
+     },
+     "dark": {
+      "roles": "8f61082fc78cdf83",
+      "notes": "f02273c3ffb77065",
+      "rows": "2158edb2002ba3b6",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "f3c2cb9ad3ea5a1a",
+      "notes": "914f4b8c0e2ff8b0",
+      "rows": "cc3b097f507c08f6",
+      "pass": true
+     },
+     "dark": {
+      "roles": "12a932e4df54db5b",
+      "notes": "f02273c3ffb77065",
+      "rows": "9f2933d0ff35b588",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "ccfae93d02a2f875",
+      "notes": "d80571215641f6d6",
+      "rows": "174fe7837d01525a",
+      "pass": true
+     },
+     "dark": {
+      "roles": "995a7db6ffc0e8dc",
+      "notes": "f02273c3ffb77065",
+      "rows": "3f772e956036e6d4",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#5e84d4",
+     "accent": "#76a571"
+    },
+    "dark": {
+     "page": "#7b37ea",
+     "accent": "#1a28e2"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "3efa76144838023d",
+      "notes": "2373769a233cf9e4",
+      "rows": "8aec968d1567fe6a",
+      "pass": true
+     },
+     "dark": {
+      "roles": "6a9811e04c093c82",
+      "notes": "f90f9b20291f5046",
+      "rows": "ab51e4687a008f92",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "2508256d9d311331",
+      "notes": "2373769a233cf9e4",
+      "rows": "a45d8385903b0af6",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e9c303c325094068",
+      "notes": "f90f9b20291f5046",
+      "rows": "f339844963d28b82",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "bb3b781a1a642045",
+      "notes": "1b634bb6b8db60cd",
+      "rows": "59df20a23853a152",
+      "pass": true
+     },
+     "dark": {
+      "roles": "358aecb6d254e93e",
+      "notes": "8d32da19195ddca1",
+      "rows": "6eb37cb829d50b22",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#94d165",
+     "accent": "#231e99",
+     "ink": "#1205ff"
+    },
+    "dark": {
+     "page": "#81dc2c",
+     "accent": "#6559ed"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "9dd2bbae80bd5cf3",
+      "notes": "61f1d978286cb71f",
+      "rows": "4046bd65097a7495",
+      "pass": true
+     },
+     "dark": {
+      "roles": "2a8310540993a785",
+      "notes": "7f70530b4ae446c1",
+      "rows": "2dd4724000b8e106",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "ee26b1337ffaf945",
+      "notes": "61f1d978286cb71f",
+      "rows": "f926578d37cb05dc",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e06856d42bf790d2",
+      "notes": "7f70530b4ae446c1",
+      "rows": "1e1fc4a6f42f6c95",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "03195416d4fb44c4",
+      "notes": "61f1d978286cb71f",
+      "rows": "a176f40c695aef67",
+      "pass": true
+     },
+     "dark": {
+      "roles": "17615ebbc0d62a4c",
+      "notes": "6197a1b6241ac32a",
+      "rows": "a77ae9a558ea4e3a",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#3e106b",
+     "accent": "#2c31e8"
+    },
+    "dark": {
+     "page": "#0be710",
+     "accent": "#84b76e"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "cb48402bb9b66e66",
+      "notes": "c56c09e1ac1b0075",
+      "rows": "c0677d7eb8e9ed36",
+      "pass": true
+     },
+     "dark": {
+      "roles": "d44eed39392f4947",
+      "notes": "85514cc5c3682226",
+      "rows": "0e61c156c5461f8c",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "a614ef52fc0f306b",
+      "notes": "c56c09e1ac1b0075",
+      "rows": "77d5019a60db76fb",
+      "pass": true
+     },
+     "dark": {
+      "roles": "d44eed39392f4947",
+      "notes": "85514cc5c3682226",
+      "rows": "6737c4f10fa2d4d2",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "704446562a2529e7",
+      "notes": "c56c09e1ac1b0075",
+      "rows": "244a11172744eacf",
+      "pass": true
+     },
+     "dark": {
+      "roles": "45e069cfc1c3fc04",
+      "notes": "85514cc5c3682226",
+      "rows": "762147872d2e6bc9",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#693b40",
+     "accent": "#d84134",
+     "ink": "#ed5c87"
+    },
+    "dark": {
+     "page": "#f2dcaf",
+     "accent": "#6ed04f",
+     "ink": "#4c149d"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "af5ef5d44d99ff7e",
+      "notes": "5226e1c2008be99f",
+      "rows": "df0996ddcd133f61",
+      "pass": true
+     },
+     "dark": {
+      "roles": "ecc969533dad614d",
+      "notes": "2c3dbcc8fbf3fd62",
+      "rows": "9e6dbc0e0447a9f2",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "3f4b51a3a16ba9e1",
+      "notes": "5226e1c2008be99f",
+      "rows": "104f9e821eea83cf",
+      "pass": true
+     },
+     "dark": {
+      "roles": "285e44b1bc5847bf",
+      "notes": "2c3dbcc8fbf3fd62",
+      "rows": "9c53bb9ca0077742",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "3f3db3c69fc94fa5",
+      "notes": "415022c877fad212",
+      "rows": "7f7efe68f47d2900",
+      "pass": true
+     },
+     "dark": {
+      "roles": "3bdab984a8cfa3a8",
+      "notes": "2c3dbcc8fbf3fd62",
+      "rows": "d8ef0289ee301bb2",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#58a0cd",
+     "accent": "#a2dd04"
+    },
+    "dark": {
+     "page": "#216d5f",
+     "accent": "#13b161",
+     "ink": "#8de241"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "37e3d04c663e116a",
+      "notes": "1a0ddd7bdd345793",
+      "rows": "3ef8d58c91e8defd",
+      "pass": true
+     },
+     "dark": {
+      "roles": "eb6cb39e0fb3e959",
+      "notes": "07fccb0f3fdf318f",
+      "rows": "1eb1dd20b375c856",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "5c2c2829aec2bb23",
+      "notes": "1a0ddd7bdd345793",
+      "rows": "c010abddc7d9eb78",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e5e79797baa2f668",
+      "notes": "07fccb0f3fdf318f",
+      "rows": "d1c1b84a6ccb7199",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "ef369a5aee87ab78",
+      "notes": "c383fedfc0b9da8a",
+      "rows": "3e27872d99af32e0",
+      "pass": true
+     },
+     "dark": {
+      "roles": "9d1492caa5a41197",
+      "notes": "07fccb0f3fdf318f",
+      "rows": "5a6e35e974e40375",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#639c94",
+     "accent": "#534379",
+     "ink": "#a01983"
+    },
+    "dark": {
+     "page": "#9d09c9",
+     "accent": "#49fee9",
+     "ink": "#b3b3df"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "40cd5570f03f5375",
+      "notes": "62a312efdb051c97",
+      "rows": "b3773c780d77a389",
+      "pass": true
+     },
+     "dark": {
+      "roles": "2331bf1bc427bde4",
+      "notes": "7f6cce57affe706b",
+      "rows": "de6083c5c870f681",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "8a00ed166dedbd02",
+      "notes": "62a312efdb051c97",
+      "rows": "e33faf9fe7036e22",
+      "pass": true
+     },
+     "dark": {
+      "roles": "2331bf1bc427bde4",
+      "notes": "7f6cce57affe706b",
+      "rows": "28c6258be1699988",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "65576ab3fd3f5ea9",
+      "notes": "62a312efdb051c97",
+      "rows": "f4d9d40444996b50",
+      "pass": true
+     },
+     "dark": {
+      "roles": "27ebd496062eb82f",
+      "notes": "7f6cce57affe706b",
+      "rows": "5470176c3dcdcc34",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#2ceb46",
+     "accent": "#07e62f",
+     "ink": "#89b3e4"
+    },
+    "dark": {
+     "page": "#3c6833",
+     "accent": "#4c4c5f",
+     "ink": "#645114"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "afa145ed2d289e5f",
+      "notes": "99a2dbdf2b9a0189",
+      "rows": "dfe2361a15997983",
+      "pass": true
+     },
+     "dark": {
+      "roles": "25244414673520ca",
+      "notes": "b47df437a849b657",
+      "rows": "5d818f120bd4cd93",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "39a88f773f161f28",
+      "notes": "99a2dbdf2b9a0189",
+      "rows": "2df14b350d1b0729",
+      "pass": true
+     },
+     "dark": {
+      "roles": "b47cab2d0f1c3709",
+      "notes": "b47df437a849b657",
+      "rows": "e90b49ac4d50c10a",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "5b5123531b494253",
+      "notes": "5214830af0b363a4",
+      "rows": "a3b431ba7add632f",
+      "pass": true
+     },
+     "dark": {
+      "roles": "63b5a3868aa42b2f",
+      "notes": "d0d0e049decf352b",
+      "rows": "01e1208812ce7e68",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#f57911",
+     "accent": "#fc2df6"
+    },
+    "dark": {
+     "page": "#ceb950",
+     "accent": "#4101e0"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "4de4dce0dc74b557",
+      "notes": "041a7e3a63669526",
+      "rows": "4aaed1b359de82d4",
+      "pass": true
+     },
+     "dark": {
+      "roles": "503e44cdf9e3dc7f",
+      "notes": "edca6ec814ec5d51",
+      "rows": "1348eba544f413d0",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "5cd0f4a3bd1e52ee",
+      "notes": "041a7e3a63669526",
+      "rows": "ea6ceb2709c1758e",
+      "pass": true
+     },
+     "dark": {
+      "roles": "503e44cdf9e3dc7f",
+      "notes": "edca6ec814ec5d51",
+      "rows": "949eb23220fa2e10",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "0fd9921f3f6bfda8",
+      "notes": "cc941f683dcaa2d7",
+      "rows": "bd3d59be9f8e3d8b",
+      "pass": true
+     },
+     "dark": {
+      "roles": "e314fa042242d89b",
+      "notes": "3e0dac2f1f9404ba",
+      "rows": "6a0a4421b741b2eb",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#855dc0",
+     "accent": "#0eefa2"
+    },
+    "dark": {
+     "page": "#141368",
+     "accent": "#af096d"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "f1e1116395f31aaf",
+      "notes": "9b5151e97341519e",
+      "rows": "77fcf4b13decfdb5",
+      "pass": true
+     },
+     "dark": {
+      "roles": "6373c7a167552a61",
+      "notes": "e516f267591e8391",
+      "rows": "3ac7e690b9e1d3ae",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "7bdb20e3e8761f82",
+      "notes": "9b5151e97341519e",
+      "rows": "d0f320e20276b300",
+      "pass": true
+     },
+     "dark": {
+      "roles": "d5a558060f0431c4",
+      "notes": "e516f267591e8391",
+      "rows": "93f0d319d7df6004",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "e32807e47921b742",
+      "notes": "3063c905370034cb",
+      "rows": "369c94db767614ac",
+      "pass": true
+     },
+     "dark": {
+      "roles": "efea3e51ba3a1d78",
+      "notes": "85f26ed91dd84146",
+      "rows": "d7267e4f04a2c3bb",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#645c53",
+     "accent": "#9e80aa",
+     "ink": "#4a3d96"
+    },
+    "dark": {
+     "page": "#cda3b5",
+     "accent": "#4ffcdd"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "3ea2e72830dcd3ad",
+      "notes": "3e74355de6bfa9ed",
+      "rows": "e5d8cfb6b4f6793f",
+      "pass": true
+     },
+     "dark": {
+      "roles": "112291ffd832c0f4",
+      "notes": "a39786c230408836",
+      "rows": "c3ddf9bfb117502a",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "732c1eb78706bd0a",
+      "notes": "3e74355de6bfa9ed",
+      "rows": "d7c03c37b8a65c61",
+      "pass": true
+     },
+     "dark": {
+      "roles": "112291ffd832c0f4",
+      "notes": "a39786c230408836",
+      "rows": "fd55ac6df5ade7fb",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "ff82eb4b9caa65d4",
+      "notes": "6ffc1943e7c780e3",
+      "rows": "daac78b740a3eaa4",
+      "pass": true
+     },
+     "dark": {
+      "roles": "2bebc7343615df35",
+      "notes": "a39786c230408836",
+      "rows": "f740907b50e116bf",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#e63d02",
+     "accent": "#721acc"
+    },
+    "dark": {
+     "page": "#fd75fa",
+     "accent": "#661eb5",
+     "ink": "#b67f67"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "e440271c806d458c",
+      "notes": "a4e0c56730d6a65b",
+      "rows": "c8b66f1508c7b05e",
+      "pass": true
+     },
+     "dark": {
+      "roles": "310166ab78c340ba",
+      "notes": "95b68eb7fef4b91f",
+      "rows": "8cece27829637df1",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "b1fe2ad0b0065fd7",
+      "notes": "a4e0c56730d6a65b",
+      "rows": "dc15587996a1394a",
+      "pass": true
+     },
+     "dark": {
+      "roles": "44aeeba125cc1b23",
+      "notes": "95b68eb7fef4b91f",
+      "rows": "2f2817f8ec448e93",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "2e86a6e5517fffe7",
+      "notes": "a4e0c56730d6a65b",
+      "rows": "ceb94d07cc4aaba7",
+      "pass": true
+     },
+     "dark": {
+      "roles": "a693dc1eaf8edad9",
+      "notes": "f0eeab33a7992829",
+      "rows": "a7db19ae2113c32f",
+      "pass": true
+     }
+    }
+   }
+  },
+  {
+   "seeds": {
+    "light": {
+     "page": "#a26e8c",
+     "accent": "#af934b",
+     "ink": "#b03f52"
+    },
+    "dark": {
+     "page": "#7e1903",
+     "accent": "#0016d9",
+     "ink": "#6a1b47"
+    }
+   },
+   "levels": {
+    "soft": {
+     "light": {
+      "roles": "ba32381b50ec2200",
+      "notes": "75a3b0c4575ec0a9",
+      "rows": "a73a3db7151c837d",
+      "pass": true
+     },
+     "dark": {
+      "roles": "cf64ebbbe61dbffa",
+      "notes": "5815e840d1e69303",
+      "rows": "03d49ca629e91f34",
+      "pass": true
+     }
+    },
+    "standard": {
+     "light": {
+      "roles": "1d388aa1ceb00007",
+      "notes": "75a3b0c4575ec0a9",
+      "rows": "9107d8011c8ccf6b",
+      "pass": true
+     },
+     "dark": {
+      "roles": "fca7c0634037c257",
+      "notes": "5815e840d1e69303",
+      "rows": "9489838dd9d4cf2c",
+      "pass": true
+     }
+    },
+    "high": {
+     "light": {
+      "roles": "47522253609c309e",
+      "notes": "b6a51c933422599b",
+      "rows": "324eb1b7bf7b55d1",
+      "pass": true
+     },
+     "dark": {
+      "roles": "203e67c6a13820ff",
+      "notes": "2079709367494a2a",
+      "rows": "7ea3c69ff36a5d0e",
+      "pass": true
+     }
+    }
+   }
+  }
+ ],
+ "counterpart": [
+  {
+   "from": {
+    "page": "#f6f1e7",
+    "accent": "#3f7d51"
+   },
+   "mode": "light",
+   "to": {
+    "page": "#f7f3eb",
+    "accent": "#347247"
+   }
+  },
+  {
+   "from": {
+    "page": "#f6f1e7",
+    "accent": "#3f7d51"
+   },
+   "mode": "dark",
+   "to": {
+    "page": "#17130c",
+    "accent": "#91c39c"
+   }
+  },
+  {
+   "from": {
+    "page": "#101814",
+    "accent": "#82be96"
+   },
+   "mode": "light",
+   "to": {
+    "page": "#edf6f1",
+    "accent": "#37714d"
+   }
+  },
+  {
+   "from": {
+    "page": "#101814",
+    "accent": "#82be96"
+   },
+   "mode": "dark",
+   "to": {
+    "page": "#0d1612",
+    "accent": "#92c2a1"
+   }
+  },
+  {
+   "from": {
+    "page": "#ff00ff",
+    "accent": "#00ff00"
+   },
+   "mode": "light",
+   "to": {
+    "page": "#ffedfe",
+    "accent": "#007900"
+   }
+  },
+  {
+   "from": {
+    "page": "#ff00ff",
+    "accent": "#00ff00"
+   },
+   "mode": "dark",
+   "to": {
+    "page": "#1b0f1b",
+    "accent": "#3ad735"
+   }
+  }
+ ]
+}
