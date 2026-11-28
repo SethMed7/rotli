@@ -1,9 +1,10 @@
 name: Regression suite
 
 # GitHub-hosted Linux runners cover the portable application, site, browser,
-# and dependency checks. The macOS lane stays deliberately small because its
-# minutes cost roughly 10x Linux minutes; it proves only the native Rust code
-# that cannot be represented by a Linux build.
+# and dependency checks. The two macOS lanes stay deliberately small because
+# their minutes cost roughly 10x Linux minutes; they prove only the native Rust
+# code that cannot be represented by a Linux build, once for the standalone app
+# ID and once for a host ID.
 #
 # Signing and notarization remain local release responsibilities. No CI runner
 # receives signing or notary credentials.
@@ -254,6 +255,9 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
     runs-on: macos-15
+    # A hung run would hold the workflow's conclusion, which a release waits on.
+    # Wide enough for a build with no cache.
+    timeout-minutes: 45
     env:
       # Job-wide: the build script compiles the ID in, and the tests read it too.
       ROTLI_APP_IDENTIFIER: com.example.host
@@ -271,7 +275,7 @@ jobs:
         with:
           workspaces: src-tauri -> target/host-identity
           key: host-identity
-      # tauri-build's build script wants the frontend dist directory to exist.
+      # A precaution: the lane above passes without it.
       - name: Placeholder frontend dist
         run: mkdir -p dist && touch dist/.keep
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
