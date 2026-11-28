@@ -632,7 +632,8 @@ A host whose other URLs should still open `main` narrows the test, to
   empty in standalone Rotli, which never fills the queue, after the release,
   and off macOS. It answers with or without an `on_opened_urls` hook, but a
   host that stays hidden for a URL needs the hook to show anything for it.
-- **A launch URL is there in time.** tao and tauri add no delay and no order
+- **A launch URL has been there in time in every run seen, but nothing
+  guarantees it.** tao and tauri add no delay and no order
   of their own: tao installs the run loop's callback before `[NSApp run]`
   (0.35.3 `event_loop.rs:233-234`) and passes `application:openURLs:` straight
   to it (`app_state.rs:309-311`); tauri-runtime-wry forwards `Opened`
@@ -640,7 +641,10 @@ A host whose other URLs should still open `main` narrows the test, to
   waiting for setup (2.11.5 `app.rs:1438`, `app.rs:2630`), where Rotli holds
   it. The order itself is AppKit's. A bare tao 0.35.3 app on macOS 27.0.1,
   launched with a URL by `open -a`, got `Opened` before
-  `applicationDidFinishLaunching` in 8 launches of 8.
+  `applicationDidFinishLaunching` in 8 launches of 8. That is one probe, not
+  a promise: if a launch URL ever arrives after the decision, the predicate
+  sees none and answers as for a plain launch, `main` shows, and the hook
+  still gets the URL.
 - **A URL can still arrive after the decision.** One opened while the app is
   already launching or running is not part of the launch: in the same probe, a
   second URL opened right behind the first arrived just after
