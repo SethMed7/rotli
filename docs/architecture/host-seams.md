@@ -612,6 +612,9 @@ rotli_lib::AppHost::new(context)
 
 A host whose other URLs should still open `main` narrows the test, to
 `url.host_str() == Some("run")` as well, say.
+`pending_opened_urls()` holds every waiting URL except `file:` ones, and
+that includes `rotli://` deep links, so `!is_empty()` alone would hide `main`
+for a Rotli link too. Test the scheme, as above.
 
 - **When it is asked.** Once, at the start of Rotli's setup, right after the
   identity check (`host::decide_at_launch`). Setup runs inside

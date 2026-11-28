@@ -300,7 +300,7 @@ pub(crate) type OpenedQueue = Held<Url>;
 static OPENED: OpenedQueue = OpenedQueue::new();
 
 /// The URLs macOS has opened the app with that still wait for setup, `file:`
-/// ones left out: what the `on_opened_urls` hook is handed when setup releases
+/// ones left out (`rotli://` deep links included, so test the scheme): what the `on_opened_urls` hook is handed when setup releases
 /// them. Nothing is taken. It is for the `start_hidden` predicate; standalone
 /// Rotli and a call after the release get none. A URL that arrives after the
 /// predicate was asked is not here and reaches the hook alone
