@@ -43,7 +43,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rust lint gate — warnings fail CI |
 | `bun run test:regression` | All Bun behavior tests plus Breve runtime and design-system checks |
 | `bun run check` | Required JavaScript/TypeScript gate: lint plus the regression suite |
-| `bun run verify` | **The local twin of CI.** Runs the Regression suite's lanes in its order — redacted proposed-source secret scan, `check`, the production build, and the three `site/` steps; `check:e2e-types` plus Playwright; `cargo clippy -D warnings` plus `cargo test`. Takes lane names to narrow it (`bun run verify rust`). `bun run check` alone is *not* the CI gate: clippy, Playwright, and every `site/` step live outside it, which is how a change can pass locally and turn `main` red. Excludes only the advisory dependency audit and the signing/notarization steps `release.sh` owns |
+| `bun run verify` | **The local twin of CI.** Runs the Regression suite's lanes in its order — redacted proposed-source secret scan, `check`, the production build, and the three `site/` steps; `check:e2e-types` plus Playwright; `cargo clippy -D warnings` plus `cargo test`. Takes lane names to narrow it (`bun run verify rust`). `bun run check` alone is *not* the CI gate: clippy, Playwright, and every `site/` step live outside it, which is how a change can pass locally and turn `main` red. Excludes the advisory dependency audit, CI's [host-identity Rust build](../architecture/host-seams.md#proof) (a second full build), and the signing/notarization steps `release.sh` owns |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust host, filesystem, security, scheduler, and IPC behavior |
 | `bun run probe:codex [codex] [model]` | What a model can reach through the Codex chat lane: runs the installed (or given) Codex with `CODEX_ISOLATION_ARGS` against a throwaway home that plants an MCP server, skills, `AGENTS.md` files and a "secure note", with a local fake model that calls code-mode `exec` to try to read it. Fails if a server starts, a forbidden tool is offered, planted instructions arrive, or the note comes back. No account, no real model call; `PROBE_WITHOUT_ISOLATION=1` runs the failing control. Not in CI (no Codex there); run it after a Codex update or before moving the version floor |
 | `NODE_OPTIONS=--max-old-space-size=4096 bun run build` | Production bundling, final TypeScript/runtime validation, and tested startup/lazy chunk budgets |
@@ -364,7 +364,7 @@ checker. Do not add a convention that only exists in prose.
 
 ## CI lanes
 
-The `Regression suite` runs four jobs in parallel on explicitly versioned
+The `Regression suite` runs its jobs in parallel on explicitly versioned
 GitHub-hosted images. Setup, security, and release integration are documented in
 [`ci-runner.md`](ci-runner.md). CI receives no signing keys; `release.sh` signs
 and notarizes locally. Bun comes from `.bun-version`; Rustup resolves
@@ -385,6 +385,10 @@ inputs.
   scanner is blocking; only its findings are advisory.
 - **Native Rust (`macos-15`):** `cargo clippy --all-targets -- -D warnings` and
   `cargo test` against the shipped macOS branches.
+- **Native Rust under a host ID (`macos-15`):** the same two commands with
+  `ROTLI_APP_IDENTIFIER=com.example.host`, in a target directory and cache of
+  their own. `bun run verify` doesn't run this one; the by-hand command is in
+  [`host-seams.md`](../architecture/host-seams.md#proof).
 
 `release.sh --publish` requires a successful Regression **conclusion** for the
 exact release commit. Missing, pending, and red evidence block; the explicit

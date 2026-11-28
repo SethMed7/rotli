@@ -241,3 +241,38 @@ jobs:
           workspaces: src-tauri -> target
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  # Several rules run only when the app ID isn't com.rotli.app: vault refusal
+  # and marking, the fail-closed shared state (no updater, Keychain,
+  # LaunchAgents or global shortcuts) and the scratch vault. The lane above
+  # never runs them (docs/architecture/host-seams.md).
+  #
+  # A job of its own, not a matrix over the lane above: that lane's name is a
+  # required check, and it has to keep reporting when the scope skips it.
+  rust-macos-host:
+    name: "Rust (host identity: clippy + tests)"
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
+    runs-on: macos-15
+    env:
+      # Job-wide: the build script compiles the ID in, and the tests read it too.
+      ROTLI_APP_IDENTIFIER: com.example.host
+      # A host build never shares a target directory with the standalone one.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target/host-identity
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      # rust-cache takes the directory to save from `workspaces`, so it has to
+      # name the same one as CARGO_TARGET_DIR.
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.8.2
+        with:
+          workspaces: src-tauri -> target/host-identity
+          key: host-identity
+      # tauri-build's build script wants the frontend dist directory to exist.
+      - name: Placeholder frontend dist
+        run: mkdir -p dist && touch dist/.keep
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml

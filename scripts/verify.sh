@@ -18,6 +18,9 @@
 # Not covered, deliberately:
 #   • the dependency-audit lane — advisory in CI, and `cargo install
 #     cargo-audit` costs minutes. Run `bun audit` / `cargo audit` by hand.
+#   • the host-identity Rust lane — a second full build in a target directory
+#     of its own. Run it by hand after touching a rule that depends on the app
+#     ID (the command is under "Proof" in docs/architecture/host-seams.md).
 #   • notarization and signing — release.sh owns those, and no CI runner or
 #     verify run ever receives a signing credential.
 set -euo pipefail
