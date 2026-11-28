@@ -28,6 +28,22 @@ fn a_public_build_ignores_the_vault_switch() {
     assert_eq!(enabled(temp.path()), !public_build(), "the switch does nothing in a public build");
 }
 
+/// A bound folder whose sidecar is gone is no longer a vault: the call refuses
+/// before opening it, so nothing makes it one again (host-seams.md).
+#[test]
+fn a_vault_that_lost_its_sidecar_is_not_reopened_for_writing() {
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let target = target(DEFAULT_ROOT_ID, &temp, true);
+    let identity = crate::containment::folder_identity(&target.path);
+    fs::remove_dir_all(temp.path().join(".rotli")).unwrap();
+    let result = call_bound(Some(Bound { target, identity }), "tools/call", json!({ "name": SEARCH, "arguments": { "query": "synthetic" } }));
+    if !public_build() {
+        assert!(refusal(&result).contains("The Librarian is off"), "{result}");
+    }
+    assert!(!temp.path().join(".rotli").exists());
+}
+
 pub(super) fn turn_on(temp: &TempDir) {
     fs::create_dir_all(temp.path().join(".rotli")).unwrap();
     fs::write(temp.path().join(".rotli/settings.json"), r#"{"theme":"grove","librarianMcp":true}"#).unwrap();

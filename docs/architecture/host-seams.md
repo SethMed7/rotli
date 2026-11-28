@@ -168,7 +168,9 @@ in two places, each on its own.
 - **Who marks.** A folder gets the mark when it is bound, after the refusal
   passed: the scratch vault when it is made, and the three registry writers
   (`persist_corpus_path`, `upsert_brain`, `add_folder` in `corpus.rs`) for the
-  root each adds. The helper marks the folder it chooses. A source fence
+  root each adds. The helper marks the folder it chooses, and the headless CLI
+  marks an empty folder it is about to turn into notes (see "The command line
+  makes no unmarked vault"). A source fence
   (`launch_secures_the_registry_and_writers_mark_their_roots`) keeps each
   writer marking before it writes.
 - **Where Rust checks.** The check runs inside `reject_privileged_root`. The
@@ -272,8 +274,8 @@ same refusal as a folder a person picks. `host_registry.rs` owns this.
   (`host_registry::vet_config`): each root must carry the mark and sit in no
   vault it doesn't own. The first time a process sees a root it also walks
   below it, so a long-lived MCP server walks each root once, as the app's
-  launch does. It writes nothing, and it refuses when its primary is refused
-  and there is no trusted scratch vault.
+  launch does. The vetting writes nothing, and it refuses when its primary is
+  refused and there is no trusted scratch vault.
 - **After launch.** Commands read the registry again while the app runs, and
   anything that writes the support folder can rewrite it then. So a host
   build takes a root, and the flags beside it, from its open stores, never
@@ -308,6 +310,46 @@ same refusal as a folder a person picks. `host_registry.rs` owns this.
   be Rotli's own demo vault, so a host build ignores a `demo.on` flag and
   refuses to turn demo mode on.
 - **Standalone Rotli** skips all of this.
+
+## The command line makes no unmarked vault
+
+Opening a folder for writing makes it a vault: `CorpusStore::open` creates
+`.rotli/`, the reserved folders and, in an empty folder, the welcome note. In
+the app a registry writer marks the folder first. The headless CLI has no
+registry write on the way to its open, so it marks in `Workspace::open`
+(`app_identity::claim_new_vault`), before anything is written.
+
+- **Which calls.** Every `rotli` command and workspace MCP tool that opens a
+  root for writing goes through `Workspace::open`, reads such as `notes list`
+  and `notes search` included, so one call covers them all. `roots`,
+  `agent config` and `mcp config` open no store, `agent doctor` opens read-only,
+  and `agent self-test` works in a temporary folder of its own, so none of
+  these marks or makes anything.
+- **A folder already marked** stays as it is. This is every folder the app
+  bound, and every one the CLI made.
+- **A new folder** must pass what the app asks of a new choice: the vault
+  refusal, the private folders `reject_privileged_root` names
+  (`private_roots.rs`, with this build's support folder and, for Linux,
+  `~/.local/share/<bundle ID>`; its own scratch vault excepted), and a support
+  folder that is not a link. The command line also follows links in that list,
+  so what a linked `~/.ssh` points at stays private.
+- **It must also be empty,** a Finder's `.DS_Store` aside. The app's picker
+  adopts a folder with files because a person chose it there. Nobody confirms
+  an environment variable, so a command line that marked such a folder would
+  scaffold into a code folder or a notes tree and keep it as the app's own. The
+  person opens it in the app first, which marks it. Before this, the first
+  command on such a folder scaffolded it unmarked and every later one refused
+  it, so nothing that worked stops working.
+- **The Librarian** server checks that its vault is still switched on before it
+  opens it, so a bound folder whose `.rotli/` was removed isn't made a vault
+  again.
+- **A connector's root** (the relay) is the app's own open vault and is not
+  marked here; a host build can't pair a relay.
+- **Standalone Rotli** marks nothing and refuses nothing here.
+
+A folder an earlier host build's CLI turned into notes has `.rotli/` and no
+mark. Nothing tells it apart from a Rotli vault, so it stays refused: start
+again in a new empty folder.
 
 ## Keeping it closed
 
@@ -1129,7 +1171,7 @@ shows "Hide …" only, since it leaves system-wide chords out.
   the app runs is carried forward and vetted at the next launch. Only the
   app's launch (`host_registry::secure_registry`, twice, around the bookmark
   repair) ever sets a registry file aside; the CLI and the MCP server vet it
-  in memory and write nothing. There is
+  in memory and never write it. There is
   also a short window between the vetting and the bind (TOCTOU) that only a
   same-user process can race.
 - **The helper and the CLI walk once per process.** `walked_once` remembers
@@ -1174,6 +1216,14 @@ shows "Hide …" only, since it leaves system-wide chords out.
 - **Each walk costs a launch's time.** The launch walks every registry root
   twice (before and after the bookmark repair); the helper and each CLI or
   MCP process walk each root once.
+- **Two first commands at once on one new folder** aren't serialized. By the
+  code, one can be refused while the other is still marking it (a `.rotli/`
+  with no mark yet reads as a vault, and a marked one reads as a folder with
+  files). The refused command writes nothing, and a later one passes once the
+  mark is there. A test covers the half-made mark, not the two processes.
+- **The app's private-folder check doesn't follow links** in its list; only
+  the command line's claim does. A folder inside what a linked `~/.ssh` points
+  at can still be chosen in the app, in standalone Rotli too.
 
 ## Limits of the single-instance lock
 
@@ -1206,6 +1256,22 @@ shows "Hide …" only, since it leaves system-wide chords out.
 
 This list says only what was run.
 
+- **The command line's mark** (2026-11-28, tests only; no native build
+  launched). `workspace_host_pin_tests.rs` re-runs the test binary as one
+  `rotli` process per call, with `HOME` and `ROTLI_CORPUS_ROOT` set on it, in
+  temporary folders. Under `ROTLI_APP_IDENTIFIER=com.example.host`, before the
+  fix, an empty folder's second write, a write after `notes list`, a second MCP
+  create and a second write into an emptied scratch vault each failed with the
+  vault refusal, and a folder with files, a private folder and a linked support
+  folder each took a write. After it, empty folders take both writes and carry
+  the mark, an unmarked vault is refused untouched, the diagnostics leave an
+  empty folder empty, and the standalone build writes no mark.
+  `workspace_librarian_tests.rs` failed before the Librarian reorder and passes
+  after it. After review, `app_identity_claim_tests.rs` asks the claim as
+  `com.example.host`, so the standalone test run covers it too. Before their
+  fixes, a folder inside a linked `~/.ssh`'s target and one under
+  `~/.local/share/<bundle ID>` were both claimed. CI runs Rust tests on macOS
+  only; none ran on Linux.
 - **Pending URLs in `start_hidden`** (2026-11-27, tests and an ordering probe;
   no Rotli build launched).
   - Rust (`host_tests.rs`): held URLs are visible to the predicate's call,
@@ -1455,7 +1521,8 @@ This list says only what was run.
   real. Tests that need the Keychain return early there, as the Keychain's own
   host test covers the refusal. The Antigravity path parity test compares the
   fixture's standalone path with the host ID swapped in.
-- **Rust tests:** `app_identity_tests.rs`, `host_registry_tests.rs` (each
+- **Rust tests:** `app_identity_tests.rs`, `app_identity_claim_tests.rs`,
+  `host_registry_tests.rs` (each
   registry file and legacy pointer planted, a vault moved to the scratch path
   with and without a readable registry, the host's own vault spelled through
   a link and `..`, and a registry rewritten after launch),

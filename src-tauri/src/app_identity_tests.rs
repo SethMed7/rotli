@@ -5,6 +5,9 @@ use super::*;
 /// A host identity for tests; never a real product's ID.
 const HOST: &str = "com.example.host";
 
+#[path = "app_identity_claim_tests.rs"]
+mod command_line_claim;
+
 fn config_identifier(path: &str) -> String {
     let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(path)).unwrap();
     let value: serde_json::Value = serde_json::from_str(&text).unwrap();

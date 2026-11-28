@@ -1,8 +1,9 @@
 {
   "files": {
     "app_identity.rs": {
-      "delegated": 1,
+      "delegated": 2,
       "private": 1,
+      "refused": 1,
       "vetted": 1
     },
     "breve_dev_roots.rs": {
@@ -55,7 +56,7 @@
       "delegated": 3,
       "no-root": 2,
       "private": 1,
-      "vetted": 4
+      "vetted": 5
     },
     "workspace_librarian.rs": {
       "vetted": 1

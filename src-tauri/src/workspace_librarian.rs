@@ -128,8 +128,8 @@ fn call(name: &str, args: &Value) -> Result<Value, String> {
     if folder_identity(&bound.target.path) != bound.identity {
         return Err("the vault folder was replaced since this Librarian server started; restart it for the vault you mean".into());
     }
+    require_on(&bound.target.path)?; // first: a folder that stopped being a vault is not opened for writing
     let mut ws = Workspace::open_target(bound.target)?; // vault bind (vetted): bound at serve from root_targets, which vets every root
-    require_on(&ws.root.path)?;
     let list = |key: &str| args.get(key).and_then(Value::as_array).cloned().unwrap_or_default();
     match name {
         SEARCH => json_value(ws.search_remote(arg_required(args, "query")?, arg_usize(args, "limit", 20).min(50))?),
