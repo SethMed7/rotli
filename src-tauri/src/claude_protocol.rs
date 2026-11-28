@@ -30,11 +30,14 @@ pub struct ToolSpec {
 }
 
 /// The side effects the protocol needs: write a line to the CLI, and run a
-/// tool in the webview (None = it never answered).
+/// tool in the webview (Err = the error line the model gets instead).
 pub(crate) trait Wire {
     fn send(&mut self, msg: &Value);
-    fn call_tool(&mut self, call_id: &str, name: &str, args: &Value) -> Option<String>;
+    fn call_tool(&mut self, call_id: &str, name: &str, args: &Value) -> Result<String, String>;
 }
+
+/// What the model hears when the webview never answered a tool call.
+pub(crate) const NO_ANSWER: &str = "the tool didn't answer in time";
 
 pub(crate) enum Step {
     Continue,
@@ -146,8 +149,9 @@ impl Protocol {
             return tool_error("blocked: that input looks like it carries a secret or secure text.");
         }
         self.calls += 1;
-        let Some(text) = wire.call_tool(&format!("c{}", self.calls), name, &args) else {
-            return tool_error("the tool didn't answer in time");
+        let text = match wire.call_tool(&format!("c{}", self.calls), name, &args) {
+            Ok(text) => text,
+            Err(why) => return tool_error(&why),
         };
         // a result no longer rides back inside a rescanned prompt — scan it here
         let text = cap_bytes(text, RESULT_CAP);
@@ -225,9 +229,9 @@ mod tests {
         fn send(&mut self, msg: &Value) {
             self.sent.push(msg.clone());
         }
-        fn call_tool(&mut self, call_id: &str, name: &str, args: &Value) -> Option<String> {
+        fn call_tool(&mut self, call_id: &str, name: &str, args: &Value) -> Result<String, String> {
             self.calls.push((call_id.into(), name.into(), args.clone()));
-            (self.answer)(name, args)
+            (self.answer)(name, args).ok_or_else(|| NO_ANSWER.into())
         }
     }
 

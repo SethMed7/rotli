@@ -62,7 +62,7 @@ fn pieces(text: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let (mut start, mut size) = (0, 0);
     for (at, ch) in text.char_indices() {
-        let width = body(ch.encode_utf8(&mut [0; 4])).len() - 2;
+        let width = escaped_width(ch);
         if size + width >= room {
             out.push(&text[start..at]);
             (start, size) = (at, 0);
@@ -71,6 +71,15 @@ fn pieces(text: &str) -> Vec<&str> {
     }
     out.push(&text[start..]);
     out
+}
+
+/// Bytes `ch` takes inside a JSON string, as serde_json writes it.
+fn escaped_width(ch: char) -> usize {
+    match ch {
+        '"' | '\\' | '\n' | '\r' | '\t' | '\u{8}' | '\u{c}' => 2,
+        c if (c as u32) < 0x20 => 6,
+        c => c.len_utf8(),
+    }
 }
 
 #[cfg(test)]
@@ -111,6 +120,13 @@ mod tests {
         assert!(sent.len() > 2 && sent.iter().all(|raw| raw.len() < LIMIT));
         let joined: String = sent.iter().map(|raw| serde_json::from_str::<String>(raw).unwrap()).collect();
         assert_eq!(joined, text);
+    }
+
+    #[test]
+    fn a_characters_width_matches_how_it_serializes() {
+        for ch in ['a', '"', '\\', '\n', '\r', '\t', '\u{8}', '\u{c}', '\u{1}', '\u{1f}', '\u{7f}', 'é', '€', '😀', '\u{2028}'] {
+            assert_eq!(escaped_width(ch), body(ch.encode_utf8(&mut [0; 4])).len() - 2, "{ch:?}");
+        }
     }
 
     #[test]

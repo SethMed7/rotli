@@ -19,7 +19,7 @@
 //! `tool_call` event names the call; its arguments, which can be long, come
 //! back through `claude_session_tool_args`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
@@ -27,7 +27,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use crate::claude_protocol::{Protocol, Step, ToolSpec, Wire};
+use crate::claude_protocol::{Protocol, Step, ToolSpec, Wire, NO_ANSWER};
 use crate::event_channel::EventChannel;
 use crate::provider::{self, ProviderState, Running};
 
@@ -37,25 +37,52 @@ const TOOL_WAIT: Duration = Duration::from_secs(300);
 /// The whole turn's hard ceiling, whatever the per-step timeout × turns says.
 const SESSION_CEILING: Duration = Duration::from_secs(30 * 60);
 
-/// One tool call waiting on the webview: its arguments until the webview reads
-/// them, and where its answer goes.
+/// What the model hears when a tool call couldn't be handed to the webview.
+const UNSENT: &str = "that tool call couldn't be handed to Rotli";
+
+/// One tool call waiting on the webview: the window that started its session,
+/// its arguments until that window reads them, and where its answer goes.
 struct Pending {
+    owner: String,
     args: Option<String>,
     answer: Sender<String>,
 }
 
 type PendingCalls = Arc<Mutex<HashMap<String, Pending>>>;
+type RunningIds = Arc<Mutex<HashSet<String>>>;
 
-/// Tool calls waiting on the webview, keyed `<request_id>:<call_id>`.
+/// Tool calls waiting on the webview, keyed `<request_id>:<call_id>`, and the
+/// request ids of the sessions running now.
 #[derive(Default)]
 pub struct SessionState {
     pending: PendingCalls,
+    running: RunningIds,
+}
+
+/// A running session's hold on its request id, given back when it ends.
+struct Claim {
+    running: RunningIds,
+    request_id: String,
+}
+
+impl Drop for Claim {
+    fn drop(&mut self) {
+        self.running.lock().unwrap().remove(&self.request_id);
+    }
+}
+
+fn claim(running: &RunningIds, request_id: &str) -> Result<Claim, String> {
+    if !running.lock().unwrap().insert(request_id.to_string()) {
+        return Err("a Claude turn with this id is already running".into());
+    }
+    Ok(Claim { running: Arc::clone(running), request_id: request_id.to_string() })
 }
 
 /// One chat turn on Claude's native protocol. Resolves with the final answer.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn claude_session_run(
+    webview: tauri::Webview,
     providers: tauri::State<'_, ProviderState>,
     sessions: tauri::State<'_, SessionState>,
     request_id: String,
@@ -77,6 +104,8 @@ pub async fn claude_session_run(
         return Err(block.message());
     }
     check_tools(&tools)?;
+    let claim = claim(&sessions.running, &request_id)?;
+    let owner = webview.label().to_string();
     let turns = max_turns.clamp(1, 24);
     let step = Duration::from_millis(timeout_ms.unwrap_or(provider::DEFAULT_TIMEOUT_MS).min(provider::MAX_TIMEOUT_MS));
     let deadline = (step * turns).min(SESSION_CEILING);
@@ -89,7 +118,9 @@ pub async fn claude_session_run(
         let _ = crate::provider_lane::model_allowed("claude", &model);
         let args = session_args(&model, reasoning_effort.as_deref(), turns)?;
         let proto = Protocol::new(system_prompt, user_text, tools);
-        run_session(&children, &pending, &request_id, &args, proto, deadline, on_event)
+        let answer = run_session(&children, &pending, (&request_id, &owner), &args, proto, deadline, on_event);
+        drop(claim);
+        answer
     })
     .await
     .map_err(|e| format!("claude session task failed: {e}"))?
@@ -110,19 +141,25 @@ pub fn claude_session_tool_result(
     Ok(())
 }
 
-/// The arguments of one `tool_call` event, as JSON text, read once.
+/// The arguments of one `tool_call` event, as JSON text, read once and only by
+/// the window that started the session.
 #[tauri::command]
 pub fn claude_session_tool_args(
+    webview: tauri::Webview,
     sessions: tauri::State<'_, SessionState>,
     request_id: String,
     call_id: String,
 ) -> Result<String, String> {
-    take_args(&sessions.pending, &format!("{request_id}:{call_id}"))
+    take_args(&sessions.pending, &format!("{request_id}:{call_id}"), webview.label())
 }
 
-fn take_args(pending: &PendingCalls, key: &str) -> Result<String, String> {
+fn take_args(pending: &PendingCalls, key: &str, caller: &str) -> Result<String, String> {
     let mut calls = pending.lock().unwrap();
-    calls.get_mut(key).and_then(|call| call.args.take()).ok_or_else(|| "that tool call has ended".into())
+    calls
+        .get_mut(key)
+        .filter(|call| call.owner == caller)
+        .and_then(|call| call.args.take())
+        .ok_or_else(|| "that tool call has ended".into())
 }
 
 fn check_tools(tools: &[ToolSpec]) -> Result<(), String> {
@@ -167,6 +204,8 @@ struct LiveWire<'a> {
     pending: &'a PendingCalls,
     children: &'a Arc<Mutex<HashMap<String, Running>>>,
     request_id: &'a str,
+    /// The label of the window that started the session.
+    owner: &'a str,
     token: u64,
 }
 
@@ -188,18 +227,21 @@ impl Wire for LiveWire<'_> {
         }
     }
 
-    fn call_tool(&mut self, call_id: &str, name: &str, args: &Value) -> Option<String> {
+    fn call_tool(&mut self, call_id: &str, name: &str, args: &Value) -> Result<String, String> {
         let key = format!("{}:{call_id}", self.request_id);
         let (tx, rx) = mpsc::channel();
-        self.pending.lock().unwrap().insert(key.clone(), Pending { args: Some(args.to_string()), answer: tx });
+        let call = Pending { owner: self.owner.to_string(), args: Some(args.to_string()), answer: tx };
+        self.pending.lock().unwrap().insert(key.clone(), call);
         let event = json!({"type": "tool_call", "callId": call_id, "name": name});
         let started = Instant::now();
-        let mut answer = None;
-        if self.events.send(&event.to_string()).is_ok() {
+        let mut answer = Err(NO_ANSWER.to_string());
+        if self.events.send(&event.to_string()).is_err() {
+            answer = Err(UNSENT.to_string());
+        } else {
             while started.elapsed() < TOOL_WAIT {
                 match rx.recv_timeout(Duration::from_millis(250)) {
                     Ok(text) => {
-                        answer = Some(text);
+                        answer = Ok(text);
                         break;
                     }
                     Err(RecvTimeoutError::Timeout) if self.alive() => {}
@@ -212,10 +254,11 @@ impl Wire for LiveWire<'_> {
     }
 }
 
+/// The pair is the session's request id and the label of the window that started it.
 fn run_session(
     children: &Arc<Mutex<HashMap<String, Running>>>,
     pending: &PendingCalls,
-    request_id: &str,
+    (request_id, owner): (&str, &str),
     args: &[String],
     mut proto: Protocol,
     deadline: Duration,
@@ -242,7 +285,7 @@ fn run_session(
     let err_thread = crate::child_run::collect_stderr(child.stderr.take());
     let token = crate::child_run::register(children, request_id, child, deadline);
 
-    let mut wire = LiveWire { stdin, events, pending, children, request_id, token };
+    let mut wire = LiveWire { stdin, events, pending, children, request_id, owner, token };
     wire.send(&proto.initialize());
     let mut outcome = None;
     for line in BufReader::new(stdout).lines() {
@@ -276,6 +319,13 @@ mod tests {
 
     /// The webview's side of a session: read each call's arguments by command,
     /// run `tool` on them, and answer.
+    /// The label of the window that starts each test session.
+    const OWNER: &str = "main";
+
+    fn wire<'a>(events: EventChannel, pending: &'a PendingCalls, children: &'a Arc<Mutex<HashMap<String, Running>>>) -> LiveWire<'a> {
+        LiveWire { stdin: None, events, pending, children, request_id: "r", owner: OWNER, token: 0 }
+    }
+
     fn webview(pending: &PendingCalls, request_id: &str, tool: fn(&Value) -> String) -> EventChannel {
         webview_seeing(pending, request_id, |_| {}, tool)
     }
@@ -291,8 +341,9 @@ mod tests {
             see(&raw);
             let ev: Value = serde_json::from_str(&serde_json::from_str::<String>(&raw).unwrap()).unwrap();
             let key = format!("{request_id}:{}", ev["callId"].as_str().unwrap());
-            let args: Value = serde_json::from_str(&take_args(&pending, &key).unwrap()).unwrap();
-            assert!(take_args(&pending, &key).is_err(), "arguments are read once");
+            assert!(take_args(&pending, &key, "finder_1").is_err(), "another window can't read them");
+            let args: Value = serde_json::from_str(&take_args(&pending, &key, OWNER).unwrap()).unwrap();
+            assert!(take_args(&pending, &key, OWNER).is_err(), "arguments are read once");
             if let Some(call) = pending.lock().unwrap().remove(&key) {
                 let _ = call.answer.send(tool(&args));
             }
@@ -339,7 +390,7 @@ mod tests {
             vec![tool],
         );
         let args = session_args("haiku", None, 4).unwrap();
-        let answer = run_session(&children, &pending, "live", &args, proto, Duration::from_secs(120), events).unwrap();
+        let answer = run_session(&children, &pending, ("live", OWNER), &args, proto, Duration::from_secs(120), events).unwrap();
         assert!(answer.contains("ECHO:kiwi"), "got: {answer}");
         assert!(children.lock().unwrap().is_empty() && pending.lock().unwrap().is_empty());
     }
@@ -356,13 +407,13 @@ mod tests {
         let events = webview_seeing(&pending, "r", move |raw| seen.lock().unwrap().push(raw.len()), |args| {
             format!("{}:{}", args["title"].as_str().unwrap(), args["body"].as_str().unwrap().len())
         });
-        let mut wire = LiveWire { stdin: None, events, pending: &pending, children: &children, request_id: "r", token: 0 };
+        let mut wire = wire(events, &pending, &children);
         // quotes and newlines are escaped twice on the way: 5 KiB of them serializes past 11 KiB
         let quoted = "\"line\"\n".repeat(768);
         for (i, body) in ["x".repeat(9000), quoted].into_iter().enumerate() {
             let expected = format!("Long note:{}", body.len());
             let args = json!({"title": "Long note", "body": body});
-            assert_eq!(wire.call_tool(&format!("c{i}"), "create_note", &args), Some(expected));
+            assert_eq!(wire.call_tool(&format!("c{i}"), "create_note", &args), Ok(expected));
         }
         let sizes = sizes.lock().unwrap();
         assert!(!sizes.is_empty() && sizes.iter().all(|&n| n < SMALL), "message sizes: {sizes:?}");
@@ -374,10 +425,48 @@ mod tests {
         let children = Arc::new(Mutex::new(HashMap::new()));
         let pending = PendingCalls::default();
         let events = EventChannel::from_fn(|_| {});
-        let mut wire = LiveWire { stdin: None, events, pending: &pending, children: &children, request_id: "r", token: 0 };
-        assert_eq!(wire.call_tool("c1", "read_note", &json!({"id": "n1"})), None);
+        let mut wire = wire(events, &pending, &children);
+        assert_eq!(wire.call_tool("c1", "read_note", &json!({"id": "n1"})), Err(NO_ANSWER.into()));
         assert!(pending.lock().unwrap().is_empty());
-        assert!(take_args(&pending, "r:c1").is_err());
+        assert!(take_args(&pending, "r:c1", OWNER).is_err());
+    }
+
+    #[test]
+    fn arguments_are_read_only_by_the_window_that_started_the_session() {
+        let pending = PendingCalls::default();
+        let (answer, _) = mpsc::channel();
+        let call = Pending { owner: OWNER.into(), args: Some("{\"id\":\"n1\"}".into()), answer };
+        pending.lock().unwrap().insert("r:c1".into(), call);
+        assert_eq!(take_args(&pending, "r:c1", "finder_1"), Err("that tool call has ended".into()));
+        assert_eq!(take_args(&pending, "r:c1", OWNER), Ok("{\"id\":\"n1\"}".into()));
+    }
+
+    #[test]
+    fn a_tool_call_that_cant_be_sent_is_answered_at_once_and_not_as_a_timeout() {
+        let children = Arc::new(Mutex::new(HashMap::new()));
+        let pending = PendingCalls::default();
+        let sent = Arc::new(Mutex::new(0));
+        let count = Arc::clone(&sent);
+        let mut wire = wire(EventChannel::from_fn(move |_| *count.lock().unwrap() += 1), &pending, &children);
+        let started = Instant::now();
+        let answer = wire.call_tool(&"c".repeat(crate::event_channel::LIMIT), "read_note", &json!({}));
+        assert_eq!(answer, Err(UNSENT.into()));
+        assert_ne!(UNSENT, NO_ANSWER);
+        assert!(started.elapsed() < Duration::from_millis(200), "it doesn't wait for an answer");
+        assert_eq!(*sent.lock().unwrap(), 0);
+        assert!(pending.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_session_whose_request_id_is_already_running_is_refused() {
+        let running = RunningIds::default();
+        let first = claim(&running, "r1").unwrap();
+        assert!(claim(&running, "r1").is_err());
+        let other = claim(&running, "r2").unwrap();
+        drop(first);
+        assert!(claim(&running, "r1").is_ok(), "the id is free once its session ends");
+        drop(other);
+        assert!(running.lock().unwrap().is_empty());
     }
 
     #[test]
