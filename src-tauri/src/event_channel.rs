@@ -1,12 +1,11 @@
 //! The one way Rotli streams to the webview. Every message stays under `LIMIT`
-//! bytes as Tauri serializes it, so it is delivered directly to the webview
-//! that made the call. `check:ipc` keeps every other file off Tauri's channel
-//! type, so nothing can send around this.
+//! bytes as Tauri serializes it. `check:ipc` keeps every other file off Tauri's
+//! channel type, so nothing can send around this.
 
 use tauri::ipc::{Channel, CommandArg, CommandItem, InvokeError, InvokeResponseBody};
 use tauri::Runtime;
 
-/// Room to spare under the 8,192 bytes Tauri delivers directly.
+/// Room to spare under 8 KiB.
 pub const LIMIT: usize = 6 * 1024;
 
 /// A command's streaming argument (a `Channel<string>` in the webview).

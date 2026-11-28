@@ -344,9 +344,8 @@ mod tests {
         assert!(children.lock().unwrap().is_empty() && pending.lock().unwrap().is_empty());
     }
 
-    /// Tauri hands a channel message to the webview directly only while its
-    /// serialized body stays under 8,192 bytes.
-    const DIRECT: usize = 8192;
+    /// Every streamed message stays under 8 KiB as Tauri serializes it.
+    const SMALL: usize = 8192;
 
     #[test]
     fn a_large_tool_call_reaches_the_webview_in_small_messages() {
@@ -366,7 +365,7 @@ mod tests {
             assert_eq!(wire.call_tool(&format!("c{i}"), "create_note", &args), Some(expected));
         }
         let sizes = sizes.lock().unwrap();
-        assert!(!sizes.is_empty() && sizes.iter().all(|&n| n < DIRECT), "message sizes: {sizes:?}");
+        assert!(!sizes.is_empty() && sizes.iter().all(|&n| n < SMALL), "message sizes: {sizes:?}");
         assert!(pending.lock().unwrap().is_empty());
     }
 
