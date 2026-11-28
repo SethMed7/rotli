@@ -2,7 +2,8 @@
 //! agent-runtime state. If one became a writable corpus root, the ordinary
 //! file APIs could rewrite credentials, CLI configuration, or the local-model
 //! registry. The app (`reject_privileged_root`) and a host build's command
-//! line (`app_identity::claim_new_vault`) share this one list.
+//! line (`app_identity::claim_new_vault`) share this one list. The command
+//! line also follows links in it.
 
 use std::path::{Path, PathBuf};
 
@@ -16,8 +17,27 @@ pub(crate) fn refuse_overlap(
     home: Option<&Path>,
     app_dirs: impl IntoIterator<Item = PathBuf>,
 ) -> Result<(), String> {
+    refuse(candidate, home, private_paths(home, app_dirs))
+}
+
+/// `refuse_overlap`, held against where each private path leads too, so what
+/// a linked `~/.ssh` points at stays private. Only a command line's claim asks
+/// this, of a folder nobody has marked. The app's check stays as it was: this
+/// one would change what standalone Rotli opens.
+pub(crate) fn refuse_overlap_through_links(
+    candidate: &Path,
+    home: &Path,
+    app_dirs: impl IntoIterator<Item = PathBuf>,
+) -> Result<(), String> {
+    let mut protected = private_paths(Some(home), app_dirs);
+    // each as spelled (it may not exist yet) and as resolved
+    let targets: Vec<_> = protected.iter().filter_map(|path| std::fs::canonicalize(path).ok()).collect();
+    protected.extend(targets);
+    refuse(candidate, Some(home), protected)
+}
+
+fn private_paths(home: Option<&Path>, app_dirs: impl IntoIterator<Item = PathBuf>) -> Vec<PathBuf> {
     let mut protected = Vec::new();
-    let mut forbidden_home_or_ancestor = false;
     if let Some(home) = home {
         protected.extend(
             [
@@ -34,12 +54,17 @@ pub(crate) fn refuse_overlap(
             .into_iter()
             .map(|relative| home.join(relative)),
         );
-        // Selecting HOME (or one of its ancestors) intersects every protected
-        // child even when the child has not been created yet. Ordinary folders
-        // below HOME remain valid unless they overlap a named private subtree.
-        forbidden_home_or_ancestor = candidate == home || home.starts_with(candidate);
     }
     protected.extend(app_dirs);
+    protected
+}
+
+fn refuse(candidate: &Path, home: Option<&Path>, protected: Vec<PathBuf>) -> Result<(), String> {
+    // Selecting HOME (or one of its ancestors) intersects every protected
+    // child even when the child has not been created yet. Ordinary folders
+    // below HOME remain valid unless they overlap a named private subtree.
+    let forbidden_home_or_ancestor =
+        home.is_some_and(|home| candidate == home || home.starts_with(candidate));
     if forbidden_home_or_ancestor || overlaps_any(candidate, &protected) {
         return Err(OVERLAPS.into());
     }

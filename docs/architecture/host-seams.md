@@ -329,8 +329,10 @@ registry write on the way to its open, so it marks in `Workspace::open`
   bound, and every one the CLI made.
 - **A new folder** must pass what the app asks of a new choice: the vault
   refusal, the private folders `reject_privileged_root` names
-  (`private_roots.rs`, with this build's support folder; its own scratch vault
-  excepted), and a support folder that is not a link.
+  (`private_roots.rs`, with this build's support folder and, for Linux,
+  `~/.local/share/<bundle ID>`; its own scratch vault excepted), and a support
+  folder that is not a link. The command line also follows links in that list,
+  so what a linked `~/.ssh` points at stays private.
 - **It must also be empty,** a Finder's `.DS_Store` aside. The app's picker
   adopts a folder with files because a person chose it there. Nobody confirms
   an environment variable, so a command line that marked such a folder would
@@ -1214,6 +1216,14 @@ shows "Hide …" only, since it leaves system-wide chords out.
 - **Each walk costs a launch's time.** The launch walks every registry root
   twice (before and after the bookmark repair); the helper and each CLI or
   MCP process walk each root once.
+- **Two first commands at once on one new folder** aren't serialized. By the
+  code, one can be refused while the other is still marking it (a `.rotli/`
+  with no mark yet reads as a vault, and a marked one reads as a folder with
+  files). The refused command writes nothing, and a later one passes once the
+  mark is there. A test covers the half-made mark, not the two processes.
+- **The app's private-folder check doesn't follow links** in its list; only
+  the command line's claim does. A folder inside what a linked `~/.ssh` points
+  at can still be chosen in the app, in standalone Rotli too.
 
 ## Limits of the single-instance lock
 
@@ -1257,7 +1267,11 @@ This list says only what was run.
   the mark, an unmarked vault is refused untouched, the diagnostics leave an
   empty folder empty, and the standalone build writes no mark.
   `workspace_librarian_tests.rs` failed before the Librarian reorder and passes
-  after it.
+  after it. After review, `app_identity_claim_tests.rs` asks the claim as
+  `com.example.host`, so the standalone test run covers it too. Before their
+  fixes, a folder inside a linked `~/.ssh`'s target and one under
+  `~/.local/share/<bundle ID>` were both claimed. CI runs Rust tests on macOS
+  only; none ran on Linux.
 - **Pending URLs in `start_hidden`** (2026-11-27, tests and an ordering probe;
   no Rotli build launched).
   - Rust (`host_tests.rs`): held URLs are visible to the predicate's call,
@@ -1497,7 +1511,8 @@ This list says only what was run.
   real. Tests that need the Keychain return early there, as the Keychain's own
   host test covers the refusal. The Antigravity path parity test compares the
   fixture's standalone path with the host ID swapped in.
-- **Rust tests:** `app_identity_tests.rs`, `host_registry_tests.rs` (each
+- **Rust tests:** `app_identity_tests.rs`, `app_identity_claim_tests.rs`,
+  `host_registry_tests.rs` (each
   registry file and legacy pointer planted, a vault moved to the scratch path
   with and without a readable registry, the host's own vault spelled through
   a link and `..`, and a registry rewritten after launch),

@@ -322,7 +322,9 @@ pub(crate) fn claim_new_vault_for(identifier: &str, home: &Path, folder: &Path) 
     }
     // the scratch vault sits in the support folder on purpose
     if trusted_scratch_for(&support, identifier).as_ref() != Some(&folder) {
-        crate::private_roots::refuse_overlap(&folder, Some(&home), [support])?;
+        // the second is Tauri's `app_data_dir` on Linux; on a Mac it is `support`
+        let app_dirs = [support, home.join(".local/share").join(identifier)];
+        crate::private_roots::refuse_overlap_through_links(&folder, &home, app_dirs)?;
     }
     let mut entries = std::fs::read_dir(&folder).map_err(|e| format!("open {}: {e}", folder.display()))?;
     if entries.any(|entry| !entry.is_ok_and(|entry| entry.file_name() == ".DS_Store")) {

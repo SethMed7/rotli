@@ -37,7 +37,10 @@ fn a_vault_that_lost_its_sidecar_is_not_reopened_for_writing() {
     let target = target(DEFAULT_ROOT_ID, &temp, true);
     let identity = crate::containment::folder_identity(&target.path);
     fs::remove_dir_all(temp.path().join(".rotli")).unwrap();
-    call_bound(Some(Bound { target, identity }), "tools/call", json!({ "name": SEARCH, "arguments": { "query": "synthetic" } }));
+    let result = call_bound(Some(Bound { target, identity }), "tools/call", json!({ "name": SEARCH, "arguments": { "query": "synthetic" } }));
+    if !public_build() {
+        assert!(refusal(&result).contains("The Librarian is off"), "{result}");
+    }
     assert!(!temp.path().join(".rotli").exists());
 }
 

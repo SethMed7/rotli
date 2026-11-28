@@ -148,7 +148,8 @@ owns the threat side.
   (`app_identity::claim_new_vault`). Whoever sets their environment
   (`ROTLI_CORPUS_ROOT`, `HOME`) chooses the folder and nobody confirms it, so
   they mark only an empty folder that passes the vault refusal and the private
-  folders, under a support folder that is not a link. A folder with files
+  folders (followed through links), under a support folder that is not a link.
+  A folder with files
   needs the person's choice in the app. See "The command line makes no
   unmarked vault" in the contract.
 - **The nudge and the mailbox.** A host build also acts on two files a
