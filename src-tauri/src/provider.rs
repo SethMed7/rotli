@@ -38,8 +38,6 @@ pub(crate) mod acp;
 #[path = "antigravity.rs"]
 pub(crate) mod antigravity;
 
-pub(crate) const CONNECTED_PROVIDER_POLICY_MESSAGE: &str =
-    "This provider lane is unavailable. Rotli supports only the user's locally authenticated official Claude Code, Codex, Cursor, and Antigravity clients; choose one of those or an on-device model.";
 pub(crate) const CLOUD_IMAGE_POLICY_MESSAGE: &str =
     "Provider-backed image generation is unavailable; no provider account was used.";
 

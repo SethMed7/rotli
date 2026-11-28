@@ -1174,8 +1174,6 @@ Everything left saying "Rotli" is listed in
   secure-notes warming notice (a Rust↔TS twin), "Rotli is already finishing
   saves…" (compared in code), "outside Rotli storage", and the Cursor pause
   message (pinned in `scripts/fixtures/parity.json`).
-- **Not routed yet** (`not-yet`): the connected-provider refusal and the
-  Library-script line, both Rust constants.
 - **Not read by the guard**: the Welcome catalog (`src/assets/welcome.json`)
   and Rotli's own welcome note, which `welcome_note` replaces for a host's
   empty folder.

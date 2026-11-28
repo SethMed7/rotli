@@ -1256,11 +1256,13 @@ fn safe_validation_report(root: &Path) -> ValidateReport {
         ok: true,
         skipped: true,
         stdout: if has_script {
-            "Library script not run — Rotli treats files in a vault as untrusted data. Use the vault's own trusted tooling to validate it."
+            format!(
+                "Library script not run — {} treats files in a vault as untrusted data. Use the vault's own trusted tooling to validate it.",
+                crate::app_identity::app_name()
+            )
         } else {
-            "No built-in safe validator is available for this library yet."
-        }
-        .into(),
+            "No built-in safe validator is available for this library yet.".into()
+        },
         errors: 0,
         warnings: 0,
     }

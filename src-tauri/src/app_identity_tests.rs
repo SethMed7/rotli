@@ -131,6 +131,8 @@ fn sentences_name_the_app_a_host_names_and_rotli_otherwise() {
     }
     // this process registered no host: the routed sentences read as before
     assert_eq!((app_name(), product_name()), ("Rotli", "rotli"));
+    assert!(crate::provider_lane::connected_provider_policy_message()
+        .starts_with("This provider lane is unavailable. Rotli supports only"));
 }
 
 /// A file gets the file sentence where a folder gets the folder's; any other

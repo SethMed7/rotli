@@ -11,8 +11,17 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::provider::{
-    self, acp, antigravity, ImageFiles, PromptVia, Running, CONNECTED_PROVIDER_POLICY_MESSAGE,
+    self, acp, antigravity, ImageFiles, PromptVia, Running,
 };
+
+/// The refusal for a provider lane this build doesn't run, in the running
+/// app's name (docs/architecture/host-seams.md, "The words, everywhere").
+pub(crate) fn connected_provider_policy_message() -> String {
+    format!(
+        "This provider lane is unavailable. {} supports only the user's locally authenticated official Claude Code, Codex, Cursor, and Antigravity clients; choose one of those or an on-device model.",
+        crate::app_identity::app_name()
+    )
+}
 
 pub(crate) const SECRET_MESSAGE: &str = "This conversation carries secret-shaped content and can't be sent to a connected model — switch to a local model to continue.";
 
@@ -122,7 +131,7 @@ fn run_on_bin(
     let parsed = match provider_id {
         "claude" => provider::parse_claude_json(&stdout),
         "codex" => provider::parse_codex_jsonl(&stdout),
-        _ => Err(CONNECTED_PROVIDER_POLICY_MESSAGE.into()),
+        _ => Err(connected_provider_policy_message()),
     };
     match parsed {
         Ok(text) => Ok(text),
