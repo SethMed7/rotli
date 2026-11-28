@@ -60,6 +60,7 @@ mod ai_office_text;
 mod pinned_site;
 mod private_browser;
 mod private_browser_media;
+mod private_roots;
 mod quick_window;
 mod vault_marker;
 mod vault_roles;
@@ -793,76 +794,21 @@ pub(crate) fn reject_privileged_root(
     if app_identity::owned_scratch_vault(app).as_ref() == Some(&candidate) {
         return app_identity::refuse_existing_vault(&candidate);
     }
-    let mut protected = Vec::new();
-    let mut forbidden_home_or_ancestor = false;
-    if let Ok(home) = std::env::var("HOME") {
-        let home =
-            std::fs::canonicalize(home).map_err(|error| format!("canonicalize home: {error}"))?;
-        protected.extend(
-            [
-                ".memex",
-                ".codex",
-                ".claude",
-                ".ssh",
-                ".gnupg",
-                ".aws",
-                ".config",
-                ".breve-secrets",
-                "Library/Keychains",
-            ]
-            .into_iter()
-            .map(|relative| home.join(relative)),
-        );
-        // Selecting HOME (or one of its ancestors) intersects every protected
-        // child even when the child has not been created yet. Ordinary folders
-        // below HOME remain valid unless they overlap a named private subtree.
-        forbidden_home_or_ancestor = candidate == home || home.starts_with(&candidate);
-    }
-    if let Ok(path) = app.path().app_config_dir() {
-        protected.push(path);
-    }
-    if let Ok(path) = app.path().app_data_dir() {
-        protected.push(path);
-    }
-    if forbidden_home_or_ancestor || overlaps_any_private_path(&candidate, &protected) {
-        return Err("That folder overlaps private application, credential, or agent-runtime state and cannot be used as a notes root.".into());
-    }
+    let home = std::env::var("HOME")
+        .ok()
+        .map(|home| std::fs::canonicalize(home).map_err(|error| format!("canonicalize home: {error}")))
+        .transpose()?;
+    let app_dirs = [app.path().app_config_dir(), app.path().app_data_dir()];
+    private_roots::refuse_overlap(&candidate, home.as_deref(), app_dirs.into_iter().filter_map(Result::ok))?;
     // A host build never opens a folder Rotli already uses as a vault: every
     // way a folder becomes notes passes here before anything writes to it.
     // The standalone build refuses nothing and reads nothing more.
     app_identity::refuse_existing_vault(&candidate)
 }
 
-fn overlaps_any_private_path(
-    candidate: &std::path::Path,
-    protected: &[std::path::PathBuf],
-) -> bool {
-    protected
-        .iter()
-        .any(|path| candidate.starts_with(path) || path.starts_with(candidate))
-}
-
 #[cfg(test)]
 mod privileged_root_tests {
-    use super::{overlaps_any_private_path, write_new_vault_settings, NativeDialogOpen};
-    use std::path::{Path, PathBuf};
-
-    #[test]
-    fn corpus_roots_cannot_contain_or_live_inside_agent_trust_state() {
-        let protected = vec![PathBuf::from("/Users/example/.memex")];
-        assert!(overlaps_any_private_path(
-            Path::new("/Users/example"),
-            &protected
-        ));
-        assert!(overlaps_any_private_path(
-            Path::new("/Users/example/.memex/ai"),
-            &protected
-        ));
-        assert!(!overlaps_any_private_path(
-            Path::new("/Users/example/Notes"),
-            &protected
-        ));
-    }
+    use super::{write_new_vault_settings, NativeDialogOpen};
 
     #[test]
     fn new_vault_reopens_home_navigation_without_virtual_welcome_state() {
