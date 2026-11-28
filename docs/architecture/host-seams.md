@@ -1504,9 +1504,19 @@ This list says only what was run.
   by a file are not proven live.
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
-- **Rust, under a host identity:** from `src-tauri`, run
-  `ROTLI_APP_IDENTIFIER=com.example.host CARGO_TARGET_DIR=<its own dir> cargo
-  test --lib` (and `cargo clippy --all-targets -- -D warnings` the same way).
+- **Rust, under a host identity:** CI's `Rust (host identity: clippy + tests)`
+  job in `.github/workflows/regression.yml` runs it, on the same changes as the
+  standalone Rust job. It isn't a required check. `bun run verify` doesn't run
+  it, so to run it by hand, from the repository root:
+
+  ```sh
+  export ROTLI_APP_IDENTIFIER=com.example.host
+  export CARGO_TARGET_DIR="$PWD/src-tauri/target/host-identity"
+  cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+  cargo test --manifest-path src-tauri/Cargo.toml
+  ```
+
+  Use a shell you close afterwards, so no standalone build inherits the host ID.
   Under that identity, the vault refusal and the shared-state refusals run for
   real. Tests that need the Keychain return early there, as the Keychain's own
   host test covers the refusal. The Antigravity path parity test compares the

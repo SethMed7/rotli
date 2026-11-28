@@ -19,12 +19,13 @@ by name for the exact source commit.
 | Rust (Linux cargo check) | `ubuntu-24.04` | `cargo check --all-targets` over the `cfg(not(target_os = "macos"))` code |
 | Rust (Windows helper check) | `windows-2022` | `cargo check --bin rotli-helper`: the Rotli Helper ships for Windows, and no other lane compiles it there (a Unix-only socket broke it unnoticed from #149 until the helper-v1.8.1 release) |
 | Rust (clippy + tests) | `macos-15` | `cargo clippy --all-targets -- -D warnings` and `cargo test` against the shipped operating-system branches |
+| Rust (host identity: clippy + tests) | `macos-15` | The same two commands with `ROTLI_APP_IDENTIFIER=com.example.host`, in their own target directory and cache: the rules that run only under a [host ID](../architecture/host-seams.md) (vault refusal and marking, fail-closed shared state, the scratch vault). Not a required check |
 
 A **Change scope** job ([`scripts/ci-scope.ts`](../../scripts/ci-scope.ts))
 runs alongside Quality and the secret scan, and the app lanes wait for it.
 When every changed path is under `site/` (except the site's `package.json`,
 `bun.lock`, and `bunfig.toml`, which the dependency audit scans), under
-`docs/`, or a root Markdown file, Browser E2E, the dependency audit, and both Rust lanes are
+`docs/`, or a root Markdown file, Browser E2E, the dependency audit, and every Rust lane are
 skipped: a website or docs change proves nothing about the app, and a skipped
 job counts as a passing required check. Quality (which checks and builds the
 site too) and the secret scan run on every change. The gated lanes run unless
@@ -32,10 +33,18 @@ the scope job explicitly answered `app=false`, so a missing base commit, an
 empty or failed diff, a manual run, or a failed scope job runs everything.
 
 Linux carries every portable Bun, TypeScript, Vite, Astro, Playwright, and
-dependency check. Rust stays on macOS because the crate contains macOS-gated
-code and a Linux build would prove a different binary. GitHub bills macOS
-minutes at roughly ten times the Linux rate, so the macOS job must remain
+dependency check. Rust tests stay on macOS because the crate contains
+macOS-gated code and a Linux build would prove a different binary. GitHub bills
+macOS minutes at roughly ten times the Linux rate, so the macOS jobs must remain
 limited to native Rust proof unless a new macOS-only invariant requires more.
+
+There are two macOS jobs because the app ID is fixed at build time: one build
+can't run both the standalone rules and the host rules. The host job is separate
+rather than a matrix entry, so the required `Rust (clippy + tests)` check keeps
+its own name. The repository's rulesets don't require the host job; the
+maintainer can add it once it has proven stable. It still counts toward the
+workflow's conclusion, so a red host job blocks publication (see "How releases
+use CI").
 
 Signing, notarization, updater signing, and publication never run in this
 workflow. Those operations remain local responsibilities of

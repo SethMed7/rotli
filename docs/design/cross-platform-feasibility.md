@@ -282,9 +282,10 @@ partly in place:
    suite (`.github/workflows/regression.yml`) runs every OS-agnostic lane
    (lint/types/architecture contracts, design-system, Playwright e2e, the
    Bun/Breve regression, `bun run build`, Astro build, dependency audit) on
-   GitHub-hosted `ubuntu-24.04`. The only macOS-locked lane is `rust-macos` —
-   `cargo clippy` + `cargo test` on GitHub-hosted `macos-15` — because a Linux
-   `cargo build` produces a *different* binary across the macOS `cfg` gates. The
+   GitHub-hosted `ubuntu-24.04`. The macOS-locked lanes are `rust-macos` and
+   `rust-macos-host` — `cargo clippy` + `cargo test` on GitHub-hosted `macos-15`,
+   under the standalone and a host app ID — because a Linux `cargo build`
+   produces a *different* binary across the macOS `cfg` gates. The
    JS/TS/Vite/Playwright surface is therefore validated on Linux today, which is
    how a Mac-only developer proves portable behavior. Playwright uses
    `--with-deps` to install Chromium's Linux system libraries. The remaining gap
