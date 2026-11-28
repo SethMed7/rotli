@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Host builds can keep Rotli's commands to Rotli's own webviews.** For apps
+  built on Rotli's shell: `src-tauri/app-commands.json` lists every app command
+  and Rotli's webview labels, and `docs/architecture/host-seams.md` shows the
+  `build.rs` and capability that grant them to Rotli's webviews alone. A host
+  that adds webviews of its own needs this, or its pages can call Rotli's
+  commands. Standalone Rotli is unchanged.
 - **Host builds can bring their own menu-bar item.** For apps built on Rotli's
   shell: a host can turn off Rotli's tray and call `host::show_main` and
   `host::quit` from its own, name itself in the tray and the app menu's Quit,
