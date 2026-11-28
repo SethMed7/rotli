@@ -34,6 +34,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now says "This file is in a folder Rotli uses as a vault…" instead of a
   sentence about folders. Standalone Rotli's window opens as before.
 
+### Changed
+
+- **Large tool calls in Claude sessions are delivered in smaller pieces.** A
+  tool call's arguments, such as a long note Claude is writing, are now read
+  by a command instead of riding inside the streamed event, and every message
+  Rotli streams to its window stays small. The arguments are read only by the
+  window that started the session, a second session can't start under a
+  request id that is already running, and a tool call that can't be handed to
+  the window is answered at once with its own error rather than as a timeout.
+  Tool calls still arrive complete and in order, and on-device answers still
+  stream as they're written.
+
 ### Fixed
 
 - **`rotli open` during setup is no longer lost.** A request that arrived while

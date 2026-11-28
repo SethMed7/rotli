@@ -26,6 +26,7 @@ mod folder_window;
 mod finder_quick_action;
 mod vault_import;
 mod document_conversion;
+mod event_channel;
 mod feature_policy;
 mod fsutil;
 /// The `rotli-helper` loopback bridge (a second binary, not the app).
@@ -2280,6 +2281,7 @@ fn launch(mut context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plug
             provider::cli_complete,
             provider::cli_cancel,
             claude_session::claude_session_run,
+            claude_session::claude_session_tool_args,
             claude_session::claude_session_tool_result,
             provider::antigravity::antigravity_manage,
             provider::generate_image,
