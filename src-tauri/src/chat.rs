@@ -205,7 +205,7 @@ pub async fn chat_messages_stream(
     temperature: Option<f32>,
     max_tokens: Option<u32>,
     request_id: Option<String>,
-    on_token: tauri::ipc::Channel<String>,
+    on_token: crate::event_channel::EventChannel,
 ) -> Result<String, String> {
     let handle = state.0.clone();
     let compute = compute.inner().clone();
@@ -385,7 +385,7 @@ fn messages_generate_stream(
     max_tokens: u32,
     endpoint: &str,
     timeout: Duration,
-    on_token: &tauri::ipc::Channel<String>,
+    on_token: &crate::event_channel::EventChannel,
     compute: &crate::compute::ComputeState,
     request_id: &str,
 ) -> Result<String, String> {
@@ -431,7 +431,7 @@ fn messages_generate_stream(
             if !tok.is_empty() {
                 full.push_str(tok);
                 // a receiver that's already gone (Stop) just drops this token
-                let _ = on_token.send(tok.to_string());
+                let _ = on_token.send_text(tok);
             }
         }
         if chunk.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {

@@ -31,6 +31,19 @@ const rustFiles = walk(join(root, "src-tauri/src"), /\.rs$/).map((file) => ({
   code: rustCode(readFileSync(file, "utf8")),
 }));
 
+// Rotli streams to the webview only through EventChannel, which keeps every
+// message small. No other file may name Tauri's channel types.
+const CHANNEL_HOME = "src-tauri/src/event_channel.rs";
+const channelUsers = rustFiles
+  .filter(
+    ({ file, code }) =>
+      file !== CHANNEL_HOME && /\b(?:Channel|JavaScriptChannelId|InvokeResponseBody)\b/.test(code),
+  )
+  .map(({ file }) => file);
+if (channelUsers.length) {
+  fail(`stream to the webview through EventChannel (${CHANNEL_HOME}), never Tauri's channel:`, channelUsers);
+}
+
 // Tauri keeps only the last handler a builder is given, so a second one would
 // replace the list this check reads.
 const handlers = rustFiles.flatMap(({ file, code }) =>

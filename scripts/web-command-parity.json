@@ -515,6 +515,7 @@
       "commands": [
         "antigravity_manage",
         "claude_session_run",
+        "claude_session_tool_args",
         "claude_session_tool_result",
         "corpus_create_managed_file_ai",
         "corpus_file_bytes_ai",
