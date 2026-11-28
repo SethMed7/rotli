@@ -152,7 +152,7 @@ pub(crate) fn refuse_field(key: &str, value: &str, owned: &[&str]) -> Result<(),
     refuse_line_breaks(&format!("{key}{value}"))?;
     let name = crate::frontmatter_keys::frontmatter_field(&format!("{key}:")).map(|(k, _)| k.name);
     match name.filter(|n| owned.contains(&n.as_str())) {
-        Some(name) => Err(format!("`{name}` is managed by rotli, not editable here")),
+        Some(name) => Err(format!("`{name}` is managed by {}, not editable here", crate::app_identity::product_name())),
         None => Ok(()),
     }
 }

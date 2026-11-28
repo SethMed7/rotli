@@ -6,6 +6,7 @@
 import { useQueries } from "@tanstack/react-query";
 
 import { PROVIDER_LABELS, type ProviderId } from "../../ai/models";
+import { productName } from "../../host/registry";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { canDetectConnectors, connectorDetectionQuery } from "../../services/connectorSetup";
 import { useUiStore } from "../../state/ui";
@@ -52,8 +53,7 @@ function LaneGuide({ secureOnly, onOpenSettings }: { secureOnly: boolean; onOpen
   return (
     <section className="chat-setup" aria-label="Set up a model">
       <p className="chat-sub">
-        No model can answer yet. Set one up on this computer — Rotli only runs tools you install and sign in
-        to yourself.
+        {`No model can answer yet. Set one up on this computer — ${productName()} only runs tools you install and sign in to yourself.`}
       </p>
       {lanes.map((id, index) => {
         const check = checks[index];

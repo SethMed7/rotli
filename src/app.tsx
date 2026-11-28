@@ -40,7 +40,7 @@ import { AppOpening } from "./components/onboarding/appOpening";
 import { PinPanel } from "./components/pinnedSites/pinPanel";
 import { WebVaultOverlays } from "./components/onboarding/webVaultOverlays";
 import { WebChatSetupDialog } from "./components/webChatSetupDialog";
-import { notesOn } from "./host/registry";
+import { appHost, notesOn, productName } from "./host/registry";
 import { registerDefaultActions } from "./keys/actions";
 import { replayHistoryKey } from "./keys/editHistoryActions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
@@ -114,6 +114,9 @@ const SettingsSurface = lazy(() =>
   })),
 );
 registerDefaultActions();
+// a host's name in the window title, where index.html says Rotli; standalone
+// keeps the document exactly as it loaded (docs/architecture/host-seams.md)
+if (appHost()) document.title = productName();
 
 if (import.meta.env.DEV) {
   // Review automation can drive any registry action (__rotli.dispatch) and
@@ -408,7 +411,7 @@ function MainShell() {
       <PinPanel />
       <Titlebar />
       <main className="app-content">
-        <h1 className="sr-only">Rotli workspace</h1>
+        <h1 className="sr-only">{`${productName()} workspace`}</h1>
         {/* Settings is the one full-surface front. Chat · Board · All-notes ·
             Recent all render inside NotesSurface's content area (contentView), so
             the three left-menu sections stay visible (the maintainer, 2026-06-26). Memory is

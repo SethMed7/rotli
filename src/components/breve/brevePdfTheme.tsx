@@ -9,6 +9,7 @@ import type { CSSProperties } from "react";
 
 import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
 import { readDocumentPdfPalette } from "../../brand/pdfPalette";
+import { productName } from "../../host/registry";
 import type { BrevePdfPalette, BrevePdfTheme, BrevePdfThemePreset } from "../../routines/breveTypes";
 import { useDataTheme } from "../../state/theme";
 
@@ -19,8 +20,12 @@ const PDF_THEME_OPTIONS: Array<{
 }> = [
   {
     value: "rotli",
-    label: "Match Rotli",
-    detail: "Follows your Rotli theme — every family, light or dark — as you change it",
+    get label() {
+      return `Match ${productName()}`;
+    },
+    get detail() {
+      return `Follows your ${productName()} theme — every family, light or dark — as you change it`;
+    },
   },
   {
     value: "charcoal",

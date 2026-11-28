@@ -19,6 +19,7 @@ import {
   suggestedLibrarian,
 } from "../../ai/librarianLane";
 import { providerCatalog } from "../../ai/models";
+import { productName } from "../../host/registry";
 import { openedInPlaceVault } from "../../memex/config";
 import { useMemexConfig } from "../../memex/useMemex";
 import { readyFrom, useConnectedCatalog } from "../../services/connectedModels";
@@ -34,7 +35,7 @@ export function librarianCopyChoice(label: string) {
   return {
     value: "on" as const,
     title: "Use the Librarian on a copy",
-    description: `Rotli copies “${label}” beside your vaults, and the Librarian organizes the copy. Your original is never touched.`,
+    description: `${productName()} copies “${label}” beside your vaults, and the Librarian organizes the copy. Your original is never touched.`,
   };
 }
 

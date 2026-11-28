@@ -90,7 +90,7 @@ export function ConnectorGuide({
               {step.command && <CopyCommand command={step.command} />}
               <span className="guide-step-detail">
                 {step.id === "check" && !onRecheck
-                  ? "Once the helper is connected, Rotli sees the tool on its own."
+                  ? `Once the helper is connected, ${productName()} sees the tool on its own.`
                   : step.detail}
               </span>
               {step.id === "check" && onRecheck && (

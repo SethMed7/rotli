@@ -508,6 +508,16 @@
   height: 100%;
   display: block;
 }
+/* a host's own mark, where a host with no mascot puts it in the quokka mark's
+   place (docs/architecture/host-seams.md); sized and tinted the same way */
+.host-product-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  color: var(--text);
+}
 .quokka-line,
 .quokka-layer,
 .quokka-detail-layer {

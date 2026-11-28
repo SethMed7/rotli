@@ -6,6 +6,7 @@
 // runs there). The answer is remembered per vault in its settings.json,
 // keyed by the vault's id, so a later copy (a fresh id) is asked for itself.
 
+import { productName } from "../host/registry";
 import { type PersonSinks, corpusAdoptPersonSinks, corpusPersonSinks } from "../lib/finderBridge";
 import { isTauri } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
@@ -52,7 +53,7 @@ export function personSinksQuestion(sinks: PersonSinks): { title: string; line: 
   const treated = both ? "archived and trashed" : sinks.archive > 0 ? "archived" : "trashed";
   return {
     title: `Move your ${theirs}?`,
-    line: `Your vault has its own ${own}. Move ${both ? "their" : "its"} notes into Rotli’s ${theirs} so the Librarian treats them as ${treated}?`,
+    line: `Your vault has its own ${own}. Move ${both ? "their" : "its"} notes into ${productName()}’s ${theirs} so the Librarian treats them as ${treated}?`,
   };
 }
 

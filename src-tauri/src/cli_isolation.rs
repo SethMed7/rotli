@@ -67,7 +67,8 @@ pub(crate) const CODEX_ISOLATION_ARGS: &[&str] = &[
 pub(crate) fn codex_version_message() -> String {
     let (major, minor, patch) = CODEX_MIN_VERSION;
     format!(
-        "Rotli needs Codex {major}.{minor}.{patch} or newer to keep your own Codex tools and MCP servers out of this chat. Update Codex, then try again."
+        "{} needs Codex {major}.{minor}.{patch} or newer to keep your own Codex tools and MCP servers out of this chat. Update Codex, then try again.",
+        crate::app_identity::app_name()
     )
 }
 

@@ -249,7 +249,7 @@ fn relaunch_app(app: &AppHandle) -> Result<(), String> {
     use std::process::{Command, Stdio};
 
     let current = tauri::process::current_binary(&app.env())
-        .map_err(|error| format!("locate Rotli for relaunch: {error}"))?;
+        .map_err(|error| format!("locate {} for relaunch: {error}", app_identity::app_name()))?;
     let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     let mut launch: Vec<std::ffi::OsString> = match macos_relaunch_target(&current) {
         MacosRelaunchTarget::Bundle(bundle) => {
@@ -281,7 +281,7 @@ fn relaunch_app(app: &AppHandle) -> Result<(), String> {
         .stderr(Stdio::null())
         .process_group(0)
         .spawn()
-        .map_err(|error| format!("relaunch Rotli: {error}"))?;
+        .map_err(|error| format!("relaunch {}: {error}", app_identity::app_name()))?;
     app.exit(0);
     Ok(())
 }
@@ -970,7 +970,7 @@ fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bo
             let mut picker = app
                 .dialog()
                 .file()
-                .set_title("Add a folder to rotli")
+                .set_title(format!("Add a folder to {}", app_identity::product_name()))
                 .set_directory(vault_location::picker_start(&app));
             if let Some(parent) = app.get_webview_window("main") {
                 picker = picker.set_parent(&parent);
@@ -1608,7 +1608,7 @@ fn corpus_switch_vault_blocking(app: AppHandle, id: String) -> Result<bool, Stri
         .is_some_and(|expected| expected != live.memex_id)
     {
         return Err(
-            "This folder is a different vault than the one Rotli connected to — refusing.".into(),
+            format!("This folder is a different vault than the one {} connected to — refusing.", app_identity::app_name()),
         );
     }
     flush_webviews_before_shutdown(&app)?;

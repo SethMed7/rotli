@@ -20,7 +20,7 @@ import {
 import { DOCX_EDITABLE, DOCUMENT_CONVERTIBLE } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
 import { PLATFORM } from "../lib/featurePolicy";
-import { extOf, fileName, managedFileNote } from "../lib/fileKind";
+import { extOf, fileName, managedFileNote, tooLargeToView } from "../lib/fileKind";
 import { kindOf, OPEN_WITH_BY_KIND } from "../lib/fileSurfaceKinds";
 import { formatBytes } from "../lib/formatBytes";
 import { hotkeyHint } from "../lib/hotkeyHint";
@@ -665,9 +665,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <pre className="file-text">{text || "(empty file)"}</pre>
         )}
 
-        {!err && kind === "html" && tooLarge && (
-          <p className="file-loading">This file is too large to view in Rotli.</p>
-        )}
+        {!err && kind === "html" && tooLarge && <p className="file-loading">{tooLargeToView()}</p>}
 
         {!err && kind === "sheet" && !sheetEditable && tables && (
           <div className="file-sheet">

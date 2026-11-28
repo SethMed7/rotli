@@ -3,6 +3,7 @@
 // a copy with the Librarian; then the copy's progress with Cancel, then where
 // the copy is or what went wrong.
 
+import { productName } from "../host/registry";
 import { answerVaultOpen, cancelVaultCopy, closeVaultImport } from "../services/vaultImport";
 import { type VaultImportStep, useVaultImport } from "../state/vaultImport";
 import { WebDialogFrame } from "./webDialogFrame";
@@ -53,7 +54,7 @@ export function importCopy(step: Exclude<VaultImportStep, { kind: "idle" }>): {
             : []),
           ...(step.report.marked === "foreign"
             ? [
-                "It has a memex.json from another app, which Rotli leaves as it is. So the copy is open as a protected folder: Rotli changes only what you ask for there, and the Librarian stays off.",
+                `It has a memex.json from another app, which ${productName()} leaves as it is. So the copy is open as a protected folder: ${productName()} changes only what you ask for there, and the Librarian stays off.`,
               ]
             : []),
         ],
@@ -109,13 +110,12 @@ export function VaultImportDialog() {
       {step.kind === "choose" && (
         <>
           <p className="web-connect-line">
-            <strong>Connect.</strong> Rotli opens these notes where they are. You read and edit them as usual;
-            nothing is moved or renamed, and the Librarian stays off here.
+            <strong>Connect.</strong>
+            {` ${productName()} opens these notes where they are. You read and edit them as usual; nothing is moved or renamed, and the Librarian stays off here.`}
           </p>
           <p className="web-connect-line">
-            <strong>Connect a copy with the Librarian.</strong> Rotli copies the folder beside your vaults,
-            and the Librarian organizes the copy, suggesting each change first. Your original stays exactly as
-            it is.
+            <strong>Connect a copy with the Librarian.</strong>
+            {` ${productName()} copies the folder beside your vaults, and the Librarian organizes the copy, suggesting each change first. Your original stays exactly as it is.`}
           </p>
           <WhyCopy />
         </>

@@ -4,6 +4,7 @@ import ExcelJS from "exceljs";
 import type { Workbook } from "exceljs";
 import JSZip from "jszip";
 
+import { productName } from "../../host/registry";
 import { bytesFromBase64, bytesToBase64 } from "../../lib/base64Bytes";
 
 const SPREADSHEET_NAMESPACE = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -78,7 +79,7 @@ export async function loadXlsx(bytes: ArrayBuffer): Promise<Workbook> {
   if (unsupported.length > 0) {
     const feature = unsupported[0] ?? "advanced workbook content";
     throw new Error(
-      `This workbook contains ${feature}, which Rotli cannot preserve safely. Open it in Excel or convert a copy before editing.`,
+      `This workbook contains ${feature}, which ${productName()} cannot preserve safely. Open it in Excel or convert a copy before editing.`,
     );
   }
   const wb = new ExcelJS.Workbook();

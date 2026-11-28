@@ -3,6 +3,7 @@
 
 import { create } from "zustand";
 
+import { productName } from "../host/registry";
 import { corpusViewsRead, corpusViewsWrite, hasDurableCorpus } from "../lib/tauri";
 import {
   createRevisionedTrackedWrite,
@@ -35,9 +36,9 @@ const viewsWriter = createRevisionedTrackedWrite((contents, revision) =>
 );
 
 /** Shown only when views.json really changed on disk under an edit made here
- * (main.ts MAIN_RELOADED_NOTICE is the twin). */
-export const VIEWS_RELOADED_NOTICE =
-  "Your views changed outside Rotli, so your last change wasn’t kept. Make it again.";
+ * (main.ts mainReloadedNotice is the twin). */
+export const viewsReloadedNotice = (): string =>
+  `Your views changed outside ${productName()}, so your last change wasn’t kept. Make it again.`;
 
 export const useViewsStore = create<ViewsState>((set, get) => ({
   manifest: EMPTY_VIEWS,
@@ -89,7 +90,7 @@ async function recoverViews(local: ViewsManifest, mayRetry: boolean): Promise<vo
       manifest: parsed.manifest,
       writable: parsed.writable,
       saveState: "error",
-      error: parsed.error ?? VIEWS_RELOADED_NOTICE,
+      error: parsed.error ?? viewsReloadedNotice(),
       dirty: false,
     });
   } catch (error) {

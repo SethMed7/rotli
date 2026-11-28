@@ -2,6 +2,7 @@
 // Captures and Tasks (split out of sidebarHome.tsx, 2026-09-28, so each can be
 // hidden from Settings → Appearance → Show in Rotli; src/lib/hideable.ts).
 
+import { productName } from "../../host/registry";
 import { dispatch } from "../../keys/registry";
 import type { Hidden } from "../../lib/hideable";
 import { DEST } from "../../services/destinations";
@@ -70,13 +71,13 @@ export function HomeShortcuts({
     <>
       {!hidden.overview && (
         <OverviewCard
-          label="Open Rotli activity dashboard"
+          label={`Open ${productName()} activity dashboard`}
           current={contentView === "dashboard" && dashboardSection === "rotli"}
           onOpen={() => {
             setDashboardSection("rotli");
             setContentView("dashboard");
           }}
-          head={["This week", "Rotli activity"]}
+          head={["This week", `${productName()} activity`]}
           rows={[
             <>
               <strong>Notes</strong> <span>{dashboard.notes.newInRange} new</span>{" "}

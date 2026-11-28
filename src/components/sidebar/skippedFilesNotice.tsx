@@ -6,7 +6,8 @@
 
 import { useId, useState } from "react";
 
-import { INDEPENDENT_COPY, searchSkippedLine, skippedSummary } from "../../lib/hardLinks";
+import { productName } from "../../host/registry";
+import { independentCopy, searchSkippedLine, skippedSummary } from "../../lib/hardLinks";
 import { useSkippedFiles } from "../../services/hooks";
 import type { SkippedFile } from "../../types";
 
@@ -28,7 +29,7 @@ export function SkippedFilesNoticeView({
   const listId = useId();
   if (files.length === 0) return null;
   return (
-    <section className="skipped-notice" aria-label="Files Rotli didn’t open">
+    <section className="skipped-notice" aria-label={`Files ${productName()} didn’t open`}>
       <p className="skipped-notice-text">{skippedSummary(files.length)}</p>
       <button
         type="button"
@@ -48,7 +49,7 @@ export function SkippedFilesNoticeView({
               </li>
             ))}
           </ul>
-          <p className="skipped-notice-help">{INDEPENDENT_COPY}</p>
+          <p className="skipped-notice-help">{independentCopy()}</p>
         </div>
       )}
     </section>

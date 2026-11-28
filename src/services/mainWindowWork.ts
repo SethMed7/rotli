@@ -6,6 +6,7 @@
 
 import { useEffect } from "react";
 
+import { productName } from "../host/registry";
 import { onQuitFlushFailure } from "../lib/quitFlush";
 import { enforceFronts } from "../state/fronts";
 import { useUiStore } from "../state/ui";
@@ -26,7 +27,9 @@ export function useMainWindowWork(surface: string): void {
     return onQuitFlushFailure((message) => {
       useUiStore
         .getState()
-        .setRowActionError(`Rotli stayed open because some changes could not be saved — ${message}`);
+        .setRowActionError(
+          `${productName()} stayed open because some changes could not be saved — ${message}`,
+        );
     });
   }, [surface]);
 }

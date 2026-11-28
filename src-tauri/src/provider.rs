@@ -323,7 +323,7 @@ pub(crate) fn build_args_for(
                 ));
             }
             if imgs.is_some() {
-                return Err("Cursor code chat does not accept image attachments in Rotli".into());
+                return Err(format!("Cursor code chat does not accept image attachments in {}", crate::app_identity::app_name()));
             }
             let mut args = Vec::new();
             if model != "cursor-auto" {

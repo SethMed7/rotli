@@ -785,7 +785,7 @@ export function registerDefaultActions(): void {
     ui.setContentView(view);
   };
   const views = [
-    ["view.dashboard", "Rotli activity dashboard", () => openView("dashboard")],
+    ["view.dashboard", `${productName()} activity dashboard`, () => openView("dashboard")],
     ["view.tasks", "Tasks", () => openView("tasks", TASKS)],
     ["view.allNotes", "All notes", () => openView("allNotes", ALL_NOTES)],
     ["browser.private", "Open a private browser", () => usePanesStore.getState().openBrowser()],

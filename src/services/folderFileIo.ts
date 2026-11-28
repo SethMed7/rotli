@@ -1,3 +1,4 @@
+import { productName } from "../host/registry";
 // Connected-folder file I/O. Native callers keep using the Rust corpus.
 import { extOf, imageMimeOf, VIDEO_EXTS } from "../lib/fileKind";
 import { isNotePath } from "../lib/protectionRule";
@@ -134,7 +135,9 @@ export async function folderWriteFileBytes(
       if (observedBytes) new TextDecoder("utf-8", { fatal: true }).decode(observedBytes);
       new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     } catch {
-      throw new Error("This text file is not valid UTF-8; Rotli cannot save it without changing its bytes.");
+      throw new Error(
+        `This text file is not valid UTF-8; ${productName()} cannot save it without changing its bytes.`,
+      );
     }
   }
   if (observedBytes && bytesRevision(observedBytes) !== revision)

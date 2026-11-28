@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 
+import { productName } from "../../host/registry";
 import {
   corpusInspectFolder,
   corpusStatus,
@@ -46,7 +47,7 @@ export function keepableVault(
  * it records nothing, and setup would end on the vault screen again. */
 export function openedOrWhy(opened: boolean, configured: boolean): string | null {
   if (opened || configured) return null;
-  return "That folder is already open here read-only, so Rotli can't keep it as this build's vault. Pick another folder.";
+  return `That folder is already open here read-only, so ${productName()} can't keep it as this build's vault. Pick another folder.`;
 }
 
 /** What a picked folder becomes: an empty one a fresh vault, anything else
@@ -202,9 +203,7 @@ export function VaultActivation({
           <div className="setup-content">
             <h1 id="vault-title">Where should your notes live?</h1>
             <p className="setup-lede">
-              Pick a folder for your notes. Make a new one with New Folder and Rotli starts a fresh vault
-              there, or pick the Markdown folder you already use, like an Obsidian vault: it stays as it is,
-              and Rotli adds only a hidden .rotli folder.
+              {`Pick a folder for your notes. Make a new one with New Folder and ${productName()} starts a fresh vault there, or pick the Markdown folder you already use, like an Obsidian vault: it stays as it is, and ${productName()} adds only a hidden .rotli folder.`}
             </p>
             {!onboarding && (
               <SetupChoiceGroup

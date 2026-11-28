@@ -116,6 +116,23 @@ fn rotli_words_are_neutral_until_a_host_supplies_its_own() {
     }
 }
 
+/// Rotli's sentences say "Rotli" and its wordmark "rotli" until a host names
+/// itself; a blank name keeps Rotli's (docs/architecture/host-seams.md).
+#[test]
+fn sentences_name_the_app_a_host_names_and_rotli_otherwise() {
+    let standalone = HostWords::default();
+    assert_eq!((app_name_in(&standalone), product_name_in(&standalone)), ("Rotli", "rotli"));
+    assert_eq!((STANDALONE_APP_NAME, STANDALONE_PRODUCT_NAME), ("Rotli", "rotli"));
+    let host = HostWords { product_name: Some("Synthetic".into()), ..HostWords::default() };
+    assert_eq!((app_name_in(&host), product_name_in(&host)), ("Synthetic", "Synthetic"));
+    for blank in ["", "   "] {
+        let host = HostWords { product_name: Some(blank.into()), ..HostWords::default() };
+        assert_eq!((app_name_in(&host), product_name_in(&host)), ("Rotli", "rotli"), "{blank:?}");
+    }
+    // this process registered no host: the routed sentences read as before
+    assert_eq!((app_name(), product_name()), ("Rotli", "rotli"));
+}
+
 /// A file gets the file sentence where a folder gets the folder's; any other
 /// refusal passes through unchanged.
 #[test]

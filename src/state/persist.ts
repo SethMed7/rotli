@@ -31,6 +31,7 @@ import {
   normalizeQuokkaCustomHue,
   quokkaHueFromLegacyColor,
 } from "../brand/quokka";
+import { hostThemeFamily } from "../host/registry";
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
@@ -69,7 +70,7 @@ import { isRetentionEligible, parseRetentionDays } from "../services/retentionPo
 import { DEFAULT_TASK_ARCHIVE_AGE, TASK_ARCHIVE_AGES, type TaskArchiveAge } from "../services/tasksView";
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
-import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { DEFAULT_ACCENT_HUE, defaultAppearance } from "./appearanceDefaults";
 import { appExtrasSnapshot, hydrateAppExtras, subscribeAppExtras } from "./appExtras";
 import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
 import { type ChatMap, isUnsavedChatKey, persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
@@ -482,7 +483,7 @@ export function parseSettings(raw: string): PersistedSettings {
   return {
     v: SETTINGS_VERSION,
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
-    themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
+    themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, defaultAppearance().themeFamily),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
     boardBackground: asEnum(data.boardBackground, BOARD_BACKGROUND_MODES, "theme"),
     accentColor: asEnum(data.accentColor, ACCENT_COLORS, "default"),
@@ -1308,6 +1309,9 @@ function prePaint(): void {
 /** Load everything durable from `.rotli/` into the stores. Never throws, never
  * blocks on bad data — a deleted or corrupted dot-file just means defaults. */
 export async function hydratePersistedState(): Promise<void> {
+  // a host's starting family until a saved choice replaces it (host-seams.md)
+  const hostFamily = hostThemeFamily();
+  if (hostFamily) useUiStore.setState({ themeFamily: hostFamily });
   if (!hasDurableCorpus()) return; // the browser twin keeps the in-memory demo, untouched
   let configured = true;
   try {
@@ -1365,12 +1369,13 @@ export async function hydratePersistedState(): Promise<void> {
     // untouched because either their app sidecar or their configured vault
     // supplies the prior choice.
     // and a new install's window: in the Dock from its very first frame
-    useUiStore.setState({ ...DEFAULT_APPEARANCE, ...FIRST_RUN_WINDOW });
+    const appearance = defaultAppearance();
+    useUiStore.setState({ ...appearance, ...FIRST_RUN_WINDOW });
     shellSettings = {
       ...shellSettings,
       ...FIRST_RUN_WINDOW,
-      theme: DEFAULT_APPEARANCE.theme,
-      themeFamily: DEFAULT_APPEARANCE.themeFamily,
+      theme: appearance.theme,
+      themeFamily: appearance.themeFamily,
     };
   }
   // 1.8.0 re-onboards once (state/onboarding.ts); marked so the writer saves it

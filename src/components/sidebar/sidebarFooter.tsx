@@ -9,6 +9,7 @@
 // The Librarian entry is the old Activity row — it's the Librarian's journal, so
 // it wears the Librarian's name; internal ids keep "activity".
 
+import { productName } from "../../host/registry";
 import { dispatch } from "../../keys/registry";
 import { webVaultName } from "../../lib/browserVault";
 import type { Hidden } from "../../lib/hideable";
@@ -77,7 +78,7 @@ export function SidebarFooter() {
     void filePath.then((rel) => {
       if (rel) {
         revealInMacApp(webVaultName(), rel);
-        showFileNotice("Asked the Rotli app to show it in Finder");
+        showFileNotice(`Asked the ${productName()} app to show it in Finder`);
       } else if (note) revealNoteInSystem(note);
       else openSystemRoot("Brain");
     });
@@ -93,7 +94,9 @@ export function SidebarFooter() {
           className="sb-footbtn"
           aria-label="Files"
           title={
-            isTauri() ? "Open the vault folder in Finder" : "Show this file in Finder through the Rotli app"
+            isTauri()
+              ? "Open the vault folder in Finder"
+              : `Show this file in Finder through the ${productName()} app`
           }
           onClick={showFiles}
         >

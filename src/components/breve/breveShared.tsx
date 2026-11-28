@@ -6,11 +6,15 @@
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 
+import { productName } from "../../host/registry";
 import { useNow } from "../../lib/useNow";
 import type { BreveSnapshot } from "../../routines/briefs";
 import { useUiStore } from "../../state/ui";
 import { CheckGlyph, ClockGlyph } from "../glyphs";
 import { breveHealthSummary } from "./breveHealthModel";
+
+/** Where an imported brief or a delivered one lives: in this app. */
+export const inAppLabel = (): string => `In ${productName()}`;
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 

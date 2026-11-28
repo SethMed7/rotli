@@ -16,6 +16,7 @@
 //
 // Pure: no React, no Tauri, no I/O.
 
+import { inlineName } from "../host/registry";
 import type { BreveRoutine } from "../lib/tauri";
 
 /** What a stage DOES — the vocabulary the view renders and colors by. */
@@ -67,7 +68,9 @@ export interface RoutinePipeline {
 }
 
 const LANE_LABEL: Record<DeliveryLane, string> = {
-  inApp: "In rotli",
+  get inApp() {
+    return `In ${inlineName()}`;
+  },
   signal: "Signal",
   email: "Email",
 };

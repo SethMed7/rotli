@@ -83,7 +83,7 @@ impl CorpusStore {
             return Err("A folder connected in place keeps its Archive and Trash as they are.".into());
         }
         let Some(roles) = self.layout.roles() else {
-            return Err("Only a copy Rotli made has its own Archive and Trash to move into.".into());
+            return Err(format!("Only a copy {} made has its own Archive and Trash to move into.", crate::app_identity::app_name()));
         };
         let mut moved = PersonSinks::default();
         let mut moves = Vec::new();

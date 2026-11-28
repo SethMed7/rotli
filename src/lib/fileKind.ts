@@ -3,6 +3,8 @@
 // (the in-app viewer) both need "what's this file's basename + extension" and
 // "is it a raster image"; this is the one definition they share.
 
+import { productName } from "../host/registry";
+
 /** Raster image extensions that read as a picture (the IDE image glyph). NOTE:
  * `svg` is intentionally excluded — it has its own brand mark in glyphs; the
  * file viewer adds svg/ico locally since it can render them in an <img>. */
@@ -91,6 +93,9 @@ const IMAGE_MIME: Record<string, string> = {
 export function imageMimeOf(ext: string): string {
   return IMAGE_MIME[ext] ?? "application/octet-stream";
 }
+
+/** What a page too large to render says, in the running app's name. */
+export const tooLargeToView = (): string => `This file is too large to view in ${productName()}.`;
 
 /** The file-details fact for a Rotli-managed file: documents, sheets, and
  * assets live in the vault's storage/ folder, which the vault's .gitignore

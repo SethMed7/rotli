@@ -2,6 +2,7 @@
 // trail in place of the two quokka trails (state/chatNavigatorStyle.ts); the
 // stored choice is never rewritten, so other themes show the person's own.
 
+import { mascotShown } from "../../host/registry";
 import { navigatorChoices, resolveNavigatorStyle } from "../../state/chatNavigatorStyle";
 import { useDataTheme } from "../../state/theme";
 import { type ChatNavigatorStyle, useUiStore } from "../../state/ui";
@@ -44,7 +45,9 @@ export function NavigatorSettings() {
       <p className="lead">
         Longer chats get a small trail that opens an overview of your prompts. Pick the quiet visual you want
         beside the conversation.
-        {tesven && " Tesven trades the quokka trails for its hexagons; they come back in other themes."}
+        {tesven &&
+          mascotShown() &&
+          " Tesven trades the quokka trails for its hexagons; they come back in other themes."}
       </p>
       <div className="navigator-picker" role="radiogroup" aria-label="Conversation navigator">
         {navigatorChoices(dataTheme).map((style) => (

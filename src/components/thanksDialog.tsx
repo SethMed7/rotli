@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 
+import { productName } from "../host/registry";
 import { ROTLI_REPO_URL } from "../lib/feedback";
 import { shareOnXUrl, shareStatus } from "../lib/thanksBanner";
 import { openLink, shareRotli } from "../services/thanksShare";
@@ -53,7 +54,7 @@ function ThanksCard() {
   return (
     <WebDialogFrame
       id="thanks"
-      title="Thank you for trying Rotli"
+      title={`Thank you for trying ${productName()}`}
       className="thanks-card"
       onClose={startNow}
       actions={

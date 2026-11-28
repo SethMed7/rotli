@@ -1,3 +1,4 @@
+import { productName } from "../host/registry";
 import { PLATFORM } from "../lib/featurePolicy";
 import { noteDiskFolder } from "../lib/noteLocation";
 /** Open, create, or list the durable chats attached to one Markdown note. A
@@ -64,7 +65,7 @@ async function noteChatContext(note: NoteSummary): Promise<NoteChatContext> {
     isSecureNotesFolder(folder) ||
     /(?:^|\/)wiki\/_secure(?:\/|$)/.test(notePath.replace(/^[^:]+:/, ""));
   const stem = secure ? secureNoteStem(note.id) : noteStemFromPath(notePath);
-  if (!stem) throw new Error("Rotli couldn’t resolve this note in the vault.");
+  if (!stem) throw new Error(`${productName()} couldn’t resolve this note in the vault.`);
 
   const chats = await listChats(instance);
   return { instance, stem, secure, chats, attached: findAttachedChats(chats, stem) };

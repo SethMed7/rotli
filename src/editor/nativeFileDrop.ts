@@ -30,6 +30,7 @@ import {
   sidebarDropTargetAt,
   SpringOpen,
 } from "../components/sidebar/sidebarDropTargets";
+import { productName } from "../host/registry";
 import { onNativeDrag } from "../lib/nativeDrag";
 import {
   corpusCreateImageAsset,
@@ -251,7 +252,7 @@ export function useNativeFileDrop(): void {
     // Rust granted none of the dropped items (folders, files gone mid-drag)
     const unlistenRefused = onNativeDropRefused(() => {
       settle();
-      showFileNotice("Nothing imported — Rotli imports files, not folders");
+      showFileNotice(`Nothing imported — ${productName()} imports files, not folders`);
     });
     return () => {
       stopped = true;

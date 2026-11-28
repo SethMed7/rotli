@@ -1,6 +1,7 @@
 // Parked dirty sheet sessions + hide/quit flush (#4). Engine-agnostic — only
 // knows SheetModel + exceljs codec; never imports @univerjs/*.
 
+import { productName } from "../host/registry";
 import { PLATFORM } from "../lib/featurePolicy";
 import { extOf, fileNameStem } from "../lib/fileKind";
 import { onQuitFlush } from "../lib/quitFlush";
@@ -77,7 +78,7 @@ export async function writeSheetModel(
   }
   // the last gate: the xlsx codec loses what it doesn't model (an .xlsm's macros)
   if (!SHEET_EDITABLE.has(extOf(fileId)))
-    throw new Error(`Rotli can't save .${extOf(fileId)} files faithfully.`);
+    throw new Error(`${productName()} can't save .${extOf(fileId)} files faithfully.`);
   applyModelToWorkbook(wb, model, idMap);
   const bytes = await saveXlsx(wb);
   const base64 = b64FromBytes(bytes);

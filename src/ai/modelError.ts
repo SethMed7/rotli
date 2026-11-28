@@ -4,6 +4,7 @@
 // Rotli never retries a block itself — support.claude.com/en/articles/16049681
 // says blocked requests are billed and re-trigger on the same content.
 
+import { productName } from "../host/registry";
 import { remoteBlockOf, remoteBlockText } from "./remoteBlock";
 
 const SAFEGUARD = /safeguards flagged this message/i;
@@ -14,7 +15,7 @@ export function modelErrorText(message: string): string {
   if (remoteBlockOf(message)) return remoteBlockText(message);
   if (!SAFEGUARD.test(message)) return message;
   const category = CATEGORY.exec(message)?.[1];
-  return `${BLOCKED}${category ? ` (${category})` : ""}. It sometimes flags ordinary requests. Edit your message and send it again, or switch model. Rotli doesn't retry on its own, because a blocked request still counts toward your plan.`;
+  return `${BLOCKED}${category ? ` (${category})` : ""}. It sometimes flags ordinary requests. Edit your message and send it again, or switch model. ${productName()} doesn't retry on its own, because a blocked request still counts toward your plan.`;
 }
 
 /** Is this error (raw, or already worded by modelErrorText) a provider safety

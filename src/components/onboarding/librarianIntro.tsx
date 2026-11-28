@@ -3,6 +3,7 @@
 
 import { useRef } from "react";
 
+import { productName } from "../../host/registry";
 import { containDialogFocus } from "../../lib/dialogFocus";
 import { useTransientPopover } from "../../lib/popover";
 import { useDialogFocus } from "../webDialogFrame";
@@ -60,8 +61,8 @@ export function LibrarianIntro({
             place them in a Library area.
           </li>
           <li>
-            <strong>Library areas are ordinary folders</strong> under <code>wiki/</code>. The Markdown files
-            remain readable and editable without Rotli.
+            <strong>Library areas are ordinary folders</strong> under <code>wiki/</code>
+            {`. The Markdown files remain readable and editable without ${productName()}.`}
           </li>
           <li>
             <strong>Main and named views are references</strong> stored in <code>.rotli/</code>, never extra
@@ -74,9 +75,7 @@ export function LibrarianIntro({
         </ul>
         <h4>Why this structure</h4>
         <p>
-          One durable file has one physical home. Views can change freely around it, and the journal can
-          reverse the Librarian&rsquo;s moves without reconciling duplicate content. That keeps the vault
-          portable, inspectable, and useful when Rotli is closed.
+          {`One durable file has one physical home. Views can change freely around it, and the journal can reverse the Librarian’s moves without reconciling duplicate content. That keeps the vault portable, inspectable, and useful when ${productName()} is closed.`}
         </p>
         <p className="lib-intro-trust">
           <strong>How much may it do?</strong> That&rsquo;s the ladder in Settings → Librarian:

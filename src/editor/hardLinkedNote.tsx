@@ -3,13 +3,13 @@
 // the same calm notice as the sidebar's, in place of the note, never its
 // cached text. Nothing to dismiss: it goes when the file has one name again.
 
-import { INDEPENDENT_COPY, OPEN_NOTE_HARD_LINKED } from "../lib/hardLinks";
+import { independentCopy, OPEN_NOTE_HARD_LINKED } from "../lib/hardLinks";
 
 export function HardLinkedNote() {
   return (
     <section className="hard-linked-note" aria-label="Note not opened">
       <p className="hard-linked-note-text">{OPEN_NOTE_HARD_LINKED}</p>
-      <p className="hard-linked-note-help">{INDEPENDENT_COPY}</p>
+      <p className="hard-linked-note-help">{independentCopy()}</p>
     </section>
   );
 }

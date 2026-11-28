@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { productName } from "../host/registry";
 import { onQuitFlush } from "../lib/quitFlush";
 import { type CanvasFileIo, canvasFileIo } from "../services/canvasFiles";
 import { type CanvasSaver, createCanvasSaver } from "./canvasSaver";
@@ -25,12 +26,14 @@ export const CANVAS_MAX_BYTES = 8_000_000;
 /** Why a canvas file didn't open — one wording, shared with the tests. */
 export const CANVAS_LOAD_REFUSAL = {
   notHere: "Canvases need a vault folder — connect one to open this canvas.",
-  unsaved:
-    "Your last changes to this canvas haven’t saved yet, so it won’t open over them. Rotli tries again when you reopen it and when you quit.",
+  get unsaved() {
+    return `Your last changes to this canvas haven’t saved yet, so it won’t open over them. ${productName()} tries again when you reopen it and when you quit.`;
+  },
   gone: "This canvas isn’t in the vault anymore.",
   tooLarge: "This canvas is too large to open.",
-  notText:
-    "This canvas isn’t UTF-8 text, so Rotli won’t open it — saving would change bytes you didn’t edit.",
+  get notText() {
+    return `This canvas isn’t UTF-8 text, so ${productName()} won’t open it — saving would change bytes you didn’t edit.`;
+  },
 } as const;
 
 /** Strict UTF-8: a byte that isn't UTF-8 refuses the file instead of becoming

@@ -99,13 +99,13 @@ impl SearchFailure {
                 "{provider} returned a bot/challenge page instead of search results. Its free endpoint availability can vary; try again later or choose another provider in Settings."
             ),
             FailureKind::Incompatible => format!(
-                "{provider} returned a response Rotli could not read. The provider may have changed its page format; try again later or choose another provider in Settings."
+                "{provider} returned a response {app} could not read. The provider may have changed its page format; try again later or choose another provider in Settings.", app = crate::app_identity::app_name()
             ),
             FailureKind::Malformed => format!(
                 "{provider} returned a malformed search response. Try again later or choose another provider in Settings."
             ),
             FailureKind::ResponseTooLarge => format!(
-                "{provider} returned an unexpectedly large response, so Rotli stopped reading it. Try a narrower query."
+                "{provider} returned an unexpectedly large response, so {app} stopped reading it. Try a narrower query.", app = crate::app_identity::app_name()
             ),
         }
     }

@@ -11,6 +11,7 @@
 
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 
+import { productName } from "../../host/registry";
 import { type ThemeFamily, useUiStore } from "../../state/ui";
 import { Character } from "../character";
 import { cloud } from "../sceneParts";
@@ -223,7 +224,7 @@ export function SceneIntro({
           </span>
         )}
       </div>
-      <p className="onb-intro-word">Rotli</p>
+      <p className="onb-intro-word">{productName()}</p>
     </div>
   );
 }

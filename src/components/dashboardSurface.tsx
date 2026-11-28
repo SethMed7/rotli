@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
+import { productName } from "../host/registry";
 import { relativeLabel } from "../lib/dateLabels";
 import { type ModelUsageRange, type ModelUsageSummary, isTauri, modelUsage } from "../lib/tauri";
 import { useNow } from "../lib/useNow";
@@ -88,8 +89,8 @@ function RotliActivity() {
 
   return (
     <>
-      <section className="dashboard-usage-toolbar rotli" aria-label="Rotli activity controls">
-        <div className="dashboard-range" role="group" aria-label="Rotli activity range">
+      <section className="dashboard-usage-toolbar rotli" aria-label={`${productName()} activity controls`}>
+        <div className="dashboard-range" role="group" aria-label={`${productName()} activity range`}>
           {RANGE_OPTIONS.map((option) => (
             <button
               key={option.id}
@@ -104,7 +105,7 @@ function RotliActivity() {
         </div>
       </section>
 
-      <section className="dashboard-metric-strip" aria-label="Rotli activity totals">
+      <section className="dashboard-metric-strip" aria-label={`${productName()} activity totals`}>
         <div>
           <span>Notes in this vault</span>
           <strong>{snapshot.notes.total}</strong>
@@ -123,11 +124,11 @@ function RotliActivity() {
         </div>
       </section>
 
-      <section className="dashboard-grid" aria-label="Rotli recents">
+      <section className="dashboard-grid" aria-label={`${productName()} recents`}>
         <article className="dashboard-panel">
           <div className="dashboard-panel-head">
             <div>
-              <span>Rotli activity</span>
+              <span>{`${productName()} activity`}</span>
               <strong>Recent notes</strong>
             </div>
             <small>Saved files</small>
@@ -155,7 +156,7 @@ function RotliActivity() {
         <article className="dashboard-panel">
           <div className="dashboard-panel-head">
             <div>
-              <span>Rotli activity</span>
+              <span>{`${productName()} activity`}</span>
               <strong>Recent chats</strong>
             </div>
             <small>Vault files</small>
@@ -190,8 +191,7 @@ function RotliActivity() {
       <section className="dashboard-provenance" aria-label="Writing provenance">
         <strong>Writing provenance</strong>
         <span>
-          Human-versus-AI word totals stay hidden until Rotli can derive them from durable edit provenance.
-          The current file alone cannot support an honest split.
+          {`Human-versus-AI word totals stay hidden until ${productName()} can derive them from durable edit provenance. The current file alone cannot support an honest split.`}
         </span>
       </section>
     </>
@@ -280,7 +280,7 @@ function ModelUsageDashboard() {
           <span>
             {browserOnly
               ? "The browser twin never scans provider histories on this computer. Open the Tauri app to view local aggregates."
-              : "Rotli found no Claude Code or Codex token records in the selected time window."}
+              : `${productName()} found no Claude Code or Codex token records in the selected time window.`}
           </span>
         </section>
       ) : (
@@ -404,11 +404,7 @@ function ModelUsageDashboard() {
       <section className="dashboard-provenance model" aria-label="Model usage provenance">
         <strong>Local model telemetry</strong>
         <span>
-          Rotli reads token counters from provider-owned local session histories and returns aggregates only.
-          Dollar values are estimated API-equivalent costs from a price snapshot checked August 12, 2026—not
-          subscription billing or an invoice. Estimates assume standard context and default cache-write rates;
-          unknown model IDs stay unpriced. No prompt, response, project path, file name, or session identifier
-          is sent to the webview.
+          {`${productName()} reads token counters from provider-owned local session histories and returns aggregates only. Dollar values are estimated API-equivalent costs from a price snapshot checked August 12, 2026—not subscription billing or an invoice. Estimates assume standard context and default cache-write rates; unknown model IDs stay unpriced. No prompt, response, project path, file name, or session identifier is sent to the webview.`}
         </span>
       </section>
     </>
@@ -422,8 +418,8 @@ export function DashboardSurface() {
     <main className={`dashboard-surface ${section}`}>
       <header className="dashboard-head">
         <div>
-          <p>{section === "rotli" ? "Rotli activity" : "Provider activity"}</p>
-          <h1>{section === "rotli" ? "Your vault in Rotli" : "Model usage on this Mac"}</h1>
+          <p>{section === "rotli" ? `${productName()} activity` : "Provider activity"}</p>
+          <h1>{section === "rotli" ? `Your vault in ${productName()}` : "Model usage on this Mac"}</h1>
         </div>
         <span>
           {section === "rotli"
@@ -439,7 +435,7 @@ export function DashboardSurface() {
           aria-current={section === "rotli" ? "page" : undefined}
           onClick={() => setSection("rotli")}
         >
-          <strong>Rotli activity</strong>
+          <strong>{`${productName()} activity`}</strong>
           <span>Vault notes and chats</span>
         </button>
         <button

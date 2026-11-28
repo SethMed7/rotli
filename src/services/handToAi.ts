@@ -14,6 +14,7 @@ import type { Host } from "../ai/types";
 import { resolveWikiEmbed } from "../editor/fileEmbeds";
 import { flushNote } from "../editor/model";
 import { savedVersionMismatch } from "../editor/savedVersion";
+import { productName } from "../host/registry";
 import { type AttachmentLink, type AttachmentPlace, attachmentLinks } from "../lib/handToAi";
 import { secureByName } from "../lib/librarianRules";
 import type { ApprovedText } from "../lib/promptText";
@@ -220,7 +221,7 @@ export async function handToAiFor(
   // a save may be out: wait for it (a failed save throws its own words)
   await flushNote(noteId);
   const note = await notesService.getNote(noteId);
-  if (!note) throw new Error("Rotli couldn’t find this note.");
+  if (!note) throw new Error(`${productName()} couldn’t find this note.`);
   const shown = note.title || "Untitled";
   if (await isSecure(note)) return { kind: "secure", title: shown };
   if (looksSecret(note.body)) return { kind: "secret", title: shown };

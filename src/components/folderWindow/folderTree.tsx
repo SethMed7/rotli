@@ -4,6 +4,7 @@
 
 import { type CSSProperties, useState } from "react";
 
+import { productName } from "../../host/registry";
 import type { FolderListing } from "../../services/folderWindow";
 import { usePanesStore } from "../../state/panes";
 import type { NoteSummary } from "../../types";
@@ -40,7 +41,9 @@ export function FolderTree({ root, listing }: { root: string; listing: Listing }
     );
   const tree = folderTree(root, listing.data.folders, listing.data.notes);
   if (tree.folders.length === 0 && tree.items.length === 0)
-    return <p className="folder-window-status">Nothing here Rotli opens yet: no notes, boards, or files.</p>;
+    return (
+      <p className="folder-window-status">{`Nothing here ${productName()} opens yet: no notes, boards, or files.`}</p>
+    );
 
   const branch = (node: FolderBranch, depth: number) => (
     <>
